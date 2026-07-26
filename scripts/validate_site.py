@@ -115,17 +115,17 @@ def _normalize_public_path(
     raw_path: str,
     base_path: str,
 ) -> tuple[str, bool]:
-    decoded_path = _decode_url_component(raw_path)
     source_route = _site_route(source_relative_path, base_path)
-    if not decoded_path:
+    if not raw_path:
         return source_route, source_route.endswith("/")
 
-    requested_directory = decoded_path.endswith("/")
-    if decoded_path.startswith("/"):
-        joined = decoded_path
+    if raw_path.startswith("/"):
+        joined = raw_path
     else:
-        joined = urlsplit(urljoin(source_route, decoded_path)).path
-    normalized = posixpath.normpath(joined)
+        joined = urlsplit(urljoin(source_route, raw_path)).path
+    decoded_path = _decode_url_component(joined)
+    requested_directory = decoded_path.endswith("/")
+    normalized = posixpath.normpath(decoded_path)
     if not normalized.startswith("/"):
         normalized = f"/{normalized}"
     if requested_directory and normalized != "/":

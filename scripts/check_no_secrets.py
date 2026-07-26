@@ -22,8 +22,20 @@ _ASSIGNMENT_PATTERN = re.compile(
 )
 _BEARER_PATTERN = re.compile(
     r"""(?ix)
-    \bAuthorization\s*:\s*Bearer\s+
-    (?P<value>"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;`]+)
+    (?:
+        (?P<header_quote>["'])Authorization(?P=header_quote)
+        |
+        \bAuthorization\b
+    )
+    \s*:\s*
+    (?:
+        (?P<container_quote>["'])Bearer\s+
+        (?P<contained_value>[^"'\r\n]+?)
+        (?P=container_quote)
+        |
+        Bearer\s+
+        (?P<value>"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;`]+)
+    )
     """
 )
 _PATTERNS = (
@@ -109,6 +121,7 @@ def _is_placeholder(path: str, value: str) -> bool:
         or normalized
         in {
             "changeme",
+            "client-default-token",
             "dummy",
             "example",
             "example-token",
@@ -142,7 +155,10 @@ def scan_repository(repository: Path) -> list[Finding]:
         for line_number, line in enumerate(text.splitlines(), start=1):
             for rule, pattern in _PATTERNS:
                 for match in pattern.finditer(line):
-                    if not _is_placeholder(display_path, match.group("value")):
+                    value = match.groupdict().get("value") or match.groupdict().get(
+                        "contained_value"
+                    )
+                    if value is not None and not _is_placeholder(display_path, value):
                         findings.append(Finding(display_path, line_number, rule))
     return sorted(set(findings))
 

@@ -60,6 +60,51 @@ def test_scan_reports_tracked_credentials_with_path_and_line_only(tmp_path: Path
     assert "real-value" not in rendered
 
 
+@pytest.mark.parametrize(
+    "authorization_line",
+    [
+        '"Author' + 'ization": "Bearer live-json-secret"',
+        "Author" + 'ization: "Bearer live-yaml-secret"',
+        "'Author" + "ization': 'Bearer live-python-secret'",
+        "Author" + "ization: Bearer live-plain-secret",
+        "Author" + "ization: Bearer 'live-quoted-secret'",
+        "aUtHoR" + 'iZaTiOn : "bEaReR live-mixed-secret"',
+    ],
+)
+def test_scan_detects_quoted_and_unquoted_bearer_header_forms(
+    tmp_path: Path,
+    authorization_line: str,
+) -> None:
+    repository = _tracked_repository(tmp_path, {"headers.txt": authorization_line})
+
+    findings = scan_repository(repository)
+
+    assert [(finding.path, finding.line_number, finding.rule) for finding in findings] == [
+        ("headers.txt", 1, "bearer credential")
+    ]
+    rendered = findings[0].render()
+    assert "headers.txt:1:" in rendered
+    assert "live-" not in rendered
+
+
+@pytest.mark.parametrize(
+    "authorization_line",
+    [
+        "Author" + "ization: Bearer ${GITHUB_TOKEN}",
+        '"Author' + 'ization": "Bearer ${GITHUB_TOKEN}"',
+        "'Author" + "ization': 'Bearer ${GITHUB_TOKEN}'",
+        '"Author' + 'ization": "Bearer client-default-token"',
+    ],
+)
+def test_scan_accepts_bearer_placeholders_in_all_supported_header_forms(
+    tmp_path: Path,
+    authorization_line: str,
+) -> None:
+    repository = _tracked_repository(tmp_path, {".env.example": authorization_line})
+
+    assert scan_repository(repository) == []
+
+
 def test_scan_ignores_placeholders_untracked_files_and_binary_data(tmp_path: Path) -> None:
     untracked_secret = "ANTHROPIC_AUTH_" + "TOKEN=real-value"
     binary_secret = b"\x00ANTHROPIC_AUTH_" + b"TOKEN=real-value"

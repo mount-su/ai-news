@@ -60,6 +60,26 @@ def test_valid_site_handles_queries_fragments_directory_indexes_and_percent_enco
     assert validate_site(dist, BASE_PATH) == []
 
 
+def test_relative_percent_encoded_query_and_fragment_delimiters_remain_path_data(
+    tmp_path: Path,
+) -> None:
+    dist = _write_site(
+        tmp_path / "dist",
+        {
+            "index.html": _page(
+                """
+                <a href="pages/name%3Fpart/">question mark path</a>
+                <a href="pages/name%23part/">hash path</a>
+                """
+            ),
+            "pages/name?part/index.html": _page("<p>Question mark</p>"),
+            "pages/name#part/index.html": _page("<p>Hash</p>"),
+        },
+    )
+
+    assert validate_site(dist, BASE_PATH) == []
+
+
 @pytest.mark.parametrize(
     ("files", "expected_code"),
     [
