@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -122,6 +123,51 @@ def test_parse_github_releases_limits_excerpt_to_4000_characters() -> None:
     assert "<" not in items[0].excerpt
     assert "  " not in items[0].excerpt
     assert len(items[0].excerpt) == 4000
+
+
+def test_parse_github_releases_decodes_entities_before_stripping_html_without_tag_residue() -> None:
+    release = {
+        "name": "Entity safety",
+        "tag_name": "v1",
+        "body": ("&lt;em&gt;single&lt;/em&gt; &amp;lt;em&amp;gt;double&amp;lt;/em&amp;gt; &amp;"),
+        "draft": False,
+        "prerelease": False,
+        "published_at": "2026-07-25T10:00:00Z",
+        "html_url": "https://github.com/example/project/releases/tag/v1",
+    }
+
+    items = parse_github_releases(json.dumps([release]).encode(), _source())
+
+    assert len(items) == 1
+    assert items[0].excerpt == "single double &"
+    assert "<em>" not in items[0].excerpt
+    assert "<em>" not in html.unescape(items[0].excerpt)
+
+
+def test_parse_github_releases_skips_incomplete_or_naive_timestamps_and_keeps_valid_item() -> None:
+    def release(title: str, published_at: str) -> dict[str, object]:
+        return {
+            "name": title,
+            "tag_name": "v1",
+            "body": "",
+            "draft": False,
+            "prerelease": False,
+            "published_at": published_at,
+            "html_url": f"https://github.com/example/project/releases/tag/{title}",
+        }
+
+    payload = json.dumps(
+        [
+            release("time-only", "10:00Z"),
+            release("date-only", "2026-07-25"),
+            release("no-timezone", "2026-07-25T10:00:00"),
+            release("complete-timestamp", "2026-07-25T10:00:00Z"),
+        ]
+    ).encode()
+
+    items = parse_github_releases(payload, _source())
+
+    assert [item.title for item in items] == ["complete-timestamp"]
 
 
 def test_parse_github_releases_rejects_invalid_json_without_exposing_payload() -> None:

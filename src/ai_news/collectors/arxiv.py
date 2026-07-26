@@ -8,15 +8,20 @@ from urllib.parse import urlsplit
 import bleach
 import feedparser
 import httpx
-from dateutil.parser import parse as parse_datetime
+from dateutil.parser import isoparse
 from pydantic import ValidationError
 
 from ai_news.http import get_bytes
 from ai_news.models import RawItem, SourceSpec
 
 _RAW_HTML_BLOCK = re.compile(r"<(?:script|style)\b[^>]*>.*?</(?:script|style)>", re.I | re.S)
+_ISO_DATETIME = re.compile(
+    r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}"
+    r"(?::\d{2}(?:[.,]\d+)?)?(?:[Zz]|[+-]\d{2}(?::?\d{2})?)$"
+)
 _WHITESPACE = re.compile(r"\s+")
 _MAX_EXCERPT_LENGTH = 4_000
+_MAX_SANITIZE_INPUT_LENGTH = _MAX_EXCERPT_LENGTH * 16
 
 
 def _require_arxiv_source(source: SourceSpec) -> str:
@@ -30,8 +35,15 @@ def _require_arxiv_source(source: SourceSpec) -> str:
 def _clean_html(value: object) -> str:
     if not isinstance(value, str):
         return ""
-    without_raw_blocks = _RAW_HTML_BLOCK.sub("", value)
-    plain_text = html.unescape(bleach.clean(without_raw_blocks, tags=[], strip=True))
+    decoded = value[:_MAX_SANITIZE_INPUT_LENGTH]
+    for _ in range(3):
+        next_decoded = html.unescape(decoded)
+        if next_decoded == decoded:
+            break
+        decoded = next_decoded
+    without_raw_blocks = _RAW_HTML_BLOCK.sub("", decoded)
+    plain_text = bleach.clean(without_raw_blocks, tags=[], strip=True)
+    plain_text = plain_text.replace("&amp;", "&")
     return _WHITESPACE.sub(" ", plain_text).strip()
 
 
@@ -49,10 +61,13 @@ def _https_url(value: object) -> str | None:
 
 
 def _published_at(value: object) -> datetime | None:
-    if not isinstance(value, str) or not value.strip():
+    if not isinstance(value, str):
+        return None
+    timestamp = value.strip()
+    if not _ISO_DATETIME.fullmatch(timestamp):
         return None
     try:
-        published_at = parse_datetime(value)
+        published_at = isoparse(timestamp)
     except (OverflowError, TypeError, ValueError):
         return None
     if published_at.tzinfo is None or published_at.utcoffset() is None:

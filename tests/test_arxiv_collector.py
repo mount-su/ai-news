@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -100,6 +101,46 @@ def test_parse_arxiv_limits_clean_excerpt_to_4000_characters() -> None:
     assert "<" not in items[0].excerpt
     assert "  " not in items[0].excerpt
     assert len(items[0].excerpt) == 4000
+
+
+def test_parse_arxiv_decodes_entities_before_stripping_html_without_tag_residue() -> None:
+    payload = b"""\
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <title>Entity safety</title>
+    <link href="https://arxiv.org/abs/2607.00002" />
+    <published>2026-07-25T10:00:00Z</published>
+    <summary type="html">&lt;em&gt;single&lt;/em&gt;
+      &amp;lt;em&amp;gt;double&amp;lt;/em&amp;gt; &amp;</summary>
+  </entry>
+</feed>
+"""
+
+    items = parse_arxiv(payload, _source())
+
+    assert len(items) == 1
+    assert items[0].excerpt == "single double &"
+    assert "<em>" not in items[0].excerpt
+    assert "<em>" not in html.unescape(items[0].excerpt)
+
+
+def test_parse_arxiv_skips_incomplete_or_naive_timestamps_and_keeps_valid_item() -> None:
+    payload = b"""\
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry><title>Time only</title><link href="https://arxiv.org/abs/1" />
+    <published>10:00Z</published></entry>
+  <entry><title>Date only</title><link href="https://arxiv.org/abs/2" />
+    <published>2026-07-25</published></entry>
+  <entry><title>No timezone</title><link href="https://arxiv.org/abs/3" />
+    <published>2026-07-25T10:00:00</published></entry>
+  <entry><title>Complete timestamp</title><link href="https://arxiv.org/abs/4" />
+    <published>2026-07-25T10:00:00Z</published></entry>
+</feed>
+"""
+
+    items = parse_arxiv(payload, _source())
+
+    assert [item.title for item in items] == ["Complete timestamp"]
 
 
 @pytest.mark.parametrize("payload", [b"", b"not XML", b"<feed><entry>"])
