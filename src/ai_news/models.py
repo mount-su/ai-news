@@ -1,10 +1,24 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from enum import StrEnum
 from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, Field, HttpUrl, SecretStr, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    SecretStr,
+    TypeAdapter,
+    field_validator,
+    model_validator,
+)
+
+_HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
+_GITHUB_REPO_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
 class Category(StrEnum):
@@ -17,6 +31,8 @@ class Category(StrEnum):
 
 
 class SourceSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]+$")
     name: str
     kind: Literal["feed", "arxiv", "github"]
@@ -31,13 +47,27 @@ class SourceSpec(BaseModel):
     def require_source_locator(self) -> SourceSpec:
         if self.kind in {"feed", "arxiv"} and self.url is None:
             raise ValueError(f"{self.kind} sources require a url")
-        if self.kind == "github" and self.repo is None:
-            raise ValueError("github sources require a repo")
+        if self.kind == "github":
+            if self.repo is None:
+                raise ValueError("github sources require a repo")
+            repo = self.repo.strip()
+            if not _GITHUB_REPO_PATTERN.fullmatch(repo):
+                raise ValueError("github repo must use owner/repo format")
+            self.repo = repo
         return self
 
 
 class SourceConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     sources: list[SourceSpec] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def require_unique_source_ids(self) -> SourceConfig:
+        source_ids = [source.id for source in self.sources]
+        if len(source_ids) != len(set(source_ids)):
+            raise ValueError("source ids must be unique")
+        return self
 
 
 class Settings(BaseModel):
@@ -46,6 +76,32 @@ class Settings(BaseModel):
     llm_model: str
     llm_auth_scheme: Literal["bearer", "x-api-key"] = "bearer"
     site_base_path: str = "/ai-news/"
+
+    @field_validator("llm_base_url", "llm_model", mode="before")
+    @classmethod
+    def strip_required_text(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                raise ValueError("value must not be empty")
+        return value
+
+    @field_validator("llm_base_url")
+    @classmethod
+    def require_https_base_url(cls, value: str) -> str:
+        parsed_url = _HTTP_URL_ADAPTER.validate_python(value)
+        original_url = urlsplit(value)
+        if parsed_url.scheme != "https" or original_url.hostname is None:
+            raise ValueError("llm_base_url must use https")
+        return value
+
+    @field_validator("llm_token")
+    @classmethod
+    def strip_and_require_token(cls, value: SecretStr) -> SecretStr:
+        secret_value = value.get_secret_value().strip()
+        if not secret_value:
+            raise ValueError("llm_token must not be empty")
+        return SecretStr(secret_value)
 
     @field_validator("site_base_path")
     @classmethod
