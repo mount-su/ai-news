@@ -6,7 +6,12 @@ from collections.abc import AsyncIterator
 import httpx
 import pytest
 
-from ai_news.http import HttpFetchError, get_bytes
+from ai_news.http import (
+    HttpFetchError,
+    HttpStatusFetchError,
+    HttpTransportFetchError,
+    get_bytes,
+)
 
 
 class RecordingStream(httpx.AsyncByteStream):
@@ -98,7 +103,7 @@ def test_retryable_status_stops_after_configured_attempts() -> None:
 
     async def exercise() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            with pytest.raises(httpx.HTTPStatusError):
+            with pytest.raises(HttpFetchError):
                 await get_bytes(
                     client,
                     "https://example.com/feed.xml",
@@ -122,8 +127,10 @@ def test_other_client_errors_are_not_retried(status: int) -> None:
 
     async def exercise() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            with pytest.raises(httpx.HTTPStatusError):
-                await get_bytes(client, "https://example.com/feed.xml")
+            with pytest.raises(HttpFetchError) as exc_info:
+                await get_bytes(client, "https://example.com/feed.xml?private=query")
+        assert exc_info.value.status_code == status
+        assert exc_info.value.safe_url == "https://example.com/feed.xml"
 
     asyncio.run(exercise())
     assert request_count == 1
@@ -166,7 +173,7 @@ def test_content_length_over_limit_is_rejected_before_stream_read() -> None:
 
     async def exercise() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            with pytest.raises(ValueError, match="^response exceeds byte limit$"):
+            with pytest.raises(HttpFetchError, match="^response exceeds byte limit$"):
                 await get_bytes(client, "https://example.com/feed.xml", max_bytes=100)
 
     asyncio.run(exercise())
@@ -181,7 +188,7 @@ def test_unknown_content_length_is_strictly_bounded_while_streaming() -> None:
 
     async def exercise() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            with pytest.raises(ValueError, match="^response exceeds byte limit$"):
+            with pytest.raises(HttpFetchError, match="^response exceeds byte limit$"):
                 await get_bytes(client, "https://example.com/feed.xml", max_bytes=7)
 
     asyncio.run(exercise())
@@ -250,7 +257,7 @@ def test_cross_origin_redirect_is_rejected_before_credentials_leave_origin() -> 
 
     async def exercise() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            with pytest.raises(ValueError, match="origin"):
+            with pytest.raises(HttpFetchError, match="origin"):
                 await get_bytes(
                     client,
                     "https://source.example/start",
@@ -274,7 +281,7 @@ def test_redirect_cannot_change_from_explicit_zero_port_to_default_https_port() 
 
     async def exercise() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            with pytest.raises(ValueError, match="origin"):
+            with pytest.raises(HttpFetchError, match="origin"):
                 await get_bytes(client, "https://example.com:0/start")
 
     asyncio.run(exercise())
@@ -294,7 +301,7 @@ def test_redirect_to_non_https_is_rejected_before_insecure_request() -> None:
 
     async def exercise() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            with pytest.raises(ValueError, match="https"):
+            with pytest.raises(HttpFetchError, match="https"):
                 await get_bytes(client, "https://example.com/start")
 
     asyncio.run(exercise())
@@ -317,7 +324,7 @@ def test_redirect_target_requires_host_and_forbids_userinfo(location: str) -> No
 
     async def exercise() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            with pytest.raises(ValueError, match="redirect"):
+            with pytest.raises(HttpFetchError, match="redirect"):
                 await get_bytes(client, "https://example.com/start")
 
     asyncio.run(exercise())
@@ -334,7 +341,7 @@ def test_redirect_loop_is_rejected_before_revisiting_a_url() -> None:
 
     async def exercise() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            with pytest.raises(ValueError, match="redirect"):
+            with pytest.raises(HttpFetchError, match="redirect"):
                 await get_bytes(client, "https://example.com/start")
 
     asyncio.run(exercise())
@@ -355,7 +362,7 @@ def test_more_than_five_redirects_is_rejected_before_sixth_hop() -> None:
 
     async def exercise() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            with pytest.raises(ValueError, match="redirect"):
+            with pytest.raises(HttpFetchError, match="redirect"):
                 await get_bytes(client, "https://example.com/0")
 
     asyncio.run(exercise())
@@ -392,7 +399,7 @@ def test_authorization_header_value_is_not_exposed_in_errors() -> None:
 
     async def exercise() -> str:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            with pytest.raises(httpx.HTTPStatusError) as exc_info:
+            with pytest.raises(HttpFetchError) as exc_info:
                 await get_bytes(
                     client,
                     "https://example.com/feed.xml",
@@ -408,6 +415,7 @@ def test_final_http_failures_do_not_retain_sensitive_request_state(failure_kind:
     authorization = "authorization-secret"
     api_key = "api-key-secret"
     query_secret = "query-secret"
+    userinfo_secret = "userinfo-secret"
 
     def handler(request: httpx.Request) -> httpx.Response:
         if failure_kind == "status":
@@ -432,7 +440,7 @@ def test_final_http_failures_do_not_retain_sensitive_request_state(failure_kind:
             try:
                 await get_bytes(
                     client,
-                    f"https://example.com/feed.xml?token={query_secret}",
+                    f"https://url-user:{userinfo_secret}@example.com/feed.xml?token={query_secret}",
                     headers={
                         "Authorization": f"Bearer {authorization}",
                         "X-API-Key": api_key,
@@ -446,13 +454,27 @@ def test_final_http_failures_do_not_retain_sensitive_request_state(failure_kind:
 
     error = asyncio.run(exercise())
     assert isinstance(error, HttpFetchError)
-    assert error.url == "https://example.com/feed.xml"
+    assert not isinstance(error, httpx.HTTPStatusError | httpx.TransportError | ValueError)
+    expected_type = {
+        "status": HttpStatusFetchError,
+        "transport": HttpTransportFetchError,
+        "redirect": HttpFetchError,
+        "oversize": HttpFetchError,
+    }[failure_kind]
+    assert type(error) is expected_type
+    expected_state: dict[str, int | str] = {"safe_url": "https://example.com/feed.xml"}
+    if failure_kind == "status":
+        expected_state["status_code"] = 401
+    assert vars(error) == expected_state
+    assert "?" not in error.safe_url
+    assert "@" not in error.safe_url
     _assert_exception_has_no_sensitive_state(
         error,
         {
             authorization,
             api_key,
             query_secret,
+            userinfo_secret,
             "Authorization",
             "X-API-Key",
         },

@@ -11,22 +11,20 @@ _RESPONSE_TOO_LARGE = "response exceeds byte limit"
 
 
 class HttpFetchError(Exception):
-    def __init__(self, message: str, *, status: int | None = None, url: str | None = None) -> None:
-        Exception.__init__(self, message)
-        self.status = status
-        self.url = url
+    def __init__(self, message: str, *, safe_url: str) -> None:
+        super().__init__(message)
+        self.safe_url = safe_url
 
 
-class _HttpStatusFetchError(HttpFetchError, httpx.HTTPStatusError):
-    pass
+class HttpStatusFetchError(HttpFetchError):
+    def __init__(self, *, status_code: int, safe_url: str) -> None:
+        super().__init__(f"HTTP request failed with status {status_code}", safe_url=safe_url)
+        self.status_code = status_code
 
 
-class _HttpTransportFetchError(HttpFetchError, httpx.TransportError):
-    pass
-
-
-class _HttpBoundaryFetchError(HttpFetchError, ValueError):
-    pass
+class HttpTransportFetchError(HttpFetchError):
+    def __init__(self, *, safe_url: str) -> None:
+        super().__init__("HTTP transport failed", safe_url=safe_url)
 
 
 def _require_https(url: httpx.URL) -> None:
@@ -57,14 +55,14 @@ async def _read_bounded(response: httpx.Response, max_bytes: int, url: httpx.URL
         except ValueError:
             declared_length = None
         if declared_length is not None and declared_length > max_bytes:
-            raise _HttpBoundaryFetchError(_RESPONSE_TOO_LARGE, url=_safe_url(url))
+            raise HttpFetchError(_RESPONSE_TOO_LARGE, safe_url=_safe_url(url))
 
     chunks: list[bytes] = []
     size = 0
     async for chunk in response.aiter_bytes():
         size += len(chunk)
         if size > max_bytes:
-            raise _HttpBoundaryFetchError(_RESPONSE_TOO_LARGE, url=_safe_url(url))
+            raise HttpFetchError(_RESPONSE_TOO_LARGE, safe_url=_safe_url(url))
         chunks.append(chunk)
     return b"".join(chunks)
 
@@ -84,35 +82,35 @@ def _redirect_url(
         invalid_target = True
 
     if invalid_target:
-        raise _HttpBoundaryFetchError(
+        raise HttpFetchError(
             "invalid redirect target",
-            url=_safe_url(current_url),
+            safe_url=_safe_url(current_url),
         ) from None
 
     if raw_target.userinfo or (raw_target.scheme and not raw_target.host):
-        raise _HttpBoundaryFetchError(
+        raise HttpFetchError(
             "invalid redirect target",
-            url=_safe_url(current_url),
+            safe_url=_safe_url(current_url),
         )
     if target.scheme != "https" or not target.host or target.userinfo:
-        raise _HttpBoundaryFetchError(
+        raise HttpFetchError(
             "redirect target must use https",
-            url=_safe_url(current_url),
+            safe_url=_safe_url(current_url),
         )
     if _origin(target) != initial_origin:
-        raise _HttpBoundaryFetchError(
+        raise HttpFetchError(
             "redirect must preserve origin",
-            url=_safe_url(current_url),
+            safe_url=_safe_url(current_url),
         )
     if target in visited_urls:
-        raise _HttpBoundaryFetchError(
+        raise HttpFetchError(
             "redirect loop detected",
-            url=_safe_url(current_url),
+            safe_url=_safe_url(current_url),
         )
     if redirect_count == _MAX_REDIRECTS:
-        raise _HttpBoundaryFetchError(
+        raise HttpFetchError(
             "redirect limit exceeded",
-            url=_safe_url(current_url),
+            safe_url=_safe_url(current_url),
         )
     return target
 
@@ -144,10 +142,9 @@ async def _request_once(
                     redirect_count,
                 )
             elif response.is_error:
-                raise _HttpStatusFetchError(
-                    f"HTTP request failed with status {response.status_code}",
-                    status=response.status_code,
-                    url=_safe_url(current_url),
+                raise HttpStatusFetchError(
+                    status_code=response.status_code,
+                    safe_url=_safe_url(current_url),
                 )
             else:
                 return await _read_bounded(response, max_bytes, current_url)
@@ -180,8 +177,8 @@ async def get_bytes(
     for retry_number in range(attempts + 1):
         try:
             return await _request_once(client, parsed_url, request_headers, max_bytes)
-        except _HttpStatusFetchError as error:
-            status = error.status
+        except HttpStatusFetchError as error:
+            status = error.status_code
             if status != 429 and not 500 <= status <= 599:
                 raise
             if retry_number == attempts:
@@ -194,8 +191,5 @@ async def get_bytes(
         await sleep(2**retry_number)
 
     if transport_failed:
-        raise _HttpTransportFetchError(
-            "HTTP transport failed",
-            url=_safe_url(parsed_url),
-        ) from None
+        raise HttpTransportFetchError(safe_url=_safe_url(parsed_url)) from None
     raise RuntimeError("unreachable")
