@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block main %}
+  <main id="main-content" class="page-shell">
+    <section class="edition-heading" aria-labelledby="archive-title">
+      <p class="eyebrow">INTELLIGENCE ARCHIVE</p>
+      <h1 id="archive-title">日期归档</h1>
+      <p>按日期倒序查阅每一期完整情报记录。</p>
+    </section>
+    <section class="archive-ledger" aria-labelledby="ledger-title">
+      <div class="section-heading">
+        <p>DAILY LEDGER</p>
+        <h2 id="ledger-title">全部日期</h2>
+      </div>
+      <ol>
+        {% for report in reports %}
+          <li>
+            <article>
+              <a href="{{ page_url('days/' ~ report.date) }}">
+                <time datetime="{{ report.date }}">{{ report.date }}</time>
+                <span>{{ report.included_count }} 条收录</span>
+                <span>{{ report.candidate_count }} 条候选</span>
+                <strong>打开档案 <span aria-hidden="true">→</span></strong>
+              </a>
+            </article>
+          </li>
+        {% endfor %}
+      </ol>
+    </section>
+  </main>
+{% endblock %}

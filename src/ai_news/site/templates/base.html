@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#07111f">
+    <title>{{ page_title }}｜{{ site_name }}</title>
+    <link rel="stylesheet" href="{{ asset_url('styles.css') }}">
+    <script src="{{ asset_url('app.js') }}" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+    <header class="masthead">
+      <div class="masthead__inner">
+        <a class="brand" href="{{ page_url() }}" aria-label="{{ site_name }}首页">
+          <span class="brand__index" aria-hidden="true">AIR / 01</span>
+          <span class="brand__name">{{ site_name }}</span>
+        </a>
+        <p class="last-run">
+          <span>最后成功生成</span>
+          <time datetime="{{ latest_report.generated_at.isoformat() }}">
+            {{ latest_report.generated_at|beijing_datetime }}
+          </time>
+        </p>
+      </div>
+      <nav class="primary-nav" aria-label="主要导航">
+        <div class="primary-nav__inner">
+          <a href="{{ page_url() }}">首页</a>
+          {% for category in categories %}
+            <a href="{{ page_url('categories/' ~ category.slug) }}">{{ category.name }}</a>
+          {% endfor %}
+          <a href="{{ page_url('archive') }}">归档</a>
+        </div>
+      </nav>
+      <section class="status-strip" aria-label="本期采集状态">
+        <div class="status-strip__inner">
+          <p><span>来源数</span><strong>{{ latest_report.source_count }}</strong></p>
+          <p><span>候选数</span><strong>{{ latest_report.candidate_count }}</strong></p>
+          <p><span>收录数</span><strong>{{ latest_report.included_count }}</strong></p>
+          <p>
+            <span>最后成功</span>
+            <strong>{{ latest_report.generated_at|beijing_datetime }}</strong>
+          </p>
+        </div>
+      </section>
+    </header>
+
+    {% block main %}{% endblock %}
+
+    <footer class="site-footer">
+      <p><strong>{{ site_name }}</strong> · 给产品与工程团队的每日 AI 决策底稿</p>
+      <a href="{{ page_url('archive') }}">浏览全部日期</a>
+    </footer>
+  </body>
+</html>

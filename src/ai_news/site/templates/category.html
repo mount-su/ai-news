@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_card.html" import news_card %}
+
+{% block main %}
+  <main id="main-content" class="page-shell">
+    <section class="edition-heading" aria-labelledby="category-title">
+      <p class="eyebrow">CATEGORY INTELLIGENCE</p>
+      <h1 id="category-title">{{ category_name }}</h1>
+      <p>跨日期聚合的 {{ category_name }} 情报，优先呈现高影响变化。</p>
+    </section>
+    <section class="feed-shell" aria-labelledby="feed-title" data-feed>
+      <div class="feed-column">
+        <div class="section-heading">
+          <p>CATEGORY FEED</p>
+          <h2 id="feed-title">{{ category_name }} 情报流</h2>
+        </div>
+        <div class="filter-console">
+          <div class="search-control">
+            <label for="feed-search">搜索标题、来源、摘要或标签</label>
+            <input id="feed-search" type="search" data-filter-search autocomplete="off" placeholder="输入关键词">
+          </div>
+          <div class="category-controls" aria-label="按分类筛选">
+            <button type="button" data-category="all" aria-pressed="true">全部</button>
+            {% for category in categories %}
+              <button type="button" data-category="{{ category.name }}" aria-pressed="false">{{ category.name }}</button>
+            {% endfor %}
+          </div>
+          <p class="result-count" data-result-count aria-live="polite">{{ items|length }} 条结果</p>
+        </div>
+        <p class="empty-state" data-empty-state hidden>没有符合当前条件的情报，请调整关键词或分类。</p>
+        <div class="news-list">
+          {% for item in items %}{{ news_card(item) }}{% endfor %}
+        </div>
+      </div>
+      <section class="signal-rail" aria-labelledby="signal-title">
+        <p class="eyebrow">TRACKING SIGNAL</p>
+        <h2 id="signal-title">后续观察</h2>
+        <ol>
+          {% for item in signals %}
+            <li><span>0{{ loop.index }}</span><strong>{{ item.title }}</strong><p>{{ item.tracking_signal }}</p></li>
+          {% endfor %}
+        </ol>
+      </section>
+    </section>
+  </main>
+{% endblock %}
