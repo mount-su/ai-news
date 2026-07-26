@@ -88,6 +88,47 @@ def _coordinated_process_save(
     save_finished.set()
 
 
+def _crash_in_orphan_window(root_text: str, report_json: str, window: str) -> None:
+    root = Path(root_text)
+    report = DailyReport.model_validate_json(report_json)
+    if window == "pre-journal":
+        original_write_artifact = storage_repository._write_artifact
+        artifact_count = 0
+
+        def crash_after_first_artifact(
+            root_boundary: Path,
+            path: Path,
+            content: bytes,
+        ) -> None:
+            nonlocal artifact_count
+            original_write_artifact(root_boundary, path, content)
+            artifact_count += 1
+            if artifact_count == 1:
+                os._exit(93)
+
+        storage_repository._write_artifact = crash_after_first_artifact
+    elif window == "post-commit":
+
+        def crash_before_cleanup(*args: Any, **kwargs: Any) -> None:
+            os._exit(94)
+
+        storage_repository._cleanup_transaction_artifacts = crash_before_cleanup
+    else:
+        raise ValueError("unsupported crash window")
+    save_report(root, report)
+
+
+def _run_orphan_window_crash(root: Path, report: DailyReport, window: str) -> None:
+    context = multiprocessing.get_context("fork")
+    process = context.Process(
+        target=_crash_in_orphan_window,
+        args=(str(root), report.model_dump_json(), window),
+    )
+    process.start()
+    _join_process(process)
+    assert process.exitcode == (93 if window == "pre-journal" else 94)
+
+
 def _join_process(process: multiprocessing.Process) -> None:
     process.join(timeout=10)
     if process.is_alive():
@@ -944,3 +985,79 @@ def test_first_save_fsyncs_created_parent_chain_and_cleanup_directories(
     assert synced_directories.count(report_parent) >= 3
     assert synced_directories.count(content_parent) >= 3
     assert not _repository_artifacts(tmp_path)
+
+
+def test_next_load_cleans_pre_journal_orphan_after_process_crash(
+    tmp_path: Path,
+) -> None:
+    old_report = _report(slugs=("old",), model="old-model")
+    save_report(tmp_path, old_report)
+    targets = _target_paths(tmp_path)
+    old_bytes = {path: path.read_bytes() for path in targets}
+
+    _run_orphan_window_crash(
+        tmp_path,
+        _report(slugs=("pre-journal",), model="pre-journal-model"),
+        "pre-journal",
+    )
+
+    assert not (tmp_path / TRANSACTION_JOURNAL).exists()
+    assert _repository_artifacts(tmp_path)
+    assert {path: path.read_bytes() for path in targets} == old_bytes
+
+    assert load_reports(tmp_path) == [old_report]
+    assert {path: path.read_bytes() for path in targets} == old_bytes
+    assert not _repository_artifacts(tmp_path)
+
+
+def test_next_load_cleans_post_commit_orphans_and_keeps_new_state(
+    tmp_path: Path,
+) -> None:
+    save_report(tmp_path, _report(slugs=("old",), model="old-model"))
+    new_report = _report(slugs=("committed", "items"), model="committed-model")
+
+    _run_orphan_window_crash(tmp_path, new_report, "post-commit")
+
+    report_path, markdown_path, index_path = _target_paths(tmp_path)
+    assert not (tmp_path / TRANSACTION_JOURNAL).exists()
+    assert _repository_artifacts(tmp_path)
+    assert DailyReport.model_validate_json(report_path.read_bytes()) == new_report
+    assert "committed\\-model" in markdown_path.read_text(encoding="utf-8")
+    assert json.loads(index_path.read_text(encoding="utf-8"))["reports"][0]["item_count"] == 2
+
+    assert load_reports(tmp_path) == [new_report]
+    assert not _repository_artifacts(tmp_path)
+
+
+def test_orphan_sweep_preserves_similar_but_invalid_regular_files(tmp_path: Path) -> None:
+    save_report(tmp_path, _report(slugs=("safe",)))
+    transaction_id = "b" * 32
+    files = {
+        tmp_path / f"content/.2026-7-26.md.{transaction_id}.tmp": b"short date",
+        tmp_path / f"content/.2026-07-26.txt.{transaction_id}.bak": b"wrong target",
+        tmp_path / ("data/.index.json." + "g" * 32 + ".tmp"): b"invalid uuid",
+        tmp_path / f"data/2026/07/.2026-08-01.json.{transaction_id}.tmp": b"path mismatch",
+        tmp_path / f"..ai-news-transaction.json.{transaction_id[:-1]}.tmp": b"short uuid",
+    }
+    for path, content in files.items():
+        path.write_bytes(content)
+
+    load_reports(tmp_path)
+
+    assert {path: path.read_bytes() for path in files} == files
+
+
+def test_orphan_sweep_rejects_matching_symlink_without_following_it(
+    tmp_path: Path,
+) -> None:
+    save_report(tmp_path, _report(slugs=("safe",)))
+    outside = tmp_path.parent / f"{tmp_path.name}-orphan-sentinel"
+    outside.write_bytes(b"untouched")
+    disguised = tmp_path / "content" / f".2026-07-26.md.{'c' * 32}.bak"
+    disguised.symlink_to(outside)
+
+    with pytest.raises(ValueError, match="artifact"):
+        load_reports(tmp_path)
+
+    assert disguised.is_symlink()
+    assert outside.read_bytes() == b"untouched"

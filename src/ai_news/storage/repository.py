@@ -29,6 +29,28 @@ _REPORT_TARGET_PATTERN = re.compile(
     r"(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2})\.json$"
 )
 _TRANSACTION_JOURNAL_NAME = ".ai-news-transaction.json"
+_TRANSACTION_ID_FRAGMENT = r"(?P<transaction_id>[0-9a-f]{32})"
+_ARTIFACT_SUFFIX_FRAGMENT = r"(?P<suffix>tmp|bak|recover\.tmp)"
+_REPORT_ARTIFACT_PATTERN = re.compile(
+    r"^\.(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2})\.json\."
+    + _TRANSACTION_ID_FRAGMENT
+    + r"\."
+    + _ARTIFACT_SUFFIX_FRAGMENT
+    + r"$"
+)
+_CONTENT_ARTIFACT_PATTERN = re.compile(
+    r"^\.(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2})\.md\."
+    + _TRANSACTION_ID_FRAGMENT
+    + r"\."
+    + _ARTIFACT_SUFFIX_FRAGMENT
+    + r"$"
+)
+_INDEX_ARTIFACT_PATTERN = re.compile(
+    r"^\.index\.json\." + _TRANSACTION_ID_FRAGMENT + r"\." + _ARTIFACT_SUFFIX_FRAGMENT + r"$"
+)
+_JOURNAL_TEMPORARY_PATTERN = re.compile(
+    r"^\." + re.escape(_TRANSACTION_JOURNAL_NAME) + r"\." + _TRANSACTION_ID_FRAGMENT + r"\.tmp$"
+)
 _THREAD_LOCKS_GUARD = threading.Lock()
 _THREAD_LOCKS: dict[str, threading.RLock] = {}
 
@@ -419,6 +441,92 @@ def _cleanup_files(root_boundary: Path, paths: list[Path | None]) -> None:
             path.unlink(missing_ok=True)
 
 
+def _scan_directory(root_boundary: Path, directory: Path) -> list[Path]:
+    if not directory.exists() and not directory.is_symlink():
+        return []
+    if directory.is_symlink():
+        raise ValueError("orphan artifact directory under storage root must not be a symlink")
+    _require_within_root(root_boundary, directory)
+    if not directory.is_dir():
+        raise ValueError("orphan artifact parent must be a directory")
+    return list(directory.iterdir())
+
+
+def _require_regular_orphan(root_boundary: Path, path: Path) -> Path:
+    if path.is_symlink():
+        raise ValueError("orphan transaction artifact must not be a symlink")
+    _require_within_root(root_boundary, path)
+    if not path.is_file():
+        raise ValueError("orphan transaction artifact must be a regular file")
+    return path
+
+
+def _valid_artifact_date(
+    value: str,
+    *,
+    year: str | None = None,
+    month: str | None = None,
+) -> bool:
+    try:
+        artifact_date = date.fromisoformat(value)
+    except ValueError:
+        return False
+    return (
+        artifact_date.isoformat() == value
+        and (year is None or f"{artifact_date:%Y}" == year)
+        and (month is None or f"{artifact_date:%m}" == month)
+    )
+
+
+def _collect_orphan_artifacts(root_boundary: Path) -> list[Path]:
+    candidates: list[Path] = []
+    root_entries = _scan_directory(root_boundary, root_boundary)
+    for entry in root_entries:
+        if _JOURNAL_TEMPORARY_PATTERN.fullmatch(entry.name):
+            candidates.append(_require_regular_orphan(root_boundary, entry))
+
+    data_directory = root_boundary / "data"
+    data_entries = _scan_directory(root_boundary, data_directory)
+    for entry in data_entries:
+        if _INDEX_ARTIFACT_PATTERN.fullmatch(entry.name):
+            candidates.append(_require_regular_orphan(root_boundary, entry))
+
+    content_directory = root_boundary / "content"
+    for entry in _scan_directory(root_boundary, content_directory):
+        match = _CONTENT_ARTIFACT_PATTERN.fullmatch(entry.name)
+        if match and _valid_artifact_date(match.group("date")):
+            candidates.append(_require_regular_orphan(root_boundary, entry))
+
+    for year_entry in data_entries:
+        if re.fullmatch(r"[0-9]{4}", year_entry.name) is None:
+            continue
+        for month_entry in _scan_directory(root_boundary, year_entry):
+            if re.fullmatch(r"[0-9]{2}", month_entry.name) is None:
+                continue
+            for entry in _scan_directory(root_boundary, month_entry):
+                match = _REPORT_ARTIFACT_PATTERN.fullmatch(entry.name)
+                if match and _valid_artifact_date(
+                    match.group("date"),
+                    year=year_entry.name,
+                    month=month_entry.name,
+                ):
+                    candidates.append(_require_regular_orphan(root_boundary, entry))
+    return candidates
+
+
+def _sweep_orphan_artifacts(root_boundary: Path) -> None:
+    if not root_boundary.exists():
+        return
+    candidates = _collect_orphan_artifacts(root_boundary)
+    if not candidates:
+        return
+    _cleanup_files(root_boundary, list(candidates))
+    _fsync_directories(
+        root_boundary,
+        {candidate.parent for candidate in candidates},
+    )
+
+
 def _read_journal(root: Path, root_boundary: Path) -> _TransactionJournal | None:
     path = _require_storage_target(root_boundary, _journal_path(root))
     if not path.exists():
@@ -526,6 +634,7 @@ def _cleanup_transaction_artifacts(
 def _recover_pending_transaction(root: Path, root_boundary: Path) -> None:
     journal = _read_journal(root, root_boundary)
     if journal is None:
+        _sweep_orphan_artifacts(root_boundary)
         return
 
     prepared_writes = _journal_prepared_writes(root, root_boundary, journal)
@@ -567,6 +676,7 @@ def _recover_pending_transaction(root: Path, root_boundary: Path) -> None:
         journal,
         prepared_writes,
     )
+    _sweep_orphan_artifacts(root_boundary)
 
 
 def _commit_files(
