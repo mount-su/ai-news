@@ -65,6 +65,8 @@ def test_readme_documents_exact_repository_configuration() -> None:
     assert "08:17" in readme
     assert "Asia/Shanghai" in readme
     assert "https://mount-su.github.io/ai-news/" in readme
+    assert "预期 Pages 地址" in readme
+    assert not re.search(r"^线上地址", readme, flags=re.MULTILINE)
 
 
 def test_readme_documents_automation_recovery_and_safety_boundaries() -> None:
@@ -113,9 +115,21 @@ def test_readme_describes_the_implemented_degraded_rule() -> None:
 
     assert "来源失败且最终仍有至少 5 条" in readme
     assert "`degraded=true`" in readme
-    assert "个别分析无效会被丢弃" in readme
-    assert "不会自动决定 `degraded`" in readme
+    assert "该字段由来源运行是否失败决定" in readme
     assert "候选损失时可以降级发布" not in readme
+
+
+def test_docs_describe_strict_batch_analysis_failure() -> None:
+    readme = _readme()
+    design = DESIGN.read_text(encoding="utf-8")
+
+    for document in [readme, design]:
+        assert "整批严格校验" in document
+        assert "只执行一次结构修复" in document
+        assert "整次生成失败" in document
+        assert "不写入新日报" in document
+        assert "舍弃该批" not in document
+        assert "个别分析无效会被丢弃" not in document
 
 
 def test_coding_plan_warning_is_generic_and_session_independent() -> None:
