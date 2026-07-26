@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>OpenAI News</title>
+    <link>https://openai.com/news/</link>
+    <description>OpenAI news feed</description>
+    <item>
+      <title>Model launch</title>
+      <link>https://openai.com/index/model-launch/</link>
+      <pubDate>Sat, 25 Jul 2026 10:00:00 GMT</pubDate>
+      <description><![CDATA[<p>A model update</p>]]></description>
+    </item>
+    <item>
+      <title>Missing URL</title>
+      <pubDate>Sat, 25 Jul 2026 11:00:00 GMT</pubDate>
+      <description>No link is present.</description>
+    </item>
+  </channel>
+</rss>
