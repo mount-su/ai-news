@@ -161,6 +161,104 @@ def test_scan_detects_indented_multiline_token_and_bearer_values_at_key_line(
     ]
 
 
+def test_scan_detects_bounded_json_blank_line_and_yaml_comment_separators(
+    tmp_path: Path,
+) -> None:
+    token_key = "ANTHROPIC_AUTH_" + "TOKEN"
+    header_key = "Author" + "ization"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "structured-values.txt": "\n".join(
+                [
+                    f'{{"{token_key}":',
+                    '"live-json-secret"}',
+                    f"{token_key}:",
+                    "",
+                    "  live-after-blank-secret",
+                    f"{token_key}:",
+                    "  # credential below",
+                    "  live-after-comment-secret",
+                    f'{{"{header_key}":',
+                    '"Bearer live-json-bearer-secret"}',
+                    f"{header_key}:",
+                    "",
+                    "  Bearer live-blank-bearer-secret",
+                    f"{header_key}:",
+                    "  # credential below",
+                    "  Bearer live-comment-bearer-secret",
+                ]
+            )
+        },
+    )
+
+    findings = scan_repository(repository)
+
+    assert [(finding.line_number, finding.rule) for finding in findings] == [
+        (1, "credential assignment"),
+        (3, "credential assignment"),
+        (6, "credential assignment"),
+        (9, "bearer credential"),
+        (11, "bearer credential"),
+        (14, "bearer credential"),
+    ]
+
+
+def test_scan_allows_placeholders_after_bounded_multiline_separators(tmp_path: Path) -> None:
+    token_key = "ANTHROPIC_AUTH_" + "TOKEN"
+    header_key = "Author" + "ization"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "placeholder-values.txt": "\n".join(
+                [
+                    f'{{"{token_key}":',
+                    '"${{ secrets.ANTHROPIC_AUTH_TOKEN }}"}',
+                    f"{token_key}:",
+                    "",
+                    "  # injected by the environment",
+                    "  ${TOKEN}",
+                    f"{header_key}:",
+                    "",
+                    "  # injected by the environment",
+                    "  Bearer ${{ secrets.GITHUB_TOKEN }}",
+                ]
+            )
+        },
+    )
+
+    assert scan_repository(repository) == []
+
+
+def test_scan_does_not_allow_many_blank_and_comment_lines_to_bypass_detection(
+    tmp_path: Path,
+) -> None:
+    token_key = "ANTHROPIC_AUTH_" + "TOKEN"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "long-separator.yaml": "\n".join(
+                [
+                    f"{token_key}:",
+                    "  # comment 1",
+                    "",
+                    "  # comment 2",
+                    "",
+                    "  # comment 3",
+                    "",
+                    "  live-after-many-comments-secret",
+                ]
+            )
+        },
+    )
+
+    findings = scan_repository(repository)
+
+    assert [(finding.line_number, finding.rule) for finding in findings] == [
+        (1, "credential assignment")
+    ]
+
+
 def test_scan_does_not_consume_unindented_next_key_as_multiline_value(tmp_path: Path) -> None:
     token_key = "ANTHROPIC_AUTH_" + "TOKEN"
     header_key = "Author" + "ization"
@@ -173,6 +271,10 @@ def test_scan_does_not_consume_unindented_next_key_as_multiline_value(tmp_path: 
                     "NEXT_KEY: harmless",
                     f"{header_key}:",
                     "NEXT_HEADER: Bearer harmless",
+                    f"{token_key}:",
+                    '"NEXT_QUOTED_KEY": harmless',
+                    f"{header_key}:",
+                    '"NEXT_QUOTED_HEADER": "Bearer harmless"',
                 ]
             )
         },

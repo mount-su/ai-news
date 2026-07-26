@@ -14,60 +14,77 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
+_STRUCTURED_VALUE_SEPARATOR = r"""
+    (?:
+        [ \t]*
+        |
+        [ \t]*\r?\n
+        (?:
+            [ \t]*\r?\n
+            |
+            [ \t]*\#[^\r\n]*\r?\n
+        )*
+        (?:
+            [ \t]+
+            |
+            (?=["'])
+        )
+    )
+"""
 _ASSIGNMENT_PATTERN = re.compile(
-    r"""(?ix)
+    r"""
     (?:
         (?P<assignment_quote>["'])ANTHROPIC_AUTH_TOKEN(?P=assignment_quote)
         |
         \bANTHROPIC_AUTH_TOKEN\b
     )
     [ \t]*(?:=(?!=)|:)
-    (?:
-        [ \t]*
-        |
-        [ \t]*\r?\n[ \t]+
-    )
+    """
+    + _STRUCTURED_VALUE_SEPARATOR
+    + r"""
     (?P<value>
         \$\{\{[^\r\n]*?\}\}
         |
-        "[^"\r\n]*"
+        \$\{[^\r\n\s]*\}
         |
-        '[^'\r\n]*'
+        "[^"\r\n]*"(?![ \t]*:)
         |
-        [^\s\#;]+
+        '[^'\r\n]*'(?![ \t]*:)
+        |
+        [^\s\#;'":]+
     )
-    """
+    """,
+    re.IGNORECASE | re.VERBOSE,
 )
 _BEARER_PATTERN = re.compile(
-    r"""(?ix)
+    r"""
     (?:
         (?P<header_quote>["'])Authorization(?P=header_quote)
         |
         \bAuthorization\b
     )
     [ \t]*:
-    (?:
-        [ \t]*
-        |
-        [ \t]*\r?\n[ \t]+
-    )
+    """
+    + _STRUCTURED_VALUE_SEPARATOR
+    + r"""
     (?:
         (?P<container_quote>["'])Bearer[ \t]+
         (?P<contained_value>[^"'\r\n]+?)
-        (?P=container_quote)
+        (?P=container_quote)(?![ \t]*:)
         |
         Bearer[ \t]+
         (?P<value>
             \$\{\{[^\r\n]*?\}\}
             |
-            "[^"\r\n]*"
+            "[^"\r\n]*"(?![ \t]*:)
             |
-            '[^'\r\n]*'
+            '[^'\r\n]*'(?![ \t]*:)
             |
             [^\s,;`]+
         )
     )
-    """
+    """,
+    re.IGNORECASE | re.VERBOSE,
 )
 _PATTERNS = (
     ("credential assignment", _ASSIGNMENT_PATTERN),
