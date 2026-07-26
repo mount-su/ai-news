@@ -10,6 +10,7 @@ from contextlib import AbstractAsyncContextManager
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Protocol
+from urllib.parse import urlsplit
 
 import httpx
 from pydantic import ValidationError
@@ -31,7 +32,7 @@ from ai_news.models import (
     SourceSpec,
 )
 from ai_news.pipeline.dedupe import deduplicate
-from ai_news.pipeline.normalize import ensure_utc, to_candidate
+from ai_news.pipeline.normalize import ensure_utc, normalize_title, to_candidate
 from ai_news.pipeline.rank import candidate_score, select_candidates
 from ai_news.storage import load_history_urls, save_report
 
@@ -42,6 +43,7 @@ _PUBLICATION_LIMIT = 20
 _PUBLICATION_THRESHOLD = 5
 _WINDOW = timedelta(hours=36)
 _ANALYSIS_FIELDS = frozenset(Analysis.model_fields)
+_EXACT_STATE_LIMIT = _DEDUPLICATION_LIMIT * 6
 
 
 class PipelineError(RuntimeError):
@@ -159,51 +161,6 @@ async def _collect_one(
     return source_run, raw_items
 
 
-def _normalize_in_window(
-    collection_results: Iterable[tuple[SourceRun, list[RawItem]]],
-    now: datetime,
-    historical_urls: set[str],
-) -> list[Candidate]:
-    window_start = now - _WINDOW
-    historical = {str(url) for url in historical_urls}
-    candidates_by_url: dict[str, Candidate] = {}
-    for source_run, raw_items in collection_results:
-        if not source_run.success:
-            continue
-        for raw_item in raw_items:
-            try:
-                candidate = to_candidate(raw_item)
-                published_at = ensure_utc(candidate.raw.published_at)
-            except Exception:
-                continue
-            if (
-                window_start <= published_at <= now
-                and str(candidate.canonical_url) not in historical
-            ):
-                canonical = str(candidate.canonical_url)
-                existing = candidates_by_url.get(canonical)
-                if existing is None or _candidate_preference_key(
-                    candidate,
-                    now,
-                ) < _candidate_preference_key(existing, now):
-                    candidates_by_url[canonical] = candidate
-                if len(candidates_by_url) == _DEDUPLICATION_LIMIT * 2:
-                    retained = select_candidates(
-                        list(candidates_by_url.values()),
-                        now,
-                        limit=_DEDUPLICATION_LIMIT,
-                    )
-                    candidates_by_url = {
-                        str(retained_candidate.canonical_url): retained_candidate
-                        for retained_candidate in retained
-                    }
-    return select_candidates(
-        list(candidates_by_url.values()),
-        now,
-        limit=_DEDUPLICATION_LIMIT,
-    )
-
-
 def _candidate_preference_key(candidate: Candidate, now: datetime) -> tuple[object, ...]:
     raw = candidate.raw
     return (
@@ -218,6 +175,118 @@ def _candidate_preference_key(candidate: Candidate, now: datetime) -> tuple[obje
         raw.is_official_source,
         str(raw.url),
     )
+
+
+def _exact_title_key(candidate: Candidate) -> tuple[str | None, str]:
+    canonical = str(candidate.canonical_url)
+    return (
+        urlsplit(canonical).hostname,
+        normalize_title(candidate.raw.title).casefold(),
+    )
+
+
+class _ExactCandidateAccumulator:
+    def __init__(self, now: datetime) -> None:
+        self._now = now
+        self._next_group_id = 0
+        self._winners: dict[int, Candidate] = {}
+        self._canonical_groups: dict[str, int] = {}
+        self._title_groups: dict[tuple[str | None, str], int] = {}
+
+    def _state_size(self) -> int:
+        return len(self._winners) + len(self._canonical_groups) + len(self._title_groups)
+
+    def _new_group(self, candidate: Candidate) -> None:
+        group_id = self._next_group_id
+        self._next_group_id += 1
+        self._winners[group_id] = candidate
+        self._canonical_groups[str(candidate.canonical_url)] = group_id
+        self._title_groups[_exact_title_key(candidate)] = group_id
+
+    def _compact(self) -> None:
+        retained = select_candidates(
+            list(self._winners.values()),
+            self._now,
+            limit=_DEDUPLICATION_LIMIT,
+        )
+        self._next_group_id = 0
+        self._winners.clear()
+        self._canonical_groups.clear()
+        self._title_groups.clear()
+        for candidate in retained:
+            self._new_group(candidate)
+
+    def _merge_groups(self, group_ids: set[int], candidate: Candidate) -> int:
+        target_group = min(group_ids)
+        winner = min(
+            [candidate, *(self._winners[group_id] for group_id in group_ids)],
+            key=lambda item: _candidate_preference_key(item, self._now),
+        )
+        self._winners[target_group] = winner
+        if len(group_ids) > 1:
+            for group_id in group_ids:
+                if group_id != target_group:
+                    del self._winners[group_id]
+            for canonical, group_id in list(self._canonical_groups.items()):
+                if group_id in group_ids:
+                    self._canonical_groups[canonical] = target_group
+            for title, group_id in list(self._title_groups.items()):
+                if group_id in group_ids:
+                    self._title_groups[title] = target_group
+        return target_group
+
+    def add(self, candidate: Candidate) -> None:
+        if self._state_size() > _EXACT_STATE_LIMIT - 3:
+            self._compact()
+
+        canonical = str(candidate.canonical_url)
+        title = _exact_title_key(candidate)
+        group_ids = {
+            group_id
+            for group_id in (
+                self._canonical_groups.get(canonical),
+                self._title_groups.get(title),
+            )
+            if group_id is not None
+        }
+        if group_ids:
+            group_id = self._merge_groups(group_ids, candidate)
+            self._canonical_groups[canonical] = group_id
+            self._title_groups[title] = group_id
+        else:
+            self._new_group(candidate)
+
+    def selected(self) -> list[Candidate]:
+        return select_candidates(
+            list(self._winners.values()),
+            self._now,
+            limit=_DEDUPLICATION_LIMIT,
+        )
+
+
+def _normalize_in_window(
+    collection_results: Iterable[tuple[SourceRun, list[RawItem]]],
+    now: datetime,
+    historical_urls: set[str],
+) -> list[Candidate]:
+    window_start = now - _WINDOW
+    historical = {str(url) for url in historical_urls}
+    accumulator = _ExactCandidateAccumulator(now)
+    for source_run, raw_items in collection_results:
+        if not source_run.success:
+            continue
+        for raw_item in raw_items:
+            try:
+                candidate = to_candidate(raw_item)
+                published_at = ensure_utc(candidate.raw.published_at)
+            except Exception:
+                continue
+            if (
+                window_start <= published_at <= now
+                and str(candidate.canonical_url) not in historical
+            ):
+                accumulator.add(candidate)
+    return accumulator.selected()
 
 
 def _prepare_candidates(

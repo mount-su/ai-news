@@ -88,6 +88,12 @@ def _analysis(number: int, *, importance: int = 8) -> Analysis:
     )
 
 
+def _updated_raw(raw: RawItem, **updates: Any) -> RawItem:
+    raw_data = raw.model_dump()
+    raw_data.update(updates)
+    return RawItem.model_validate(raw_data)
+
+
 class _Analyzer:
     def __init__(
         self,
@@ -566,6 +572,133 @@ def test_duplicate_canonical_urls_are_folded_before_bounded_pretrim() -> None:
     assert report.candidate_count == 6
     assert len(report.items) == 6
     assert sum(str(item.canonical_url) == duplicate_url for item in report.items) == 1
+
+
+def test_same_host_exact_titles_are_folded_before_bounded_pretrim() -> None:
+    source = _source(0)
+    noise_items = [
+        _updated_raw(
+            _raw(index, source=source),
+            title="  SAME　normalized title  ",
+            source_weight=10,
+        )
+        for index in range(500)
+    ]
+    healthy_items = [
+        _updated_raw(
+            _raw(10_000 + index, source=source),
+            source_weight=1,
+        )
+        for index in range(5)
+    ]
+
+    report = _run(
+        collector=_collector({source.id: [*noise_items, *healthy_items]}),
+        analyzer=_Analyzer(),
+    )
+
+    assert report.candidate_count == 6
+    assert len(report.items) == 6
+
+
+def test_exact_key_bridge_merges_both_existing_groups(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ai_news.pipeline import run as run_module
+
+    source = _source(0)
+    bridge_items = [
+        _updated_raw(
+            _raw(20_000, source=source),
+            url="https://example.com/bridge/first",
+            title="Alpha exact group",
+            source_weight=10,
+        ),
+        _updated_raw(
+            _raw(20_001, source=source),
+            url="https://example.com/bridge/second",
+            title="Beta exact group",
+            source_weight=9,
+        ),
+        _updated_raw(
+            _raw(20_002, source=source),
+            url="https://example.com/bridge/first",
+            title="Beta exact group",
+            source_weight=8,
+        ),
+    ]
+    healthy_items = [_raw(21_000 + index, source=source) for index in range(5)]
+    dedupe_sizes: list[int] = []
+    real_deduplicate = run_module.deduplicate
+
+    def observed_deduplicate(
+        candidates: list[Any],
+        historical_urls: set[str],
+    ) -> list[Any]:
+        dedupe_sizes.append(len(candidates))
+        return real_deduplicate(candidates, historical_urls)
+
+    monkeypatch.setattr(run_module, "deduplicate", observed_deduplicate)
+
+    report = _run(
+        collector=_collector({source.id: [*bridge_items, *healthy_items]}),
+        analyzer=_Analyzer(),
+    )
+
+    assert dedupe_sizes == [6]
+    assert report.candidate_count == 6
+    assert len(report.items) == 6
+
+
+def test_large_exact_title_alias_state_is_bounded_and_order_independent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ai_news.pipeline import run as run_module
+
+    source = _source(0)
+    aliases = [
+        _updated_raw(
+            _raw(30_000 + index, source=source),
+            title="One exact title across many aliases",
+            source_weight=10,
+        )
+        for index in range(3_200)
+    ]
+    healthy_items = [
+        _updated_raw(
+            _raw(40_000 + index, source=source),
+            source_weight=1,
+        )
+        for index in range(5)
+    ]
+    all_items = [*aliases, *healthy_items]
+    dedupe_sizes: list[int] = []
+    real_deduplicate = run_module.deduplicate
+
+    def bounded_deduplicate(candidates: list[Any], historical_urls: set[str]) -> list[Any]:
+        dedupe_sizes.append(len(candidates))
+        return real_deduplicate(candidates, historical_urls)
+
+    monkeypatch.setattr(run_module, "deduplicate", bounded_deduplicate)
+    first_analyzer = _Analyzer()
+    second_analyzer = _Analyzer()
+
+    first_report = _run(
+        collector=_collector({source.id: all_items}),
+        analyzer=first_analyzer,
+        monotonic=lambda: 100.0,
+    )
+    second_report = _run(
+        collector=_collector({source.id: list(reversed(all_items))}),
+        analyzer=second_analyzer,
+        monotonic=lambda: 100.0,
+    )
+
+    assert dedupe_sizes == [6, 6]
+    assert first_report.candidate_count == second_report.candidate_count == 6
+    assert [item.id for item in first_analyzer.calls[0]] == [
+        item.id for item in second_analyzer.calls[0]
+    ]
 
 
 def test_more_than_1500_unique_items_stay_bounded_and_order_independent(
