@@ -1,0 +1,129 @@
+name: Daily AI news
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 8 * * *"
+      timezone: "Asia/Shanghai"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: Optional ISO date to regenerate
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-news-daily
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    if: >-
+      ${{ github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install .
+
+      - name: Generate daily report
+        env:
+          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+          ANTHROPIC_DEFAULT_OPUS_MODEL: ${{ vars.ANTHROPIC_DEFAULT_OPUS_MODEL }}
+          ANTHROPIC_AUTH_SCHEME: ${{ vars.ANTHROPIC_AUTH_SCHEME || 'bearer' }}
+          SITE_BASE_PATH: /ai-news/
+          GITHUB_TOKEN: ${{ github.token }}
+          INPUT_DATE: ${{ inputs.date }}
+        run: |
+          set -euo pipefail
+          run_date="${INPUT_DATE:-}"
+          args=(--root .)
+          if [[ -n "$run_date" ]]; then
+            args+=(--date "$run_date")
+          fi
+          python -m ai_news generate "${args[@]}"
+
+      - name: Stage generated data
+        run: git add -- data content
+
+      - name: Scan for secrets
+        run: python scripts/check_no_secrets.py
+
+      - name: Commit generated data
+        run: |
+          set -euo pipefail
+          if git diff --cached --quiet; then
+            echo "No generated data changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "data: publish daily AI news"
+          git push origin HEAD:main
+
+  build:
+    needs: generate
+    if: >-
+      ${{ always() && (needs.generate.result == 'success' ||
+      needs.generate.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out current main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install .
+
+      - name: Build static site
+        run: python -m ai_news build --root . --output dist
+
+      - name: Validate static site
+        run: python scripts/validate_site.py dist --base-path /ai-news/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

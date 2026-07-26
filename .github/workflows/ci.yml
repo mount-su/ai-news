@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install ".[dev]"
+
+      - name: Check lint
+        run: ruff check .
+
+      - name: Check formatting
+        run: ruff format --check .
+
+      - name: Run tests with coverage
+        run: pytest --cov=ai_news --cov-report=term-missing --cov-fail-under=85
+
+      - name: Scan for secrets
+        run: python scripts/check_no_secrets.py
+
+      - name: Build deterministic offline demo
+        run: python -m ai_news demo --root .demo --output .demo/dist
+
+      - name: Validate static site
+        run: python scripts/validate_site.py .demo/dist --base-path /ai-news/
+
+      # actionlint 1.7.7 predates GitHub's schedule.timezone schema support.
+      # Ignore only its exact stale-schema diagnostic; every other finding remains fatal.
+      - name: Lint workflows
+        run: >-
+          docker run --rm
+          -v "$GITHUB_WORKSPACE:/repo"
+          -w /repo
+          rhysd/actionlint:1.7.7
+          -ignore 'element of "schedule" section must be mapping and must contain one key "cron"'
+          .github/workflows/ci.yml
+          .github/workflows/daily-news.yml
