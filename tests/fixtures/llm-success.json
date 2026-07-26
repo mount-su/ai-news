@@ -1,0 +1,17 @@
+{
+  "id": "msg_fixture",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "[{\"id\":\"b08ea2b7ae6b1c8e\",\"title\":\"Fixture One\",\"category\":\"大模型\",\"summary\":\"这是一个用于验证结构化大模型分析响应的完整摘要内容。\",\"importance\":8,\"why_it_matters\":\"它验证客户端能够安全解析第一条合法分析结果。\",\"tags\":[\"模型\",\"发布\"],\"is_official\":true,\"marketing_risk\":\"low\",\"tracking_signal\":\"持续关注后续官方评测和能力更新。\"},{\"id\":\"9a0b99e263405a2c\",\"title\":\"Fixture Two\",\"category\":\"论文研究\",\"summary\":\"这是第二条用于验证多行结构化分析响应的完整摘要内容。\",\"importance\":6,\"why_it_matters\":\"它验证客户端能够保持多条候选结果的输入顺序。\",\"tags\":[\"研究\",\"评测\"],\"is_official\":false,\"marketing_risk\":\"medium\",\"tracking_signal\":\"关注论文复现结果及后续公开数据。\"}]"
+    }
+  ],
+  "model": "test-model",
+  "stop_reason": "end_turn",
+  "usage": {
+    "input_tokens": 100,
+    "output_tokens": 200
+  }
+}
