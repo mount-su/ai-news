@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import shlex
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -8,6 +10,31 @@ import yaml
 REPOSITORY = Path(__file__).parents[1]
 CI_PATH = REPOSITORY / ".github/workflows/ci.yml"
 DAILY_PATH = REPOSITORY / ".github/workflows/daily-news.yml"
+ACTION_PINS = {
+    "actions/checkout": (
+        "d23441a48e516b6c34aea4fa41551a30e30af803",
+        "v6",
+        "https://github.com/actions/checkout",
+    ),
+    "actions/setup-python": (
+        "ece7cb06caefa5fff74198d8649806c4678c61a1",
+        "v6",
+        "https://github.com/actions/setup-python",
+    ),
+    "actions/upload-pages-artifact": (
+        "7b1f4a764d45c48632c6b24a0339c27f5614fb0b",
+        "v4",
+        "https://github.com/actions/upload-pages-artifact",
+    ),
+    "actions/deploy-pages": (
+        "d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e",
+        "v4",
+        "https://github.com/actions/deploy-pages",
+    ),
+}
+ACTIONLINT_IMAGE = (
+    "rhysd/actionlint:1.7.7@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9"
+)
 
 
 class WorkflowLoader(yaml.SafeLoader):
@@ -51,6 +78,37 @@ def _run_commands(steps: list[dict[str, object]]) -> str:
     return "\n".join(str(step.get("run", "")) for step in steps)
 
 
+def _git(repository: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", str(repository), *arguments],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_all_external_actions_are_commit_pinned_with_auditable_tag_sources() -> None:
+    all_usage_pattern = re.compile(r"^\s*uses:\s*\S+.*$", re.MULTILINE)
+    usage_pattern = re.compile(
+        r"^\s*uses:\s*([^@\s]+)@([0-9a-f]+)\s+#\s+(\S+)\s+source:\s+(\S+)\s*$",
+        re.MULTILINE,
+    )
+    all_usage_lines: list[str] = []
+    usages: list[tuple[str, str, str, str]] = []
+    for path in (CI_PATH, DAILY_PATH):
+        source = path.read_text(encoding="utf-8")
+        all_usage_lines.extend(all_usage_pattern.findall(source))
+        usages.extend(usage_pattern.findall(source))
+
+    assert usages
+    assert len(usages) == len(all_usage_lines)
+    assert {name for name, _sha, _tag, _source in usages} == set(ACTION_PINS)
+    for name, sha, tag, source in usages:
+        expected_sha, expected_tag, expected_source = ACTION_PINS[name]
+        assert re.fullmatch(r"[0-9a-f]{40}", sha)
+        assert (sha, tag, source) == (expected_sha, expected_tag, expected_source)
+
+
 def test_ci_triggers_and_read_only_permissions() -> None:
     workflow = _load_workflow(CI_PATH)
 
@@ -71,8 +129,8 @@ def test_ci_runs_all_quality_and_offline_validation_commands() -> None:
     steps = _steps(workflow, "quality")
     commands = _run_commands(steps)
 
-    assert steps[0]["uses"] == "actions/checkout@v6"
-    assert steps[1]["uses"] == "actions/setup-python@v6"
+    assert steps[0]["uses"] == f"actions/checkout@{ACTION_PINS['actions/checkout'][0]}"
+    assert steps[1]["uses"] == (f"actions/setup-python@{ACTION_PINS['actions/setup-python'][0]}")
     assert steps[1]["with"] == {"python-version": "3.12", "cache": "pip"}
     for command in (
         'python -m pip install ".[dev]"',
@@ -91,7 +149,7 @@ def test_ci_actionlint_is_pinned_and_only_ignores_the_known_timezone_schema_gap(
     workflow = _load_workflow(CI_PATH)
     commands = _run_commands(_steps(workflow, "quality"))
 
-    assert "rhysd/actionlint:1.7.7" in commands
+    assert re.findall(r"rhysd/actionlint:\S+", commands) == [ACTIONLINT_IMAGE]
     assert ".github/workflows/ci.yml" in commands
     assert ".github/workflows/daily-news.yml" in commands
     assert "-ignore" in commands
@@ -138,7 +196,7 @@ def test_daily_generate_is_write_scoped_conditional_and_maps_exact_environment()
     steps = _steps(workflow, "generate")
     assert steps[0] == {
         "name": "Check out main",
-        "uses": "actions/checkout@v6",
+        "uses": f"actions/checkout@{ACTION_PINS['actions/checkout'][0]}",
         "with": {"ref": "main"},
     }
     generate_step = next(step for step in steps if step.get("name") == "Generate daily report")
@@ -191,6 +249,98 @@ def test_daily_scans_then_commits_only_publication_data_with_default_token() -> 
     assert "git add -A" not in commands
 
 
+def test_daily_commit_rebases_and_retries_push_without_force() -> None:
+    workflow = _load_workflow(DAILY_PATH)
+    steps = _steps(workflow, "generate")
+    command = str(
+        next(step for step in steps if step.get("name") == "Commit generated data")["run"]
+    )
+    loop = command[command.index("for attempt") :]
+
+    assert "for attempt in 1 2 3" in loop
+    assert loop.index("git fetch origin main") < loop.index("git rebase origin/main")
+    assert loop.index("git rebase origin/main") < loop.index("git push origin HEAD:main")
+    assert "if git push origin HEAD:main" in loop
+    assert "git rebase --abort" in loop
+    assert "exit 1" in loop
+    assert re.search(r"\bgit\s+push\b[^\n]*(?:--force(?:-with-lease)?|-f(?:\s|$))", command) is None
+
+
+def test_daily_commit_script_publishes_after_remote_advance_and_one_rejected_push(
+    tmp_path: Path,
+) -> None:
+    workflow = _load_workflow(DAILY_PATH)
+    commit_script = str(
+        next(
+            step
+            for step in _steps(workflow, "generate")
+            if step.get("name") == "Commit generated data"
+        )["run"]
+    )
+    remote = tmp_path / "remote.git"
+    seed = tmp_path / "seed"
+    worker = tmp_path / "worker"
+    racer = tmp_path / "racer"
+    published = tmp_path / "published"
+
+    remote.mkdir()
+    _git(remote, "init", "--bare", "--initial-branch=main")
+    seed.mkdir()
+    _git(seed, "init", "--initial-branch=main")
+    _git(seed, "config", "user.name", "Seed")
+    _git(seed, "config", "user.email", "seed@example.invalid")
+    (seed / "README.md").write_text("seed\n", encoding="utf-8")
+    _git(seed, "add", "README.md")
+    _git(seed, "commit", "-m", "seed")
+    _git(seed, "remote", "add", "origin", str(remote))
+    _git(seed, "push", "-u", "origin", "main")
+    subprocess.run(["git", "clone", str(remote), str(worker)], check=True, capture_output=True)
+    subprocess.run(["git", "clone", str(remote), str(racer)], check=True, capture_output=True)
+
+    _git(racer, "config", "user.name", "Racer")
+    _git(racer, "config", "user.email", "racer@example.invalid")
+    (racer / "remote-update.txt").write_text("remote advanced\n", encoding="utf-8")
+    _git(racer, "add", "remote-update.txt")
+    _git(racer, "commit", "-m", "advance remote")
+    _git(racer, "push", "origin", "main")
+
+    (worker / "data").mkdir()
+    (worker / "content").mkdir()
+    (worker / "data/report.json").write_text("{}\n", encoding="utf-8")
+    (worker / "content/report.md").write_text("# report\n", encoding="utf-8")
+    (worker / "local-only.txt").write_text("must remain untracked\n", encoding="utf-8")
+    _git(worker, "add", "--", "data", "content")
+
+    rejection_marker = remote / "rejected-once"
+    hook = remote / "hooks/pre-receive"
+    hook.write_text(
+        "#!/bin/sh\n"
+        f"marker={shlex.quote(str(rejection_marker))}\n"
+        'if [ ! -f "$marker" ]; then\n'
+        '  : > "$marker"\n'
+        "  exit 1\n"
+        "fi\n",
+        encoding="utf-8",
+    )
+    hook.chmod(0o755)
+
+    completed = subprocess.run(
+        ["bash", "-c", commit_script],
+        cwd=worker,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert rejection_marker.is_file()
+    assert "Push attempt 1 of 3 failed; retrying." in completed.stderr
+    subprocess.run(["git", "clone", str(remote), str(published)], check=True, capture_output=True)
+    assert (published / "remote-update.txt").read_text(encoding="utf-8") == "remote advanced\n"
+    assert (published / "data/report.json").read_text(encoding="utf-8") == "{}\n"
+    assert (published / "content/report.md").read_text(encoding="utf-8") == "# report\n"
+    assert not (published / "local-only.txt").exists()
+
+
 def test_daily_build_reads_fresh_main_after_generate_success_or_skip() -> None:
     workflow = _load_workflow(DAILY_PATH)
     jobs = workflow["jobs"]
@@ -207,13 +357,18 @@ def test_daily_build_reads_fresh_main_after_generate_success_or_skip() -> None:
     steps = _steps(workflow, "build")
     assert steps[0] == {
         "name": "Check out current main",
-        "uses": "actions/checkout@v6",
+        "uses": f"actions/checkout@{ACTION_PINS['actions/checkout'][0]}",
         "with": {"ref": "main"},
     }
     commands = _run_commands(steps)
     assert "python -m ai_news build --root . --output dist" in commands
     assert "python scripts/validate_site.py dist --base-path /ai-news/" in commands
-    upload = next(step for step in steps if step.get("uses") == "actions/upload-pages-artifact@v4")
+    upload = next(
+        step
+        for step in steps
+        if step.get("uses")
+        == f"actions/upload-pages-artifact@{ACTION_PINS['actions/upload-pages-artifact'][0]}"
+    )
     assert upload["with"] == {"path": "dist"}
 
 
@@ -237,6 +392,6 @@ def test_daily_deploy_has_minimal_pages_permissions_and_environment() -> None:
         {
             "name": "Deploy to GitHub Pages",
             "id": "deployment",
-            "uses": "actions/deploy-pages@v4",
+            "uses": f"actions/deploy-pages@{ACTION_PINS['actions/deploy-pages'][0]}",
         }
     ]
