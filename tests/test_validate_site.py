@@ -44,6 +44,7 @@ def test_valid_site_handles_queries_fragments_directory_indexes_and_percent_enco
                 <a href="#main-content">same page</a>
                 <a href="/ai-news/about/?view=full#details">about</a>
                 <a href="/ai-news/pages/%E4%BD%A0%E5%A5%BD/?q=1#%E9%83%A8%E5%88%86">encoded</a>
+                <a href="http://example.com/out">external http</a>
                 <a href="https://example.com/out">external</a>
                 <a href="//cdn.example.com/library.js">cdn</a>
                 <a href="mailto:editor@example.com">mail</a>
@@ -78,6 +79,57 @@ def test_relative_percent_encoded_query_and_fragment_delimiters_remain_path_data
     )
 
     assert validate_site(dist, BASE_PATH) == []
+
+
+@pytest.mark.parametrize(
+    "unsafe_url",
+    [
+        "///ai-news/assets/app.js",
+        "javascript:alert(1)",
+        "data:text/html,unsafe",
+        "vbscript:msgbox(1)",
+    ],
+)
+def test_validator_rejects_authority_ambiguity_and_dangerous_schemes(
+    tmp_path: Path,
+    unsafe_url: str,
+) -> None:
+    dist = _write_site(
+        tmp_path / "dist",
+        {
+            "index.html": _page(f'<a href="{unsafe_url}">unsafe</a>'),
+            "assets/app.js": '"use strict";\n',
+        },
+    )
+
+    issues = validate_site(dist, BASE_PATH)
+
+    assert "invalid-url" in {issue.code for issue in issues}
+
+
+def test_validator_rejects_invalid_percent_encoding_in_query(tmp_path: Path) -> None:
+    dist = _write_site(
+        tmp_path / "dist",
+        {"index.html": _page('<a href="/ai-news/?q=%ZZ">bad query</a>')},
+    )
+
+    issues = validate_site(dist, BASE_PATH)
+
+    assert "invalid-url" in {issue.code for issue in issues}
+
+
+def test_validation_issue_render_escapes_control_characters_in_path(tmp_path: Path) -> None:
+    dist = _write_site(
+        tmp_path / "dist",
+        {"unsafe\x1b[2J.html": _page("<p>missing main</p>", main=False)},
+    )
+
+    issues = validate_site(dist, BASE_PATH)
+
+    assert len(issues) == 1
+    rendered = issues[0].render()
+    assert "\x1b" not in rendered
+    assert "\\u001b" in rendered
 
 
 @pytest.mark.parametrize(

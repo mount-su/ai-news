@@ -18,6 +18,7 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 _INVALID_PERCENT = re.compile(r"%(?![0-9A-Fa-f]{2})")
 _URL_ATTRIBUTES = {"href", "src"}
+_ALLOWED_EXTERNAL_SCHEMES = {"http", "https", "mailto", "tel"}
 
 
 @dataclass(frozen=True, order=True)
@@ -28,7 +29,7 @@ class ValidationIssue:
 
     def render(self) -> str:
         display_path = self.path
-        if any(character.isspace() for character in display_path):
+        if any(character.isspace() or not character.isprintable() for character in display_path):
             display_path = json.dumps(display_path, ensure_ascii=True)
         return f"{display_path}: {self.code}: {self.message}"
 
@@ -199,11 +200,23 @@ def _reference_issues(
     files: set[str],
     documents: dict[str, _Document],
 ) -> list[ValidationIssue]:
+    raw_reference = reference.value.strip()
+    if raw_reference.startswith("///"):
+        return [ValidationIssue(source_path, "invalid-url", "page contains an invalid URL")]
     try:
-        parsed = urlsplit(reference.value)
+        parsed = urlsplit(raw_reference)
     except ValueError:
         return [ValidationIssue(source_path, "invalid-url", "page contains an invalid URL")]
-    if parsed.scheme or parsed.netloc:
+    try:
+        if parsed.query:
+            _decode_url_component(parsed.query)
+    except (UnicodeDecodeError, ValueError):
+        return [ValidationIssue(source_path, "invalid-url", "page contains an invalid URL")]
+    if parsed.scheme:
+        if parsed.scheme.casefold() in _ALLOWED_EXTERNAL_SCHEMES:
+            return []
+        return [ValidationIssue(source_path, "invalid-url", "page contains an invalid URL")]
+    if parsed.netloc:
         return []
 
     try:

@@ -61,6 +61,74 @@ def test_scan_reports_tracked_credentials_with_path_and_line_only(tmp_path: Path
 
 
 @pytest.mark.parametrize(
+    "assignment_line",
+    [
+        "ANTHROPIC_AUTH_" + "TOKEN: live-yaml-secret",
+        '"ANTHROPIC_AUTH_' + 'TOKEN" : "live-json-secret"',
+        "'anthropic_auth_" + "token': 'live-mixed-secret'",
+        "ANTHROPIC_AUTH_" + "TOKEN = live-env-secret",
+    ],
+)
+def test_scan_detects_colon_and_equals_token_assignments(
+    tmp_path: Path,
+    assignment_line: str,
+) -> None:
+    repository = _tracked_repository(tmp_path, {"settings.txt": assignment_line})
+
+    findings = scan_repository(repository)
+
+    assert [(finding.path, finding.line_number, finding.rule) for finding in findings] == [
+        ("settings.txt", 1, "credential assignment")
+    ]
+    assert "live-" not in findings[0].render()
+
+
+def test_scan_does_not_treat_equality_comparison_as_assignment(tmp_path: Path) -> None:
+    comparison = "ANTHROPIC_AUTH_" + 'TOKEN == "not-an-assignment"'
+    repository = _tracked_repository(tmp_path, {"condition.py": comparison})
+
+    assert scan_repository(repository) == []
+
+
+def test_finding_render_escapes_control_characters_in_path(tmp_path: Path) -> None:
+    assignment = "ANTHROPIC_AUTH_" + "TOKEN=live-control-path-secret"
+    repository = _tracked_repository(tmp_path, {"unsafe\x1b[2J.env": assignment})
+
+    findings = scan_repository(repository)
+
+    assert len(findings) == 1
+    rendered = findings[0].render()
+    assert "\x1b" not in rendered
+    assert "\\u001b" in rendered
+    assert "live-control-path-secret" not in rendered
+
+
+def test_scan_allows_references_but_rejects_shell_fallback_literals(tmp_path: Path) -> None:
+    key = "ANTHROPIC_AUTH_" + "TOKEN"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "workflow.env": "\n".join(
+                [
+                    f"{key} = ${{{{ secrets.ANTHROPIC_AUTH_TOKEN }}}}",
+                    f"{key} = ${{TOKEN}}",
+                    f"{key} = ${{TOKEN:-live-fallback-secret}}",
+                    f"{key} = ${{TOKEN-live-fallback-secret}}",
+                ]
+            )
+        },
+    )
+
+    findings = scan_repository(repository)
+
+    assert [(finding.path, finding.line_number) for finding in findings] == [
+        ("workflow.env", 3),
+        ("workflow.env", 4),
+    ]
+    assert "live-fallback-secret" not in "\n".join(finding.render() for finding in findings)
+
+
+@pytest.mark.parametrize(
     "authorization_line",
     [
         '"Author' + 'ization": "Bearer live-json-secret"',
@@ -173,3 +241,30 @@ def test_cli_exits_zero_for_clean_repository(
 
     assert main([]) == 0
     assert capsys.readouterr().err == ""
+
+
+def test_main_none_reads_process_arguments(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT_PATH), "unexpected"])
+
+    assert main() == 2
+
+    captured = capsys.readouterr()
+    assert "unexpected arguments" in captured.err
+    assert captured.out == ""
+
+
+def test_script_rejects_real_unexpected_cli_argument() -> None:
+    completed = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "unexpected"],
+        cwd=SCRIPT_PATH.parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 2
+    assert "unexpected arguments" in completed.stderr
+    assert completed.stdout == ""

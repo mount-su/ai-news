@@ -15,9 +15,21 @@ from pathlib import Path, PurePosixPath
 
 _ASSIGNMENT_PATTERN = re.compile(
     r"""(?ix)
-    \bANTHROPIC_AUTH_TOKEN\b
-    \s*=\s*
-    (?P<value>"[^"\r\n]*"|'[^'\r\n]*'|[^\s\#;]+)
+    (?:
+        (?P<assignment_quote>["'])ANTHROPIC_AUTH_TOKEN(?P=assignment_quote)
+        |
+        \bANTHROPIC_AUTH_TOKEN\b
+    )
+    \s*(?:=(?!=)|:)\s*
+    (?P<value>
+        \$\{\{[^\r\n]*?\}\}
+        |
+        "[^"\r\n]*"
+        |
+        '[^'\r\n]*'
+        |
+        [^\s\#;]+
+    )
     """
 )
 _BEARER_PATTERN = re.compile(
@@ -43,6 +55,11 @@ _PATTERNS = (
     ("bearer credential", _BEARER_PATTERN),
 )
 _SPECIFICATION_DIRECTORY = PurePosixPath("docs/superpowers/plans")
+_SHELL_REFERENCE_PATTERN = re.compile(r"^\$\{[A-Za-z_][A-Za-z0-9_]*\}$")
+_GITHUB_SECRET_REFERENCE_PATTERN = re.compile(
+    r"^\$\{\{\s*secrets\.[A-Za-z_][A-Za-z0-9_]*\s*\}\}$",
+    re.IGNORECASE,
+)
 
 
 class SecretScanError(RuntimeError):
@@ -57,7 +74,7 @@ class Finding:
 
     def render(self) -> str:
         display_path = self.path
-        if any(character.isspace() for character in display_path):
+        if any(character.isspace() or not character.isprintable() for character in display_path):
             display_path = json.dumps(display_path, ensure_ascii=True)
         return f"{display_path}:{self.line_number}: potential {self.rule}"
 
@@ -114,7 +131,8 @@ def _is_placeholder(path: str, value: str) -> bool:
     if not normalized:
         return True
     if (
-        (normalized.startswith("${") and normalized.endswith("}"))
+        _SHELL_REFERENCE_PATTERN.fullmatch(normalized)
+        or _GITHUB_SECRET_REFERENCE_PATTERN.fullmatch(normalized)
         or (normalized.startswith("<") and normalized.endswith(">"))
         or normalized.startswith("replace-with-")
         or normalized.startswith("your-")
@@ -149,7 +167,11 @@ def scan_repository(repository: Path) -> list[Finding]:
     findings: list[Finding] = []
     for raw_path, display_path in _tracked_paths(root):
         content = _read_regular_file(root, raw_path)
-        if content is None or b"\0" in content:
+        if content is None:
+            continue
+        # A NUL byte classifies the tracked entry as binary. The scanner's
+        # contract is intentionally limited to tracked text files.
+        if b"\0" in content:
             continue
         text = content.decode("utf-8", errors="replace")
         for line_number, line in enumerate(text.splitlines(), start=1):
@@ -164,7 +186,8 @@ def scan_repository(repository: Path) -> list[Finding]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    if argv:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments:
         print("secret_scan_error: unexpected arguments", file=sys.stderr)
         return 2
     try:
