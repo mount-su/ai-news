@@ -57,13 +57,13 @@ def parse_feed(payload: bytes, source: SourceSpec) -> list[RawItem]:
 
     items: list[RawItem] = []
     for entry in parsed_feed.entries:
-        title = _text(entry.get("title"))
-        url = _https_url(entry.get("link"))
-        published_at = _published_at(entry)
-        if not title or url is None or published_at is None:
-            continue
-
         try:
+            title = _text(entry.get("title"))
+            url = _https_url(entry.get("link"))
+            published_at = _published_at(entry)
+            if not title or url is None or published_at is None:
+                continue
+
             item = RawItem(
                 source_id=source.id,
                 source_name=source.name,
@@ -75,7 +75,7 @@ def parse_feed(payload: bytes, source: SourceSpec) -> list[RawItem]:
                 category_hint=source.category,
                 is_official_source=source.official,
             )
-        except ValidationError:
+        except (OverflowError, TypeError, ValueError, ValidationError):
             continue
         items.append(item)
 

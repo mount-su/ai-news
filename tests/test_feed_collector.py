@@ -63,6 +63,21 @@ def test_invalid_entries_are_skipped_without_discarding_valid_entries() -> None:
     assert [item.title for item in items] == ["Valid Entry"]
 
 
+def test_malformed_url_entry_is_skipped_without_losing_later_valid_entry() -> None:
+    payload = b"""\
+<rss version="2.0"><channel><title>Malformed URL</title>
+  <item><title>Broken URL</title><link>https://[broken</link>
+    <pubDate>Sat, 25 Jul 2026 10:00:00 GMT</pubDate></item>
+  <item><title>Valid after broken</title><link>https://example.com/valid</link>
+    <pubDate>Sat, 25 Jul 2026 11:00:00 GMT</pubDate></item>
+</channel></rss>
+"""
+
+    items = parse_feed(payload, _source())
+
+    assert [item.title for item in items] == ["Valid after broken"]
+
+
 def test_atom_timestamp_with_offset_is_normalized_to_utc() -> None:
     payload = b"""\
 <?xml version="1.0" encoding="utf-8"?>

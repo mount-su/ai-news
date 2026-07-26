@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 import httpx
 import pytest
 
-from ai_news.http import get_bytes
+from ai_news.http import HttpFetchError, get_bytes
 
 
 class RecordingStream(httpx.AsyncByteStream):
@@ -18,6 +18,28 @@ class RecordingStream(httpx.AsyncByteStream):
         for chunk in self.chunks:
             self.iterations += 1
             yield chunk
+
+
+def _assert_exception_has_no_sensitive_state(error: Exception, secrets: set[str]) -> None:
+    pending: list[BaseException] = [error]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+
+        rendered = f"{current!s} {current!r}"
+        assert all(secret not in rendered for secret in secrets)
+        for value in vars(current).values():
+            assert not isinstance(value, httpx.Request | httpx.Response | httpx.Headers)
+            value_rendered = f"{value!s} {value!r}"
+            assert all(secret not in value_rendered for secret in secrets)
+
+        if current.__cause__ is not None:
+            pending.append(current.__cause__)
+        if current.__context__ is not None:
+            pending.append(current.__context__)
 
 
 def test_non_https_url_is_rejected_without_a_request() -> None:
@@ -212,6 +234,53 @@ def test_https_redirect_is_followed() -> None:
     assert requested_urls == ["https://example.com/start", "https://example.com/final"]
 
 
+def test_cross_origin_redirect_is_rejected_before_credentials_leave_origin() -> None:
+    secret = "private-api-key"
+    received_requests: list[tuple[str, str | None]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        received_requests.append((str(request.url), request.headers.get("X-API-Key")))
+        if request.url.host == "source.example":
+            return httpx.Response(
+                302,
+                headers={"Location": "https://127.0.0.1/internal"},
+                request=request,
+            )
+        return httpx.Response(200, content=b"must not be reached", request=request)
+
+    async def exercise() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(ValueError, match="origin"):
+                await get_bytes(
+                    client,
+                    "https://source.example/start",
+                    headers={"X-API-Key": secret},
+                )
+
+    asyncio.run(exercise())
+    assert received_requests == [("https://source.example/start", secret)]
+
+
+def test_redirect_cannot_change_from_explicit_zero_port_to_default_https_port() -> None:
+    requested_urls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_urls.append(str(request.url))
+        return httpx.Response(
+            302,
+            headers={"Location": "https://example.com/final"},
+            request=request,
+        )
+
+    async def exercise() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(ValueError, match="origin"):
+                await get_bytes(client, "https://example.com:0/start")
+
+    asyncio.run(exercise())
+    assert requested_urls == ["https://example.com:0/start"]
+
+
 def test_redirect_to_non_https_is_rejected_before_insecure_request() -> None:
     requested_urls: list[str] = []
 
@@ -230,6 +299,67 @@ def test_redirect_to_non_https_is_rejected_before_insecure_request() -> None:
 
     asyncio.run(exercise())
     assert requested_urls == ["https://example.com/start"]
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        "https://user:password@example.com/final",
+        "https:///missing-host",
+    ],
+)
+def test_redirect_target_requires_host_and_forbids_userinfo(location: str) -> None:
+    requested_urls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_urls.append(str(request.url))
+        return httpx.Response(302, headers={"Location": location}, request=request)
+
+    async def exercise() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(ValueError, match="redirect"):
+                await get_bytes(client, "https://example.com/start")
+
+    asyncio.run(exercise())
+    assert requested_urls == ["https://example.com/start"]
+
+
+def test_redirect_loop_is_rejected_before_revisiting_a_url() -> None:
+    requested_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_paths.append(request.url.path)
+        location = "/second" if request.url.path == "/start" else "/start"
+        return httpx.Response(302, headers={"Location": location}, request=request)
+
+    async def exercise() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(ValueError, match="redirect"):
+                await get_bytes(client, "https://example.com/start")
+
+    asyncio.run(exercise())
+    assert requested_paths == ["/start", "/second"]
+
+
+def test_more_than_five_redirects_is_rejected_before_sixth_hop() -> None:
+    requested_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_paths.append(request.url.path)
+        redirect_number = int(request.url.path.removeprefix("/"))
+        return httpx.Response(
+            302,
+            headers={"Location": f"/{redirect_number + 1}"},
+            request=request,
+        )
+
+    async def exercise() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(ValueError, match="redirect"):
+                await get_bytes(client, "https://example.com/0")
+
+    asyncio.run(exercise())
+    assert requested_paths == ["/0", "/1", "/2", "/3", "/4", "/5"]
 
 
 @pytest.mark.parametrize(
@@ -271,3 +401,59 @@ def test_authorization_header_value_is_not_exposed_in_errors() -> None:
         return str(exc_info.value)
 
     assert secret not in asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("failure_kind", ["status", "transport", "redirect", "oversize"])
+def test_final_http_failures_do_not_retain_sensitive_request_state(failure_kind: str) -> None:
+    authorization = "authorization-secret"
+    api_key = "api-key-secret"
+    query_secret = "query-secret"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if failure_kind == "status":
+            return httpx.Response(401, request=request)
+        if failure_kind == "transport":
+            raise httpx.ConnectError("connection failed", request=request)
+        if failure_kind == "redirect":
+            return httpx.Response(
+                302,
+                headers={"Location": "https://127.0.0.1/internal"},
+                request=request,
+            )
+        return httpx.Response(
+            200,
+            headers={"Content-Length": "2"},
+            content=b"xx",
+            request=request,
+        )
+
+    async def exercise() -> Exception:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            try:
+                await get_bytes(
+                    client,
+                    f"https://example.com/feed.xml?token={query_secret}",
+                    headers={
+                        "Authorization": f"Bearer {authorization}",
+                        "X-API-Key": api_key,
+                    },
+                    attempts=0,
+                    max_bytes=1,
+                )
+            except Exception as error:
+                return error
+        raise AssertionError("expected get_bytes to fail")
+
+    error = asyncio.run(exercise())
+    assert isinstance(error, HttpFetchError)
+    assert error.url == "https://example.com/feed.xml"
+    _assert_exception_has_no_sensitive_state(
+        error,
+        {
+            authorization,
+            api_key,
+            query_secret,
+            "Authorization",
+            "X-API-Key",
+        },
+    )
