@@ -6,6 +6,7 @@ import hashlib
 import html
 import json
 import os
+import tomllib
 from datetime import UTC, date, datetime
 from html.parser import HTMLParser
 from pathlib import Path
@@ -245,6 +246,34 @@ def _assert_internal_targets_exist(output: Path, html_path: Path) -> None:
         assert target.is_file(), f"{html_path}: missing target for {value}"
         if parsed.fragment:
             assert parsed.fragment in _parse(target).ids
+
+
+def test_package_data_configuration_covers_all_site_templates_and_static_assets() -> None:
+    repository = Path(__file__).parents[1]
+    configuration = tomllib.loads((repository / "pyproject.toml").read_text(encoding="utf-8"))
+    setuptools_configuration = configuration["tool"]["setuptools"]
+
+    assert "package-data" in setuptools_configuration
+    package_data = setuptools_configuration["package-data"]
+    assert set(package_data["ai_news.site"]) == {
+        "templates/*.html",
+        "static/*.css",
+        "static/*.js",
+    }
+
+    site_directory = repository / "src/ai_news/site"
+    configured_resources = {
+        path.relative_to(site_directory).as_posix()
+        for pattern in package_data["ai_news.site"]
+        for path in site_directory.glob(pattern)
+    }
+    expected_resources = {
+        path.relative_to(site_directory).as_posix()
+        for directory in ("templates", "static")
+        for path in (site_directory / directory).iterdir()
+        if path.is_file()
+    }
+    assert configured_resources == expected_resources
 
 
 def test_build_writes_complete_subpath_site_and_valid_internal_links(
