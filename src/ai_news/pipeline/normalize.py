@@ -79,35 +79,32 @@ def canonical_url(url: str | HttpUrl) -> str:
         raise ValueError("URL must not contain control characters")
 
     try:
-        parsed = urlsplit(value)
-        port = parsed.port
-        username = parsed.username
-        password = parsed.password
-        original_host = parsed.hostname
-    except (UnicodeError, ValueError) as error:
+        validated_url = _HTTP_URL_ADAPTER.validate_python(url)
+    except (ValidationError, ValueError) as error:
         raise ValueError("URL is malformed") from error
 
     try:
-        validated_url = _HTTP_URL_ADAPTER.validate_python(url)
-    except (ValidationError, ValueError) as error:
+        original_host = urlsplit(value).hostname
+    except (UnicodeError, ValueError) as error:
         raise ValueError("URL is malformed") from error
 
     if validated_url.scheme != "https":
         raise ValueError("URL must use https")
     if not original_host or not validated_url.host:
         raise ValueError("URL must include a host")
-    if username is not None or password is not None:
+    if validated_url.username is not None or validated_url.password is not None:
         raise ValueError("URL userinfo is not allowed")
 
     normalized_host, is_ipv6 = _normalize_host(validated_url.host)
     display_host = f"[{normalized_host}]" if is_ipv6 else normalized_host
-    if port is not None and port != 443:
-        display_host = f"{display_host}:{port}"
+    if validated_url.port is not None and validated_url.port != 443:
+        display_host = f"{display_host}:{validated_url.port}"
 
-    _require_valid_percent_encoding(parsed.query)
+    validated_query = validated_url.query or ""
+    _require_valid_percent_encoding(validated_query)
     try:
         query_items = parse_qsl(
-            parsed.query,
+            validated_query,
             keep_blank_values=True,
             encoding="utf-8",
             errors="strict",
@@ -122,7 +119,9 @@ def canonical_url(url: str | HttpUrl) -> str:
     retained_query.sort(key=lambda pair: (pair[0], pair[1]))
     query = urlencode(retained_query, doseq=True, encoding="utf-8", errors="strict")
 
-    return urlunsplit(("https", display_host, _normalize_path(parsed.path), query, ""))
+    return urlunsplit(
+        ("https", display_host, _normalize_path(validated_url.path or "/"), query, "")
+    )
 
 
 def normalize_title(title: str) -> str:

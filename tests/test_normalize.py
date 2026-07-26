@@ -111,10 +111,6 @@ def test_canonical_url_strips_a_dns_root_dot() -> None:
             "https://example.com/新闻/%e6%b5%8b%e8%af%95/",
             "https://example.com/%E6%96%B0%E9%97%BB/%E6%B5%8B%E8%AF%95",
         ),
-        (
-            "https://example.com/safe/%2e%2e/admin",
-            "https://example.com/safe/%2E%2E/admin",
-        ),
     ],
 )
 def test_canonical_url_normalizes_ports_ipv6_and_path_encoding(
@@ -122,6 +118,36 @@ def test_canonical_url_normalizes_ports_ipv6_and_path_encoding(
     expected: str,
 ) -> None:
     assert canonical_url(url) == expected
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://example.com/a/../b", "https://example.com/b"),
+        ("https://example.com/safe/%2e%2e/admin", "https://example.com/admin"),
+    ],
+)
+def test_canonical_path_is_identical_for_string_http_url_and_raw_item(
+    url: str,
+    expected: str,
+) -> None:
+    parsed_url = HTTP_URL_ADAPTER.validate_python(url)
+    raw = _raw_item(url=url)
+
+    assert canonical_url(url) == expected
+    assert canonical_url(parsed_url) == expected
+    assert str(to_candidate(raw).canonical_url) == expected
+
+
+def test_canonical_path_does_not_recursively_decode_double_encoded_dot_segments() -> None:
+    url = "https://example.com/safe/%252e%252e/admin"
+    expected = "https://example.com/safe/%252e%252e/admin"
+    parsed_url = HTTP_URL_ADAPTER.validate_python(url)
+    raw = _raw_item(url=url)
+
+    assert canonical_url(url) == expected
+    assert canonical_url(parsed_url) == expected
+    assert str(to_candidate(raw).canonical_url) == expected
 
 
 @pytest.mark.parametrize(
