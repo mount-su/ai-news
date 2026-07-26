@@ -256,6 +256,13 @@ class NewsItem(BaseModel):
             raise ValueError("tags must be unique")
         return value
 
+    @model_validator(mode="after")
+    def require_canonical_identity(self) -> NewsItem:
+        expected_id = hashlib.sha256(str(self.canonical_url).encode("utf-8")).hexdigest()[:16]
+        if self.id != expected_id:
+            raise ValueError("id must match the canonical_url SHA-256 prefix")
+        return self
+
     @classmethod
     def from_candidate_analysis(
         cls,

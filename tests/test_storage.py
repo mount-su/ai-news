@@ -163,6 +163,37 @@ def test_public_models_reject_extra_fields_insecure_urls_and_naive_datetimes() -
         DailyReport.model_validate({**report_payload, "schema_version": "2.0"})
 
 
+def test_news_item_rejects_id_that_does_not_match_canonical_url() -> None:
+    item_payload = _item("identity").model_dump(mode="json")
+    forged_id = "0" * 16
+    assert forged_id != item_payload["id"]
+
+    with pytest.raises(ValidationError, match="id"):
+        NewsItem.model_validate({**item_payload, "id": forged_id})
+
+
+def test_save_report_revalidates_news_item_identity(tmp_path: Path) -> None:
+    report = _report(slugs=("identity",))
+    forged_item = report.items[0].model_copy(update={"id": "0" * 16})
+    forged_report = report.model_copy(update={"items": [forged_item]})
+
+    with pytest.raises(ValidationError, match="id"):
+        save_report(tmp_path, forged_report)
+
+    assert all(not path.exists() for path in _target_paths(tmp_path))
+
+
+def test_load_reports_rejects_news_item_identity_corrupted_on_disk(tmp_path: Path) -> None:
+    save_report(tmp_path, _report(slugs=("identity",)))
+    report_path = _target_paths(tmp_path)[0]
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    payload["items"][0]["id"] = "0" * 16
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="id"):
+        load_reports(tmp_path)
+
+
 def test_source_run_factories_enforce_safe_error_metadata() -> None:
     success = SourceRun.succeeded(
         source_id="official-feed",
@@ -435,3 +466,89 @@ def test_load_reports_rejects_symlink_escape(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="path"):
         load_reports(tmp_path)
+
+
+def test_loaders_reject_index_symlink_that_escapes_root(tmp_path: Path) -> None:
+    root = tmp_path / "repository"
+    outside = tmp_path / "outside"
+    (root / "data").mkdir(parents=True)
+    outside.mkdir()
+    outside_index = outside / "index.json"
+    outside_index.write_text('{"reports": []}\n', encoding="utf-8")
+    (root / "data/index.json").symlink_to(outside_index)
+
+    with pytest.raises(ValueError, match="root"):
+        load_reports(root)
+    with pytest.raises(ValueError, match="root"):
+        load_history_urls(root, RUN_DATE)
+
+
+def test_data_directory_symlink_escape_is_rejected_without_external_writes(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repository"
+    outside = tmp_path / "outside-data"
+    root.mkdir()
+    outside.mkdir()
+    sentinel = outside / "sentinel.bin"
+    sentinel.write_bytes(b"unchanged")
+    (root / "data").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="root"):
+        save_report(root, _report(slugs=("escape",)))
+
+    assert {path.name: path.read_bytes() for path in outside.iterdir()} == {
+        "sentinel.bin": b"unchanged"
+    }
+    with pytest.raises(ValueError, match="root"):
+        load_reports(root)
+    with pytest.raises(ValueError, match="root"):
+        load_history_urls(root, RUN_DATE)
+
+
+def test_content_directory_symlink_escape_is_rejected_without_external_writes(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repository"
+    outside = tmp_path / "outside-content"
+    root.mkdir()
+    outside.mkdir()
+    sentinel = outside / "sentinel.bin"
+    sentinel.write_bytes(b"unchanged")
+    (root / "content").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="root"):
+        save_report(root, _report(slugs=("escape",)))
+
+    assert {path.name: path.read_bytes() for path in outside.iterdir()} == {
+        "sentinel.bin": b"unchanged"
+    }
+
+
+def test_report_leaf_symlink_escape_is_rejected_without_external_changes(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repository"
+    outside = tmp_path / "outside-report.json"
+    report_path = _target_paths(root)[0]
+    report_path.parent.mkdir(parents=True)
+    outside.write_bytes(b"external sentinel")
+    report_path.symlink_to(outside)
+
+    with pytest.raises(ValueError, match="root"):
+        save_report(root, _report(slugs=("escape",)))
+
+    assert outside.read_bytes() == b"external sentinel"
+    assert report_path.is_symlink()
+
+
+def test_root_symlink_uses_resolved_repository_as_storage_boundary(tmp_path: Path) -> None:
+    actual_root = tmp_path / "actual-repository"
+    root_alias = tmp_path / "repository-alias"
+    actual_root.mkdir()
+    root_alias.symlink_to(actual_root, target_is_directory=True)
+
+    save_report(root_alias, _report(slugs=("allowed",)))
+
+    assert [report.date for report in load_reports(root_alias)] == [RUN_DATE]
+    assert _target_paths(actual_root)[0].is_file()

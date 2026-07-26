@@ -63,6 +63,29 @@ def _index_path(root: Path) -> Path:
     return root / "data" / "index.json"
 
 
+def _root_boundary(root: Path) -> Path:
+    try:
+        return root.resolve(strict=False)
+    except (OSError, RuntimeError) as error:
+        raise ValueError("storage root cannot be resolved safely") from error
+
+
+def _require_within_root(root_boundary: Path, path: Path) -> Path:
+    try:
+        resolved_path = path.resolve(strict=False)
+        resolved_path.relative_to(root_boundary)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise ValueError("storage path escapes resolved root") from error
+    return path
+
+
+def _require_storage_target(root_boundary: Path, path: Path) -> Path:
+    _require_within_root(root_boundary, path)
+    if path.is_symlink():
+        raise ValueError("storage path must not be a leaf symlink")
+    return path
+
+
 def _json_text(value: object) -> str:
     return (
         json.dumps(
@@ -141,35 +164,42 @@ def _render_markdown(report: DailyReport) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _read_index(root: Path) -> _ReportIndex:
-    path = _index_path(root)
+def _read_index(root: Path, root_boundary: Path) -> _ReportIndex:
+    path = _require_storage_target(root_boundary, _index_path(root))
     if not path.exists():
         return _ReportIndex(reports=[])
     if not path.is_file():
         raise ValueError("index path must be a regular file")
+    _require_storage_target(root_boundary, path)
     return _ReportIndex.model_validate_json(path.read_bytes())
 
 
-def _validated_report_path(root: Path, entry: _IndexEntry) -> Path:
+def _validated_report_path(
+    root: Path,
+    root_boundary: Path,
+    entry: _IndexEntry,
+) -> Path:
     relative_path = PurePosixPath(entry.path)
     expected_path = _report_relative_path(entry.date)
     if relative_path.is_absolute() or relative_path.as_posix() != expected_path:
         raise ValueError(f"index path does not match report date for {entry.date.isoformat()}")
 
-    target = root.joinpath(*relative_path.parts)
-    data_root = (root / "data").resolve()
-    resolved_target = target.resolve(strict=False)
-    try:
-        resolved_target.relative_to(data_root)
-    except ValueError as error:
-        raise ValueError(f"report path escapes data root for {entry.date.isoformat()}") from error
+    target = _require_storage_target(
+        root_boundary,
+        root.joinpath(*relative_path.parts),
+    )
     if not target.is_file():
         raise ValueError(f"indexed report path is not a file for {entry.date.isoformat()}")
+    _require_storage_target(root_boundary, target)
     return target
 
 
-def _load_entry_report(root: Path, entry: _IndexEntry) -> DailyReport:
-    path = _validated_report_path(root, entry)
+def _load_entry_report(
+    root: Path,
+    root_boundary: Path,
+    entry: _IndexEntry,
+) -> DailyReport:
+    path = _validated_report_path(root, root_boundary, entry)
     report = DailyReport.model_validate_json(path.read_bytes())
     if report.date != entry.date:
         raise ValueError(f"index date does not match report date for {entry.date.isoformat()}")
@@ -178,8 +208,15 @@ def _load_entry_report(root: Path, entry: _IndexEntry) -> DailyReport:
     return report
 
 
-def _prepare_file(target: Path, content: bytes, suffix: str) -> Path:
+def _prepare_file(
+    root_boundary: Path,
+    target: Path,
+    content: bytes,
+    suffix: str,
+) -> Path:
+    _require_storage_target(root_boundary, target)
     target.parent.mkdir(parents=True, exist_ok=True)
+    _require_storage_target(root_boundary, target)
     temporary_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -193,6 +230,7 @@ def _prepare_file(target: Path, content: bytes, suffix: str) -> Path:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
+        _require_within_root(root_boundary, temporary_path)
         return temporary_path
     except BaseException:
         if temporary_path is not None:
@@ -200,8 +238,9 @@ def _prepare_file(target: Path, content: bytes, suffix: str) -> Path:
         raise
 
 
-def _fsync_directories(paths: set[Path]) -> None:
+def _fsync_directories(root_boundary: Path, paths: set[Path]) -> None:
     for path in sorted(paths, key=str):
+        _require_within_root(root_boundary, path)
         descriptor = os.open(path, os.O_RDONLY)
         try:
             os.fsync(descriptor)
@@ -215,22 +254,33 @@ def _cleanup_files(paths: list[Path | None]) -> None:
             path.unlink(missing_ok=True)
 
 
-def _commit_files(target_contents: list[tuple[Path, bytes]]) -> None:
+def _commit_files(
+    root_boundary: Path,
+    target_contents: list[tuple[Path, bytes]],
+) -> None:
     temporary_files: list[Path] = []
     prepared_writes: list[_PreparedWrite] = []
     replaced_writes: list[_PreparedWrite] = []
     directories = {target.parent for target, _ in target_contents}
     try:
+        for target, _ in target_contents:
+            _require_storage_target(root_boundary, target)
+
         for target, content in target_contents:
-            temporary_files.append(_prepare_file(target, content, ".tmp"))
+            temporary_files.append(_prepare_file(root_boundary, target, content, ".tmp"))
 
         for (target, _), temporary in zip(
             target_contents,
             temporary_files,
             strict=True,
         ):
+            _require_storage_target(root_boundary, target)
             existed = target.exists()
-            backup = _prepare_file(target, target.read_bytes(), ".bak") if existed else None
+            backup = (
+                _prepare_file(root_boundary, target, target.read_bytes(), ".bak")
+                if existed
+                else None
+            )
             prepared_writes.append(
                 _PreparedWrite(
                     target=target,
@@ -242,23 +292,27 @@ def _commit_files(target_contents: list[tuple[Path, bytes]]) -> None:
 
         try:
             for prepared in prepared_writes:
+                _require_storage_target(root_boundary, prepared.target)
+                _require_within_root(root_boundary, prepared.temporary)
                 prepared.temporary.replace(prepared.target)
                 replaced_writes.append(prepared)
-            _fsync_directories(directories)
+            _fsync_directories(root_boundary, directories)
         except BaseException as commit_error:
             rollback_error: BaseException | None = None
             for prepared in reversed(replaced_writes):
                 try:
+                    _require_storage_target(root_boundary, prepared.target)
                     if prepared.existed:
                         if prepared.backup is None:
                             raise RuntimeError("transaction backup is missing")
+                        _require_within_root(root_boundary, prepared.backup)
                         os.replace(prepared.backup, prepared.target)
                     else:
                         prepared.target.unlink(missing_ok=True)
                 except BaseException as error:
                     rollback_error = rollback_error or error
             try:
-                _fsync_directories(directories)
+                _fsync_directories(root_boundary, directories)
             except BaseException as error:
                 rollback_error = rollback_error or error
             if rollback_error is not None:
@@ -270,9 +324,17 @@ def _commit_files(target_contents: list[tuple[Path, bytes]]) -> None:
 
 def save_report(root: Path, report: DailyReport) -> None:
     root = Path(root)
-    existing_index = _read_index(root)
+    report = DailyReport.model_validate_json(report.model_dump_json())
+    root_boundary = _root_boundary(root)
+    report_target = _report_path(root, report.date)
+    markdown_target = _markdown_path(root, report.date)
+    index_target = _index_path(root)
+    for target in (report_target, markdown_target, index_target):
+        _require_storage_target(root_boundary, target)
+
+    existing_index = _read_index(root, root_boundary)
     for entry in existing_index.reports:
-        _load_entry_report(root, entry)
+        _load_entry_report(root, root_boundary, entry)
 
     replacement = _IndexEntry(
         date=report.date,
@@ -292,19 +354,21 @@ def save_report(root: Path, report: DailyReport) -> None:
     markdown_content = _render_markdown(report).encode("utf-8")
     index_content = _json_text(index.model_dump(mode="json")).encode("utf-8")
     _commit_files(
+        root_boundary,
         [
-            (_report_path(root, report.date), report_content),
-            (_markdown_path(root, report.date), markdown_content),
-            (_index_path(root), index_content),
-        ]
+            (report_target, report_content),
+            (markdown_target, markdown_content),
+            (index_target, index_content),
+        ],
     )
 
 
 def load_reports(root: Path) -> list[DailyReport]:
     root = Path(root)
-    index = _read_index(root)
+    root_boundary = _root_boundary(root)
+    index = _read_index(root, root_boundary)
     entries = sorted(index.reports, key=lambda entry: entry.date, reverse=True)
-    return [_load_entry_report(root, entry) for entry in entries]
+    return [_load_entry_report(root, root_boundary, entry) for entry in entries]
 
 
 def load_history_urls(
@@ -316,8 +380,9 @@ def load_history_urls(
         raise ValueError("days must be at least 1")
 
     root = Path(root)
-    index = _read_index(root)
+    root_boundary = _root_boundary(root)
+    index = _read_index(root, root_boundary)
     window_start = run_date - timedelta(days=days)
     entries = [entry for entry in index.reports if window_start <= entry.date < run_date]
-    reports = [_load_entry_report(root, entry) for entry in entries]
+    reports = [_load_entry_report(root, root_boundary, entry) for entry in entries]
     return {str(item.canonical_url) for report in reports for item in report.items}
