@@ -175,11 +175,91 @@ def test_x_api_key_authentication_uses_only_x_api_key_header() -> None:
 
 
 @pytest.mark.parametrize(
+    ("auth_scheme", "client_headers", "required_header", "forbidden_header"),
+    [
+        (
+            "bearer",
+            {"x-api-key": "client-default-key"},
+            ("authorization", "Bearer top-secret-token"),
+            "x-api-key",
+        ),
+        (
+            "x-api-key",
+            {"Authorization": "Bearer client-default-token"},
+            ("x-api-key", "top-secret-token"),
+            "authorization",
+        ),
+    ],
+)
+def test_request_auth_is_isolated_from_opposite_client_default_header(
+    auth_scheme: str,
+    client_headers: dict[str, str],
+    required_header: tuple[str, str],
+    forbidden_header: str,
+) -> None:
+    candidate = _candidate(f"client-header-{auth_scheme}")
+    captured: list[httpx.Headers] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request.headers)
+        return httpx.Response(200, content=_anthropic_response([_analysis_row(candidate)]))
+
+    async def exercise() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            headers=client_headers,
+        ) as client:
+            analyzer = AnthropicAnalyzer(
+                _settings(auth_scheme=auth_scheme),
+                client=client,
+            )
+            await analyzer.analyze([candidate])
+
+    asyncio.run(exercise())
+
+    assert captured[0][required_header[0]] == required_header[1]
+    assert forbidden_header not in captured[0]
+
+
+@pytest.mark.parametrize("auth_scheme", ["bearer", "x-api-key"])
+def test_request_auth_is_isolated_from_client_default_auth(auth_scheme: str) -> None:
+    candidate = _candidate(f"client-auth-{auth_scheme}")
+    captured: list[httpx.Headers] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request.headers)
+        return httpx.Response(200, content=_anthropic_response([_analysis_row(candidate)]))
+
+    async def exercise() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            auth=("client-user", "client-password"),
+        ) as client:
+            analyzer = AnthropicAnalyzer(
+                _settings(auth_scheme=auth_scheme),
+                client=client,
+            )
+            await analyzer.analyze([candidate])
+
+    asyncio.run(exercise())
+
+    if auth_scheme == "bearer":
+        assert captured[0]["authorization"] == "Bearer top-secret-token"
+        assert "x-api-key" not in captured[0]
+    else:
+        assert captured[0]["x-api-key"] == "top-secret-token"
+        assert "authorization" not in captured[0]
+
+
+@pytest.mark.parametrize(
     "base_url",
     [
         "https://user:password@proxy.example/api",
+        "https://@proxy.example/api",
         "https://proxy.example/api?private=query",
+        "https://proxy.example/api?",
         "https://proxy.example/api#private-fragment",
+        "https://proxy.example/api#",
     ],
 )
 def test_unsafe_base_url_components_are_rejected_without_request(base_url: str) -> None:
@@ -198,6 +278,30 @@ def test_unsafe_base_url_components_are_rejected_without_request(base_url: str) 
         exc_info.value,
         {"top-secret-token", "password", "private=query", "private-fragment"},
     )
+
+
+@pytest.mark.parametrize(
+    ("base_url", "expected_path"),
+    [
+        ("https://[2001:db8::1]/api/coding", "/api/coding/v1/messages"),
+        ("https://proxy.example/api/@scope", "/api/@scope/v1/messages"),
+    ],
+)
+def test_base_url_validation_preserves_valid_ipv6_and_path_at_sign(
+    base_url: str,
+    expected_path: str,
+) -> None:
+    candidate = _candidate("valid-base-delimiters")
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(200, content=_anthropic_response([_analysis_row(candidate)]))
+
+    result = _run_analyze(handler, [candidate], settings=_settings(base_url=base_url))
+
+    assert list(result) == [candidate.id]
+    assert captured[0].url.path == expected_path
 
 
 def test_429_and_5xx_are_retried_three_times_with_exponential_delays() -> None:

@@ -40,6 +40,11 @@ class _AnalysisRow(BaseModel):
 
 
 def _validated_endpoint(base_url: str) -> httpx.URL | None:
+    if "?" in base_url or "#" in base_url:
+        return None
+    _, separator, remainder = base_url.partition("://")
+    if not separator or "@" in remainder.split("/", 1)[0]:
+        return None
     try:
         parsed = httpx.URL(base_url)
     except (TypeError, ValueError):
@@ -185,20 +190,31 @@ class AnthropicAnalyzer:
             "messages": [{"role": "user", "content": prompt}],
         }
 
+    def _build_request(self, client: httpx.AsyncClient, prompt: str) -> httpx.Request:
+        request = client.build_request(
+            "POST",
+            self._endpoint,
+            json=self._body(prompt),
+            timeout=30,
+        )
+        request.headers.pop("Authorization", None)
+        request.headers.pop("x-api-key", None)
+        request.headers.update(self._headers())
+        return request
+
     async def _request(self, client: httpx.AsyncClient, prompt: str) -> str:
         for retry_number in range(4):
             retry = False
             terminal_error: str | None = None
             response_body: bytes | None = None
             try:
-                async with client.stream(
-                    "POST",
-                    self._endpoint,
-                    headers=self._headers(),
-                    json=self._body(prompt),
-                    timeout=30,
+                response = await client.send(
+                    self._build_request(client, prompt),
+                    stream=True,
+                    auth=None,
                     follow_redirects=False,
-                ) as response:
+                )
+                try:
                     if response.status_code == 429 or 500 <= response.status_code <= 599:
                         retry = True
                     elif 300 <= response.status_code <= 399:
@@ -209,6 +225,8 @@ class AnthropicAnalyzer:
                         response_body = await _read_bounded(response)
                         if response_body is None:
                             terminal_error = "LLM response exceeds size limit"
+                finally:
+                    await response.aclose()
             except httpx.TransportError:
                 retry = True
 
