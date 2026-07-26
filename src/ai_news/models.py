@@ -133,6 +133,14 @@ class RawItem(BaseModel):
     is_official_source: bool
 
 
+class Candidate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=r"^[0-9a-f]{16}$")
+    canonical_url: HttpUrl
+    raw: RawItem
+
+
 class Analysis(BaseModel):
     title: str
     category: Category
