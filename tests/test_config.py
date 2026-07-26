@@ -211,6 +211,16 @@ sources:
         "owner/",
         "owner/re po",
         "owner/@repo",
+        "../repo",
+        "./repo",
+        "owner/..",
+        "owner/.",
+        "owner--name/repo",
+        "-owner/repo",
+        "owner-/repo",
+        "owner.name/repo",
+        f"{'o' * 40}/repo",
+        f"owner/{'r' * 101}",
     ],
 )
 def test_github_source_rejects_invalid_repo(repo: str) -> None:
@@ -229,11 +239,11 @@ def test_github_source_strips_valid_repo() -> None:
         id="github-valid",
         name="Valid GitHub Repo",
         kind="github",
-        repo="  owner.name/repo_name-1  ",
+        repo="  owner-name/repo.name_1-2  ",
         category=Category.OPEN_SOURCE,
     )
 
-    assert source.repo == "owner.name/repo_name-1"
+    assert source.repo == "owner-name/repo.name_1-2"
 
 
 @pytest.mark.parametrize("base_path", ["ai-news/", "/ai-news"])

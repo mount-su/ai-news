@@ -18,7 +18,8 @@ from pydantic import (
 )
 
 _HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
-_GITHUB_REPO_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_GITHUB_OWNER_PATTERN = re.compile(r"^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")
+_GITHUB_REPO_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
 
 
 class Category(StrEnum):
@@ -51,8 +52,17 @@ class SourceSpec(BaseModel):
             if self.repo is None:
                 raise ValueError("github sources require a repo")
             repo = self.repo.strip()
-            if not _GITHUB_REPO_PATTERN.fullmatch(repo):
+            parts = repo.split("/")
+            if len(parts) != 2:
                 raise ValueError("github repo must use owner/repo format")
+            owner, repo_name = parts
+            if (
+                len(owner) > 39
+                or not _GITHUB_OWNER_PATTERN.fullmatch(owner)
+                or repo_name in {".", ".."}
+                or not _GITHUB_REPO_NAME_PATTERN.fullmatch(repo_name)
+            ):
+                raise ValueError("github repo must use a valid GitHub owner and repository name")
             self.repo = repo
         return self
 
