@@ -18,7 +18,7 @@ _STRUCTURED_VALUE_SEPARATOR = r"""
     (?:
         [ \t]*
         |
-        [ \t]*\r?\n
+        [ \t]*(?:\#[^\r\n]*)?\r?\n
         (?:
             [ \t]*\r?\n
             |

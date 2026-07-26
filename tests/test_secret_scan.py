@@ -259,6 +259,77 @@ def test_scan_does_not_allow_many_blank_and_comment_lines_to_bypass_detection(
     ]
 
 
+def test_scan_detects_values_after_inline_yaml_comment_and_reports_key_line(
+    tmp_path: Path,
+) -> None:
+    token_key = "ANTHROPIC_AUTH_" + "TOKEN"
+    header_key = "Author" + "ization"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "inline-comments.yaml": "\n".join(
+                [
+                    f"{token_key}:  # supplied below",
+                    "  live-token-secret",
+                    f"{header_key}: # supplied below",
+                    "  Bearer live-bearer-secret",
+                ]
+            )
+        },
+    )
+
+    findings = scan_repository(repository)
+
+    assert [(finding.line_number, finding.rule) for finding in findings] == [
+        (1, "credential assignment"),
+        (3, "bearer credential"),
+    ]
+
+
+def test_scan_allows_placeholder_after_inline_yaml_comment(tmp_path: Path) -> None:
+    token_key = "ANTHROPIC_AUTH_" + "TOKEN"
+    header_key = "Author" + "ization"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "inline-placeholders.yaml": "\n".join(
+                [
+                    f"{token_key}: # supplied below",
+                    "  ${TOKEN}",
+                    f"{header_key}: # supplied below",
+                    "  Bearer ${{ secrets.GITHUB_TOKEN }}",
+                ]
+            )
+        },
+    )
+
+    assert scan_repository(repository) == []
+
+
+def test_scan_does_not_consume_next_key_after_inline_comment_only_value(
+    tmp_path: Path,
+) -> None:
+    token_key = "ANTHROPIC_AUTH_" + "TOKEN"
+    header_key = "Author" + "ization"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "inline-null.yaml": "\n".join(
+                [
+                    f"{token_key}: # intentionally empty",
+                    "NEXT_KEY: harmless",
+                    f"{header_key}: # intentionally empty",
+                    "NEXT_HEADER: Bearer harmless",
+                    f"{token_key}: # intentionally empty",
+                    '"NEXT_QUOTED_KEY": harmless',
+                ]
+            )
+        },
+    )
+
+    assert scan_repository(repository) == []
+
+
 def test_scan_does_not_consume_unindented_next_key_as_multiline_value(tmp_path: Path) -> None:
     token_key = "ANTHROPIC_AUTH_" + "TOKEN"
     header_key = "Author" + "ization"
