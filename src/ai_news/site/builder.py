@@ -79,19 +79,11 @@ def _resolved(path: Path, *, label: str) -> Path:
         raise ValueError(f"{label} cannot be resolved safely") from error
 
 
-def _existing_path_chain(path: Path) -> Iterable[Path]:
-    absolute = path.expanduser().absolute()
-    yield absolute
-    yield from absolute.parents
-
-
 def _validate_output(root: Path, output: Path) -> tuple[Path, Path]:
     root_resolved = _resolved(root, label="root")
-    output_input = output.expanduser()
-    for candidate in _existing_path_chain(output_input):
-        if candidate.is_symlink():
-            raise ValueError("output must not use symlinked paths")
-
+    output_input = output.expanduser().absolute()
+    if output_input.is_symlink():
+        raise ValueError("output must not be a symlink")
     output_resolved = _resolved(output_input, label="output")
     home_resolved = _resolved(Path.home(), label="home")
     filesystem_root = Path(output_resolved.anchor)
@@ -102,8 +94,13 @@ def _validate_output(root: Path, output: Path) -> tuple[Path, Path]:
         or home_resolved.is_relative_to(output_resolved)
     ):
         raise ValueError("output path is unsafe")
-    if output_input.is_symlink():
-        raise ValueError("output must not be a symlink")
+    output_parent = output_resolved.parent
+    if output_parent.resolve(strict=False) != output_parent:
+        raise ValueError("resolved output parent is unsafe")
+    if output_parent.exists() and not output_parent.is_dir():
+        raise ValueError("resolved output parent must be a directory")
+    if output_resolved.is_symlink():
+        raise ValueError("resolved output must not be a symlink")
     if output_resolved.exists() and not output_resolved.is_dir():
         raise ValueError("output must be a directory")
     return root_resolved, output_resolved
@@ -362,12 +359,17 @@ def build_site(
     """Build an atomic, subpath-safe static site from stored daily reports."""
 
     base_path = _validate_base_path(base_path)
-    _root_resolved, output_resolved = _validate_output(Path(root), Path(output))
-    reports = sorted(load_reports(Path(root)), key=lambda report: report.date, reverse=True)
+    root_path = Path(root)
+    output_path = Path(output)
+    root_resolved, output_resolved = _validate_output(root_path, output_path)
+    reports = sorted(load_reports(root_path), key=lambda report: report.date, reverse=True)
     if not reports:
         raise ValueError("at least one report is required to build the site")
 
     output_resolved.parent.mkdir(parents=True, exist_ok=True)
+    confirmed_root, confirmed_output = _validate_output(root_path, output_path)
+    if confirmed_root != root_resolved or confirmed_output != output_resolved:
+        raise ValueError("root or output path changed during site build")
     staging = Path(
         tempfile.mkdtemp(
             prefix=f".{output_resolved.name}.ai-news-stage-",

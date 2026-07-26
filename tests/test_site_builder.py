@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 
 import pytest
 
+from ai_news import cli
 from ai_news.models import Category, DailyReport, NewsItem, SourceRun
 from ai_news.site import builder
 from ai_news.site.builder import build_site
@@ -431,6 +432,51 @@ def test_root_dist_is_allowed_and_replaces_only_the_existing_output(
     assert not stale.exists()
     assert (output / "index.html").is_file()
     assert source_sentinel.read_text(encoding="utf-8") == "source"
+
+
+def test_safe_symlink_ancestor_alias_builds_only_in_resolved_output(
+    tmp_path: Path,
+) -> None:
+    real_parent = tmp_path / "real-parent"
+    real_parent.mkdir()
+    real_root, _items = _saved_report_root(real_parent)
+    alias_root = tmp_path / "safe-root-alias"
+    alias_root.symlink_to(real_root, target_is_directory=True)
+    alias_output = alias_root / "dist"
+
+    build_site(alias_root, alias_output)
+
+    assert alias_output.resolve() == real_root / "dist"
+    assert (real_root / "dist/index.html").is_file()
+    assert (real_root / "dist/assets/styles.css").is_file()
+    assert alias_root.is_symlink()
+
+
+def test_cli_demo_builds_real_site_through_safe_alias_with_default_base_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for environment_name in (
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL",
+        "ANTHROPIC_AUTH_SCHEME",
+    ):
+        monkeypatch.delenv(environment_name, raising=False)
+    real_parent = tmp_path / "real-demo"
+    real_parent.mkdir()
+    alias_parent = tmp_path / "demo-alias"
+    alias_parent.symlink_to(real_parent, target_is_directory=True)
+    root = alias_parent / "workspace"
+    output = root / "dist"
+
+    result = cli.main(["demo", "--root", str(root), "--output", str(output)])
+
+    assert result == 0
+    assert (real_parent / "workspace/dist/index.html").is_file()
+    homepage = (real_parent / "workspace/dist/index.html").read_text(encoding="utf-8")
+    assert "/ai-news/assets/styles.css" in homepage
+    assert "/ai-news/assets/app.js" in homepage
 
 
 def test_empty_or_failed_build_preserves_existing_output(
