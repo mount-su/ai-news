@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 README = ROOT / "README.md"
+DESIGN = ROOT / "docs" / "superpowers" / "specs" / "2026-07-26-ai-news-github-pages-design.md"
 
 EXPECTED_HEADINGS = [
     "# AI 情报雷达",
@@ -105,3 +106,24 @@ def test_readme_does_not_contain_screenshot_markup_or_token_assignment() -> None
         r"ANTHROPIC_AUTH_TOKEN\s*=\s*[\"']?[A-Za-z0-9_-]{16,}",
         readme,
     )
+
+
+def test_readme_describes_the_implemented_degraded_rule() -> None:
+    readme = _readme()
+
+    assert "来源失败且最终仍有至少 5 条" in readme
+    assert "`degraded=true`" in readme
+    assert "个别分析无效会被丢弃" in readme
+    assert "不会自动决定 `degraded`" in readme
+    assert "候选损失时可以降级发布" not in readme
+
+
+def test_coding_plan_warning_is_generic_and_session_independent() -> None:
+    readme = _readme()
+    design = DESIGN.read_text(encoding="utf-8")
+
+    assert "若选择带 Coding Plan 特征的兼容端点" in readme
+    assert "这类 Base URL" in design
+    for session_specific_text in ["所给火山端点", "所提供的 Base URL"]:
+        assert session_specific_text not in readme
+        assert session_specific_text not in design
