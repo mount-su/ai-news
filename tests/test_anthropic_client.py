@@ -251,6 +251,44 @@ def test_request_auth_is_isolated_from_client_default_auth(auth_scheme: str) -> 
         assert "authorization" not in captured[0]
 
 
+def test_request_does_not_inherit_client_default_params_cookies_or_unrelated_headers() -> None:
+    candidate = _candidate("client-defaults")
+    captured: list[httpx.Request] = []
+    secrets = {"query-secret", "cookie-secret", "header-secret"}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(401, request=request)
+
+    async def exercise() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            params={"client_default": "query-secret"},
+            cookies={"session": "cookie-secret"},
+            headers={"x-unrelated": "header-secret"},
+        ) as client:
+            analyzer = AnthropicAnalyzer(_settings(), client=client)
+            with pytest.raises(AnalysisError) as exc_info:
+                await analyzer.analyze([candidate])
+        _assert_exception_has_no_sensitive_state(exc_info.value, secrets)
+
+    asyncio.run(exercise())
+
+    request = captured[0]
+    assert str(request.url) == "https://proxy.example/api/coding/v1/messages"
+    assert request.url.query == b""
+    assert "cookie" not in request.headers
+    assert "x-unrelated" not in request.headers
+    assert request.extensions["timeout"] == {
+        "connect": 30,
+        "read": 30,
+        "write": 30,
+        "pool": 30,
+    }
+    rendered_request = f"{request.url!s} {request.headers!r}"
+    assert all(secret not in rendered_request for secret in secrets)
+
+
 @pytest.mark.parametrize(
     "base_url",
     [

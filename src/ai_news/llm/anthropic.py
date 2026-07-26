@@ -190,17 +190,14 @@ class AnthropicAnalyzer:
             "messages": [{"role": "user", "content": prompt}],
         }
 
-    def _build_request(self, client: httpx.AsyncClient, prompt: str) -> httpx.Request:
-        request = client.build_request(
+    def _build_request(self, prompt: str) -> httpx.Request:
+        return httpx.Request(
             "POST",
             self._endpoint,
+            headers=self._headers(),
             json=self._body(prompt),
-            timeout=30,
+            extensions={"timeout": httpx.Timeout(30).as_dict()},
         )
-        request.headers.pop("Authorization", None)
-        request.headers.pop("x-api-key", None)
-        request.headers.update(self._headers())
-        return request
 
     async def _request(self, client: httpx.AsyncClient, prompt: str) -> str:
         for retry_number in range(4):
@@ -209,7 +206,7 @@ class AnthropicAnalyzer:
             response_body: bytes | None = None
             try:
                 response = await client.send(
-                    self._build_request(client, prompt),
+                    self._build_request(prompt),
                     stream=True,
                     auth=None,
                     follow_redirects=False,
