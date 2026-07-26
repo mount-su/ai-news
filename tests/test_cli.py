@@ -44,35 +44,37 @@ def test_generate_dispatches_date_root_config_and_settings(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    source_config = _source_config()
     settings = _settings()
-    config_paths: list[Path] = []
     run_arguments: list[dict[str, Any]] = []
-
-    def fake_load_source_config(path: Path) -> SourceConfig:
-        config_paths.append(path)
-        return source_config
+    sources_directory = tmp_path / "sources"
+    sources_directory.mkdir()
+    (sources_directory / "feeds.yaml").write_text(
+        """
+sources:
+  - id: actual-layout
+    name: Actual Layout
+    kind: feed
+    url: https://example.com/feed.xml
+    category: 大模型
+""",
+        encoding="utf-8",
+    )
 
     async def fake_run_daily(**kwargs: Any) -> object:
         run_arguments.append(kwargs)
         return object()
 
-    monkeypatch.setattr(cli, "load_source_config", fake_load_source_config)
     monkeypatch.setattr(cli, "load_settings", lambda: settings)
     monkeypatch.setattr(cli, "run_daily", fake_run_daily)
 
     result = cli.main(["generate", "--date", RUN_DATE.isoformat(), "--root", str(tmp_path)])
 
     assert result == 0
-    assert config_paths == [tmp_path / "sources/sources.yml"]
-    assert run_arguments == [
-        {
-            "root": tmp_path,
-            "run_date": RUN_DATE,
-            "source_config": source_config,
-            "settings": settings,
-        }
-    ]
+    assert len(run_arguments) == 1
+    assert run_arguments[0]["root"] == tmp_path
+    assert run_arguments[0]["run_date"] == RUN_DATE
+    assert run_arguments[0]["settings"] == settings
+    assert [source.id for source in run_arguments[0]["source_config"].sources] == ["actual-layout"]
 
 
 def test_generate_uses_shanghai_today_when_date_is_omitted(

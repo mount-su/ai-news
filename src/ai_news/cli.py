@@ -117,7 +117,7 @@ def _demo_report() -> DailyReport:
 
 def _generate(root: Path, run_date: date | None) -> int:
     try:
-        source_config = load_source_config(root / "sources/sources.yml")
+        source_config = load_source_config(root / "sources/feeds.yaml")
         settings = load_settings()
     except Exception as error:
         _safe_error("configuration_error", error)

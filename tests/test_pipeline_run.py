@@ -394,6 +394,53 @@ def test_missing_or_invalid_analysis_is_not_fabricated(
         )
 
 
+@pytest.mark.parametrize(
+    "invalid_kind",
+    [
+        "numeric-string",
+        "boolean-string",
+        "boolean-as-integer",
+        "tuple-tags",
+        "extra-field",
+        "missing-field",
+    ],
+)
+def test_non_strict_analysis_payloads_are_discarded_without_saving(
+    invalid_kind: str,
+) -> None:
+    source = _source(0)
+    items = [_raw(index, source=source) for index in range(5)]
+    saves: list[DailyReport] = []
+
+    def result(candidates: list[Any]) -> dict[str, dict[str, Any]]:
+        values: dict[str, dict[str, Any]] = {}
+        for index, candidate in enumerate(candidates):
+            payload = _analysis(index).model_dump()
+            if invalid_kind == "numeric-string":
+                payload["importance"] = "8"
+            elif invalid_kind == "boolean-string":
+                payload["is_official"] = "false"
+            elif invalid_kind == "boolean-as-integer":
+                payload["importance"] = True
+            elif invalid_kind == "tuple-tags":
+                payload["tags"] = tuple(payload["tags"])
+            elif invalid_kind == "extra-field":
+                payload["unexpected"] = "must be rejected"
+            else:
+                payload.pop("tracking_signal")
+            values[candidate.id] = payload
+        return values
+
+    with pytest.raises(PublicationThresholdError):
+        _run(
+            collector=_collector({source.id: items}),
+            analyzer=_Analyzer(result),
+            report_saver=lambda _root, report: saves.append(report),
+        )
+
+    assert saves == []
+
+
 def test_unknown_analysis_id_fails_the_whole_run_without_saving() -> None:
     source = _source(0)
     items = [_raw(index, source=source) for index in range(5)]
@@ -495,6 +542,72 @@ def test_fixed_clocks_make_the_report_deterministic() -> None:
 
     assert first == second
     assert all(source_run.elapsed_ms == 0 for source_run in first.source_runs)
+
+
+def test_duplicate_canonical_urls_are_folded_before_bounded_pretrim() -> None:
+    source = _source(0)
+    duplicate_url = "https://example.com/news/high-priority-duplicate"
+    duplicate_items: list[RawItem] = []
+    for index in range(500):
+        raw_data = _raw(index, source=source).model_dump()
+        raw_data.update(url=duplicate_url, source_weight=10)
+        duplicate_items.append(RawItem.model_validate(raw_data))
+    unique_items: list[RawItem] = []
+    for index in range(5):
+        raw_data = _raw(10_000 + index, source=source).model_dump()
+        raw_data["source_weight"] = 1
+        unique_items.append(RawItem.model_validate(raw_data))
+
+    report = _run(
+        collector=_collector({source.id: [*duplicate_items, *unique_items]}),
+        analyzer=_Analyzer(),
+    )
+
+    assert report.candidate_count == 6
+    assert len(report.items) == 6
+    assert sum(str(item.canonical_url) == duplicate_url for item in report.items) == 1
+
+
+def test_more_than_1500_unique_items_stay_bounded_and_order_independent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ai_news.pipeline import run as run_module
+
+    source = _source(0)
+    raw_items = [
+        _raw(
+            index,
+            source=source,
+            published_at=NOW - timedelta(seconds=index % 3600),
+        )
+        for index in range(1_601)
+    ]
+    dedupe_sizes: list[int] = []
+    real_deduplicate = run_module.deduplicate
+
+    def bounded_deduplicate(candidates: list[Any], historical_urls: set[str]) -> list[Any]:
+        dedupe_sizes.append(len(candidates))
+        return real_deduplicate(candidates, historical_urls)
+
+    monkeypatch.setattr(run_module, "deduplicate", bounded_deduplicate)
+    first_analyzer = _Analyzer()
+    second_analyzer = _Analyzer()
+
+    _run(
+        collector=_collector({source.id: raw_items}),
+        analyzer=first_analyzer,
+        monotonic=lambda: 100.0,
+    )
+    _run(
+        collector=_collector({source.id: list(reversed(raw_items))}),
+        analyzer=second_analyzer,
+        monotonic=lambda: 100.0,
+    )
+
+    assert dedupe_sizes == [500, 500]
+    assert [item.id for item in first_analyzer.calls[0]] == [
+        item.id for item in second_analyzer.calls[0]
+    ]
 
 
 def test_client_exit_failure_is_safe_and_prevents_all_persistence(

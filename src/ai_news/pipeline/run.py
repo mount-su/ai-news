@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -32,7 +32,7 @@ from ai_news.models import (
 )
 from ai_news.pipeline.dedupe import deduplicate
 from ai_news.pipeline.normalize import ensure_utc, to_candidate
-from ai_news.pipeline.rank import select_candidates
+from ai_news.pipeline.rank import candidate_score, select_candidates
 from ai_news.storage import load_history_urls, save_report
 
 _COLLECTION_CONCURRENCY = 6
@@ -41,6 +41,7 @@ _ANALYSIS_LIMIT = 30
 _PUBLICATION_LIMIT = 20
 _PUBLICATION_THRESHOLD = 5
 _WINDOW = timedelta(hours=36)
+_ANALYSIS_FIELDS = frozenset(Analysis.model_fields)
 
 
 class PipelineError(RuntimeError):
@@ -165,7 +166,7 @@ def _normalize_in_window(
 ) -> list[Candidate]:
     window_start = now - _WINDOW
     historical = {str(url) for url in historical_urls}
-    candidates: list[Candidate] = []
+    candidates_by_url: dict[str, Candidate] = {}
     for source_run, raw_items in collection_results:
         if not source_run.success:
             continue
@@ -179,16 +180,44 @@ def _normalize_in_window(
                 window_start <= published_at <= now
                 and str(candidate.canonical_url) not in historical
             ):
-                candidates.append(candidate)
-                if len(candidates) == _DEDUPLICATION_LIMIT * 2:
-                    candidates = select_candidates(
-                        candidates,
+                canonical = str(candidate.canonical_url)
+                existing = candidates_by_url.get(canonical)
+                if existing is None or _candidate_preference_key(
+                    candidate,
+                    now,
+                ) < _candidate_preference_key(existing, now):
+                    candidates_by_url[canonical] = candidate
+                if len(candidates_by_url) == _DEDUPLICATION_LIMIT * 2:
+                    retained = select_candidates(
+                        list(candidates_by_url.values()),
                         now,
                         limit=_DEDUPLICATION_LIMIT,
                     )
-    if len(candidates) > _DEDUPLICATION_LIMIT:
-        return select_candidates(candidates, now, limit=_DEDUPLICATION_LIMIT)
-    return candidates
+                    candidates_by_url = {
+                        str(retained_candidate.canonical_url): retained_candidate
+                        for retained_candidate in retained
+                    }
+    return select_candidates(
+        list(candidates_by_url.values()),
+        now,
+        limit=_DEDUPLICATION_LIMIT,
+    )
+
+
+def _candidate_preference_key(candidate: Candidate, now: datetime) -> tuple[object, ...]:
+    raw = candidate.raw
+    return (
+        -candidate_score(candidate, now),
+        -ensure_utc(raw.published_at).timestamp(),
+        candidate.id,
+        raw.source_id,
+        raw.source_name,
+        raw.title,
+        raw.excerpt,
+        raw.category_hint.value,
+        raw.is_official_source,
+        str(raw.url),
+    )
 
 
 def _prepare_candidates(
@@ -221,8 +250,19 @@ def _validated_analyses(
             seen_ids.add(candidate_id)
             if candidate_id not in expected_ids:
                 raise AnalysisPipelineError("unknown analysis id")
+            if isinstance(raw_analysis, Analysis):
+                analysis_data = raw_analysis.model_dump()
+            elif isinstance(raw_analysis, Mapping):
+                analysis_data = dict(raw_analysis)
+            else:
+                continue
+            if set(analysis_data) != _ANALYSIS_FIELDS:
+                continue
             try:
-                validated[candidate_id] = Analysis.model_validate(raw_analysis)
+                validated[candidate_id] = Analysis.model_validate(
+                    analysis_data,
+                    strict=True,
+                )
             except (TypeError, ValueError, ValidationError):
                 continue
     except AnalysisPipelineError:
