@@ -218,6 +218,14 @@ def _parse(path: Path) -> _DocumentParser:
     return parser
 
 
+def _directory_bytes(path: Path) -> dict[str, bytes]:
+    return {
+        file.relative_to(path).as_posix(): file.read_bytes()
+        for file in sorted(path.rglob("*"))
+        if file.is_file()
+    }
+
+
 def _assert_internal_targets_exist(output: Path, html_path: Path) -> None:
     parser = _parse(html_path)
     for link in parser.links:
@@ -416,6 +424,33 @@ def test_dangerous_outputs_and_symlinks_are_rejected_without_touching_sentinels(
     assert output_sentinel.read_text(encoding="utf-8") == "linked"
 
 
+@pytest.mark.parametrize(
+    "relative_output",
+    [
+        "data",
+        "data/site",
+        "content",
+        "content/site",
+        "sources",
+        "sources/site",
+    ],
+)
+def test_reserved_storage_paths_are_rejected_without_changing_persisted_bytes(
+    report_root: tuple[Path, dict[str, NewsItem]],
+    relative_output: str,
+) -> None:
+    root, _items = report_root
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "feeds.yaml").write_bytes(b"sources:\n  - id: persisted\n")
+    before = _directory_bytes(root)
+
+    with pytest.raises(ValueError, match="reserved"):
+        build_site(root, root / relative_output)
+
+    assert _directory_bytes(root) == before
+
+
 def test_root_dist_is_allowed_and_replaces_only_the_existing_output(
     report_root: tuple[Path, dict[str, NewsItem]],
 ) -> None:
@@ -534,3 +569,46 @@ def test_output_replacement_rolls_back_when_final_replace_fails(
 
     assert sentinel.read_text(encoding="utf-8") == "old site"
     assert not any("ai-news-" in path.name for path in tmp_path.iterdir() if path != output)
+
+
+def test_partial_backup_cleanup_failure_keeps_successful_site_and_owned_remainder(
+    report_root: tuple[Path, dict[str, NewsItem]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, _items = report_root
+    output = tmp_path / "dist"
+    (output / "nested").mkdir(parents=True)
+    (output / "sentinel.txt").write_bytes(b"old site\n")
+    (output / "nested/preserve.bin").write_bytes(b"\x00old\xff")
+    real_rmtree = builder.shutil.rmtree
+
+    def partially_fail_backup_cleanup(
+        path: str | os.PathLike[str],
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        selected_path = Path(path)
+        if ".dist.ai-news-backup-" in selected_path.name:
+            (selected_path / "nested/preserve.bin").unlink()
+            raise PermissionError("simulated backup cleanup denial")
+        real_rmtree(selected_path, *args, **kwargs)
+
+    monkeypatch.setattr(builder.shutil, "rmtree", partially_fail_backup_cleanup)
+
+    build_site(root, output)
+
+    assert (output / "index.html").is_file()
+    assert (output / "search.json").is_file()
+    assert not (output / "sentinel.txt").exists()
+    backup_artifacts = [
+        path for path in tmp_path.iterdir() if path.name.startswith(".dist.ai-news-backup-")
+    ]
+    assert len(backup_artifacts) == 1
+    backup = backup_artifacts[0]
+    assert not backup.is_symlink()
+    assert _directory_bytes(backup) == {"sentinel.txt": b"old site\n"}
+
+    monkeypatch.setattr(builder.shutil, "rmtree", real_rmtree)
+    builder._remove_owned_directory(backup, tmp_path, ".dist.ai-news-backup-")
+    assert not backup.exists()

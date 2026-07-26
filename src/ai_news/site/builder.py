@@ -22,6 +22,7 @@ _SITE_DIRECTORY = Path(__file__).parent
 _TEMPLATE_DIRECTORY = _SITE_DIRECTORY / "templates"
 _STATIC_DIRECTORY = _SITE_DIRECTORY / "static"
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
+_RESERVED_ROOT_DIRECTORIES = ("data", "content", "sources")
 
 CATEGORY_SLUGS: dict[Category, str] = {
     Category.MODEL: "model",
@@ -79,6 +80,10 @@ def _resolved(path: Path, *, label: str) -> Path:
         raise ValueError(f"{label} cannot be resolved safely") from error
 
 
+def _paths_overlap(first: Path, second: Path) -> bool:
+    return first == second or first.is_relative_to(second) or second.is_relative_to(first)
+
+
 def _validate_output(root: Path, output: Path) -> tuple[Path, Path]:
     root_resolved = _resolved(root, label="root")
     output_input = output.expanduser().absolute()
@@ -94,6 +99,17 @@ def _validate_output(root: Path, output: Path) -> tuple[Path, Path]:
         or home_resolved.is_relative_to(output_resolved)
     ):
         raise ValueError("output path is unsafe")
+    for directory_name in _RESERVED_ROOT_DIRECTORIES:
+        reserved_path = root_resolved / directory_name
+        reserved_boundaries = {
+            reserved_path,
+            _resolved(reserved_path, label="reserved storage path"),
+        }
+        if any(
+            _paths_overlap(output_resolved, reserved_boundary)
+            for reserved_boundary in reserved_boundaries
+        ):
+            raise ValueError("output overlaps a reserved storage path")
     output_parent = output_resolved.parent
     if output_parent.resolve(strict=False) != output_parent:
         raise ValueError("resolved output parent is unsafe")
@@ -321,6 +337,15 @@ def _remove_owned_directory(path: Path, parent: Path, prefix: str) -> None:
     shutil.rmtree(resolved)
 
 
+def _remove_owned_directory_best_effort(path: Path, parent: Path, prefix: str) -> None:
+    try:
+        _remove_owned_directory(path, parent, prefix)
+    except Exception:
+        # Installation is already committed. A uniquely named remainder is safer
+        # than reporting failure after rmtree may have changed the old backup.
+        return
+
+
 def _install_staging(staging: Path, output: Path) -> None:
     parent = output.parent
     backup = parent / f".{output.name}.ai-news-backup-{uuid4().hex}"
@@ -337,7 +362,7 @@ def _install_staging(staging: Path, output: Path) -> None:
                 moved_old_output = False
             raise
         if moved_old_output:
-            _remove_owned_directory(
+            _remove_owned_directory_best_effort(
                 backup,
                 parent,
                 f".{output.name}.ai-news-backup-",
