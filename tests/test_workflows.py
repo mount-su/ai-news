@@ -226,7 +226,6 @@ def test_daily_deploy_has_minimal_pages_permissions_and_environment() -> None:
 
     assert deploy["needs"] == "build"
     assert deploy["permissions"] == {
-        "contents": "read",
         "pages": "write",
         "id-token": "write",
     }
