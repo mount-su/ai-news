@@ -701,6 +701,92 @@ def test_large_exact_title_alias_state_is_bounded_and_order_independent(
     ]
 
 
+def test_compaction_preserves_retained_aliases_for_later_bridges() -> None:
+    from ai_news.pipeline import run as run_module
+
+    source = _source(0)
+    first = run_module.to_candidate(
+        _updated_raw(
+            _raw(50_000, source=source),
+            url="https://example.com/a",
+            title="Alpha",
+            source_weight=10,
+        )
+    )
+    alias = run_module.to_candidate(
+        _updated_raw(
+            _raw(50_001, source=source),
+            url="https://example.com/b",
+            title="Alpha",
+            source_weight=9,
+        )
+    )
+    later_bridge = run_module.to_candidate(
+        _updated_raw(
+            _raw(50_002, source=source),
+            url="https://example.com/b",
+            title="Different",
+            source_weight=9,
+        )
+    )
+    fillers = [
+        run_module.to_candidate(
+            _updated_raw(
+                _raw(51_000 + index, source=source),
+                source_weight=1,
+            )
+        )
+        for index in range(1_000)
+    ]
+
+    def selected(sequence: list[Any]) -> list[Any]:
+        accumulator = run_module._ExactCandidateAccumulator(NOW)
+        for candidate in sequence:
+            accumulator.add(candidate)
+        return accumulator.selected()
+
+    forward = selected([first, alias, *fillers, later_bridge])
+    reverse = selected([later_bridge, *reversed(fillers), alias, first])
+    bridge_ids = {first.id, alias.id, later_bridge.id}
+
+    assert len(forward) == len(reverse) == 500
+    assert {candidate.id for candidate in forward} == {candidate.id for candidate in reverse}
+    assert len(bridge_ids & {candidate.id for candidate in forward}) == 1
+    assert len(run_module.deduplicate(forward, set())) == 500
+
+
+def test_single_huge_exact_group_remains_hard_bounded_and_order_independent() -> None:
+    from ai_news.pipeline import run as run_module
+
+    source = _source(0)
+    aliases = [
+        run_module.to_candidate(
+            _updated_raw(
+                _raw(60_000 + index, source=source),
+                title="One huge exact group",
+                source_weight=10,
+            )
+        )
+        for index in range(6_200)
+    ]
+
+    def accumulate(sequence: list[Any]) -> tuple[int, list[Any]]:
+        accumulator = run_module._ExactCandidateAccumulator(NOW)
+        maximum_state_size = 0
+        for candidate in sequence:
+            accumulator.add(candidate)
+            maximum_state_size = max(maximum_state_size, accumulator._state_size())
+        return maximum_state_size, accumulator.selected()
+
+    forward_maximum, forward = accumulate(aliases)
+    reverse_maximum, reverse = accumulate(list(reversed(aliases)))
+
+    assert forward_maximum <= run_module._EXACT_STATE_LIMIT
+    assert reverse_maximum <= run_module._EXACT_STATE_LIMIT
+    assert len(forward) == len(reverse) == 1
+    assert forward[0].id == reverse[0].id
+
+
 def test_more_than_1500_unique_items_stay_bounded_and_order_independent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

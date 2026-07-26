@@ -44,6 +44,7 @@ _PUBLICATION_THRESHOLD = 5
 _WINDOW = timedelta(hours=36)
 _ANALYSIS_FIELDS = frozenset(Analysis.model_fields)
 _EXACT_STATE_LIMIT = _DEDUPLICATION_LIMIT * 6
+_EXACT_STATE_TARGET = _DEDUPLICATION_LIMIT * 4
 
 
 class PipelineError(RuntimeError):
@@ -204,17 +205,56 @@ class _ExactCandidateAccumulator:
         self._title_groups[_exact_title_key(candidate)] = group_id
 
     def _compact(self) -> None:
-        retained = select_candidates(
+        retained_candidates = select_candidates(
             list(self._winners.values()),
             self._now,
             limit=_DEDUPLICATION_LIMIT,
         )
-        self._next_group_id = 0
-        self._winners.clear()
-        self._canonical_groups.clear()
-        self._title_groups.clear()
-        for candidate in retained:
-            self._new_group(candidate)
+        retained_ids = {candidate.id for candidate in retained_candidates}
+        retained_winners = {
+            group_id: winner
+            for group_id, winner in self._winners.items()
+            if winner.id in retained_ids
+        }
+
+        mandatory_canonical = {
+            str(winner.canonical_url): group_id for group_id, winner in retained_winners.items()
+        }
+        mandatory_titles = {
+            _exact_title_key(winner): group_id for group_id, winner in retained_winners.items()
+        }
+        optional_aliases: list[
+            tuple[
+                tuple[str, ...],
+                str | None,
+                tuple[str | None, str] | None,
+                int,
+            ]
+        ] = []
+        for canonical, group_id in self._canonical_groups.items():
+            if group_id in retained_winners and mandatory_canonical.get(canonical) != group_id:
+                optional_aliases.append((("canonical", canonical), canonical, None, group_id))
+        for title, group_id in self._title_groups.items():
+            if group_id in retained_winners and mandatory_titles.get(title) != group_id:
+                optional_aliases.append(
+                    (
+                        ("title", title[0] or "", title[1]),
+                        None,
+                        title,
+                        group_id,
+                    )
+                )
+        optional_aliases.sort(key=lambda alias: alias[0])
+
+        self._winners = retained_winners
+        self._canonical_groups = mandatory_canonical
+        self._title_groups = mandatory_titles
+        remaining_budget = _EXACT_STATE_TARGET - self._state_size()
+        for _, canonical, title, group_id in optional_aliases[:remaining_budget]:
+            if canonical is not None:
+                self._canonical_groups[canonical] = group_id
+            elif title is not None:
+                self._title_groups[title] = group_id
 
     def _merge_groups(self, group_ids: set[int], candidate: Candidate) -> int:
         target_group = min(group_ids)
@@ -257,6 +297,8 @@ class _ExactCandidateAccumulator:
             self._new_group(candidate)
 
     def selected(self) -> list[Candidate]:
+        if len(self._winners) > _DEDUPLICATION_LIMIT or self._state_size() > _EXACT_STATE_TARGET:
+            self._compact()
         return select_candidates(
             list(self._winners.values()),
             self._now,
