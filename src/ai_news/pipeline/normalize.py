@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
-import re
 import unicodedata
 from datetime import UTC, datetime
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
-from pydantic import HttpUrl
+from pydantic import HttpUrl, TypeAdapter, ValidationError
 
 from ai_news.models import Candidate, RawItem
 
@@ -22,8 +21,8 @@ TRACKING_PARAMS = {
 }
 
 _HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
-_HOST_LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 _PATH_SAFE = "/:@!$&'()*+,;=-._~"
+_HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
 
 
 def _require_valid_percent_encoding(value: str) -> None:
@@ -60,19 +59,14 @@ def _normalize_path(path: str) -> str:
 
 
 def _normalize_host(host: str) -> tuple[str, bool]:
-    if ":" in host:
+    if host.startswith("[") and host.endswith("]"):
         try:
-            return ipaddress.IPv6Address(host).compressed.lower(), True
+            return ipaddress.IPv6Address(host[1:-1]).compressed.lower(), True
         except ValueError as error:
             raise ValueError("URL has an invalid IPv6 host") from error
 
-    try:
-        ascii_host = host.encode("idna").decode("ascii").lower()
-    except UnicodeError as error:
-        raise ValueError("URL has an invalid host") from error
-
-    labels = ascii_host.removesuffix(".").split(".")
-    if not labels or any(not _HOST_LABEL.fullmatch(label) for label in labels):
+    ascii_host = host.lower().rstrip(".")
+    if not ascii_host:
         raise ValueError("URL has an invalid host")
     return ascii_host, False
 
@@ -89,18 +83,23 @@ def canonical_url(url: str | HttpUrl) -> str:
         port = parsed.port
         username = parsed.username
         password = parsed.password
-        host = parsed.hostname
+        original_host = parsed.hostname
     except (UnicodeError, ValueError) as error:
         raise ValueError("URL is malformed") from error
 
-    if parsed.scheme.lower() != "https":
+    try:
+        validated_url = _HTTP_URL_ADAPTER.validate_python(url)
+    except (ValidationError, ValueError) as error:
+        raise ValueError("URL is malformed") from error
+
+    if validated_url.scheme != "https":
         raise ValueError("URL must use https")
-    if not host:
+    if not original_host or not validated_url.host:
         raise ValueError("URL must include a host")
     if username is not None or password is not None:
         raise ValueError("URL userinfo is not allowed")
 
-    normalized_host, is_ipv6 = _normalize_host(host)
+    normalized_host, is_ipv6 = _normalize_host(validated_url.host)
     display_host = f"[{normalized_host}]" if is_ipv6 else normalized_host
     if port is not None and port != 443:
         display_host = f"{display_host}:{port}"

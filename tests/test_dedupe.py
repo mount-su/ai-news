@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from difflib import SequenceMatcher
+from itertools import pairwise, permutations
+
+import pytest
 
 from ai_news.models import Candidate, Category, RawItem
 from ai_news.pipeline.dedupe import deduplicate
@@ -17,16 +20,20 @@ def _candidate(
     host: str = "example.com",
     weight: int = 5,
     published_at: datetime = BASE_TIME,
+    url_slug: str | None = None,
+    source_id: str | None = None,
+    source_name: str | None = None,
+    excerpt: str = "Summary",
 ) -> Candidate:
     return to_candidate(
         RawItem(
-            source_id=f"source-{slug}",
-            source_name=f"Source {slug}",
+            source_id=source_id or f"source-{slug}",
+            source_name=source_name or f"Source {slug}",
             source_weight=weight,
             title=title,
-            url=f"https://{host}/{slug}",
+            url=f"https://{host}/{url_slug or slug}",
             published_at=published_at,
-            excerpt="Summary",
+            excerpt=excerpt,
             category_hint=Category.MODEL,
             is_official_source=False,
         )
@@ -97,15 +104,15 @@ def test_deduplicate_chooses_weight_then_newest_time_then_smallest_id() -> None:
     assert deduplicate([newer_b, low_weight, older, newer_a], set()) == [expected]
 
 
-def test_deduplicate_merges_transitive_duplicate_groups_and_is_order_independent() -> None:
-    first = _candidate("first", "Model release abcdefghij", weight=6)
-    bridge = _candidate("bridge", "Model release abXdefghij", weight=9)
-    last = _candidate("last", "Model release abXdefgYij", weight=7)
+def test_deduplicate_merges_all_pairwise_duplicate_groups_and_is_order_independent() -> None:
+    first = _candidate("first", "Model release abcdefghijklmnop", weight=6)
+    bridge = _candidate("bridge", "Model release abcdefghijklmnXp", weight=9)
+    last = _candidate("last", "Model release abcdefghijklYnXp", weight=7)
     titles = [item.raw.title.casefold() for item in [first, bridge, last]]
 
     assert SequenceMatcher(None, titles[0], titles[1]).ratio() >= 0.92
     assert SequenceMatcher(None, titles[1], titles[2]).ratio() >= 0.92
-    assert SequenceMatcher(None, titles[0], titles[2]).ratio() < 0.92
+    assert SequenceMatcher(None, titles[0], titles[2]).ratio() >= 0.92
     assert deduplicate([first, bridge, last], set()) == [bridge]
     assert deduplicate([last, first, bridge], set()) == [bridge]
 
@@ -122,3 +129,124 @@ def test_deduplicate_keeps_genuinely_different_titles_and_is_repeatable() -> Non
 
     assert first_run == sorted(items, key=lambda item: item.id)
     assert second_run == first_run
+
+
+def test_deduplicate_treats_sequence_similarity_symmetrically() -> None:
+    first = _candidate("asymmetric-a", "bddbcbbabcac", host="first.example")
+    second = _candidate("asymmetric-b", "bddbcbbabacadc", host="second.example")
+
+    assert SequenceMatcher(None, first.raw.title, second.raw.title).ratio() >= 0.92
+    assert SequenceMatcher(None, second.raw.title, first.raw.title).ratio() < 0.92
+    expected = sorted([first, second], key=lambda item: item.id)
+    assert deduplicate([first, second], set()) == expected
+    assert deduplicate([second, first], set()) == expected
+
+
+def test_deduplicate_uses_full_stable_tie_break_for_every_input_permutation() -> None:
+    candidates = [
+        _candidate(
+            "tie-z",
+            "Shared title Z",
+            url_slug="shared",
+            source_id="z-source",
+            source_name="Alpha",
+            excerpt="A",
+        ),
+        _candidate(
+            "tie-a",
+            "Shared title A",
+            url_slug="shared",
+            source_id="a-source",
+            source_name="Zulu",
+            excerpt="Z",
+        ),
+        _candidate(
+            "tie-m",
+            "Shared title M",
+            url_slug="shared",
+            source_id="m-source",
+            source_name="Middle",
+            excerpt="M",
+        ),
+    ]
+    expected = candidates[1]
+
+    for ordered_candidates in permutations(candidates):
+        assert deduplicate(list(ordered_candidates), set()) == [expected]
+
+
+def test_deduplicate_does_not_collapse_a_long_similarity_bridge_into_one_group() -> None:
+    base_title = "abcdefghij klmnopqrst"
+    titles: list[str] = []
+    for changed_characters in range(11):
+        characters = list(base_title)
+        characters[:changed_characters] = ["X"] * changed_characters
+        titles.append("".join(characters))
+    candidates = [
+        _candidate(f"bridge-{index}", title, weight=index % 3 + 1)
+        for index, title in enumerate(titles)
+    ]
+
+    assert all(
+        SequenceMatcher(None, first, second).ratio() >= 0.92 for first, second in pairwise(titles)
+    )
+    assert SequenceMatcher(None, titles[0], titles[-1]).ratio() < 0.60
+
+    forward = deduplicate(candidates, set())
+    reverse = deduplicate(list(reversed(candidates)), set())
+
+    assert len(forward) > 1
+    assert forward == reverse
+
+
+def test_deduplicate_bounds_fuzzy_title_comparison_to_256_normalized_characters() -> None:
+    prefix = "A" * 256
+    first = _candidate(
+        "long-a",
+        prefix + "B" * 744,
+        host="first.example",
+        weight=4,
+    )
+    winner = _candidate(
+        "long-b",
+        prefix + "C" * 744,
+        host="second.example",
+        weight=9,
+    )
+
+    assert deduplicate([first, winner], set()) == [winner]
+
+
+def test_deduplicate_uses_cheap_filters_before_expensive_large_title_comparisons(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidates = [
+        _candidate(
+            f"bulk-{index}",
+            chr(0x4E00 + index) * 1000,
+            host=f"source-{index}.example",
+        )
+        for index in range(120)
+    ]
+    sequence_matcher_calls = 0
+    real_sequence_matcher = SequenceMatcher
+
+    def counting_sequence_matcher(*args: object, **kwargs: object) -> SequenceMatcher:
+        nonlocal sequence_matcher_calls
+        sequence_matcher_calls += 1
+        return real_sequence_matcher(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "ai_news.pipeline.dedupe.SequenceMatcher",
+        counting_sequence_matcher,
+    )
+
+    assert len(deduplicate(candidates, set())) == len(candidates)
+    assert sequence_matcher_calls <= len(candidates)
+
+
+def test_deduplicate_rejects_more_than_500_candidates() -> None:
+    candidate = _candidate("bounded", "Bounded input")
+
+    with pytest.raises(ValueError, match="500"):
+        deduplicate([candidate] * 501, set())

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime, timedelta, timezone, tzinfo
 
 import pytest
-from pydantic import ValidationError
+from pydantic import HttpUrl, TypeAdapter, ValidationError
 
 from ai_news.models import Candidate, Category, RawItem
 from ai_news.pipeline.normalize import (
@@ -15,6 +16,7 @@ from ai_news.pipeline.normalize import (
 )
 
 TIMEZONE_PLUS_EIGHT = timezone(timedelta(hours=8))
+HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
 
 
 def _raw_item(
@@ -34,6 +36,18 @@ def _raw_item(
         category_hint=Category.MODEL,
         is_official_source=True,
     )
+
+
+def _direct_candidate_data(
+    canonical: str,
+    *,
+    raw_url: str | None = None,
+) -> dict[str, object]:
+    return {
+        "id": hashlib.sha256(canonical.encode()).hexdigest()[:16],
+        "canonical_url": canonical,
+        "raw": _raw_item(url=raw_url or canonical),
+    }
 
 
 def test_tracking_params_are_the_exact_supported_set() -> None:
@@ -62,6 +76,29 @@ def test_canonical_url_retains_duplicate_query_values_in_stable_encoded_order() 
         canonical_url("https://EXAMPLE.com/items/?b=two words&a=2&a=1&A=0&empty=")
         == "https://example.com/items?A=0&a=1&a=2&b=two+words&empty="
     )
+
+
+@pytest.mark.parametrize(
+    ("unicode_host", "ascii_host"),
+    [
+        ("faß.de", "xn--fa-hia.de"),
+        ("βόλος.com", "xn--nxasmm1c.com"),
+    ],
+)
+def test_canonical_url_uses_pydantic_idna_for_strings_and_http_urls(
+    unicode_host: str,
+    ascii_host: str,
+) -> None:
+    value = f"https://{unicode_host}/news"
+    parsed_value = HTTP_URL_ADAPTER.validate_python(value)
+
+    assert canonical_url(value) == f"https://{ascii_host}/news"
+    assert canonical_url(parsed_value) == f"https://{ascii_host}/news"
+
+
+def test_canonical_url_strips_a_dns_root_dot() -> None:
+    assert canonical_url("https://example.com./news") == "https://example.com/news"
+    assert canonical_url("https://example.com./news") == canonical_url("https://example.com/news")
 
 
 @pytest.mark.parametrize(
@@ -148,13 +185,70 @@ def test_to_candidate_normalizes_a_copy_and_uses_stable_canonical_url_hash() -> 
     assert raw.model_dump() == original
 
 
-def test_candidate_forbids_unknown_fields_and_requires_a_16_character_hex_id() -> None:
-    raw = _raw_item()
+def test_candidate_forbids_unknown_fields() -> None:
+    data = to_candidate(_raw_item()).model_dump()
 
     with pytest.raises(ValidationError):
-        Candidate(
-            id="not-an-id",
-            canonical_url="https://example.com/",
-            raw=raw,
-            unexpected=True,
-        )
+        Candidate(**data, unexpected=True)
+
+
+def test_candidate_requires_a_16_character_hex_id() -> None:
+    data = to_candidate(_raw_item()).model_dump()
+    data["id"] = "not-an-id"
+
+    with pytest.raises(ValidationError):
+        Candidate.model_validate(data)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://example.com/news",
+        "https://user:secret@example.com/news",
+        "https://example.com/news/",
+        "https://example.com/news?utm_source=tracker",
+    ],
+)
+def test_candidate_rejects_noncanonical_or_unsafe_canonical_url(url: str) -> None:
+    with pytest.raises(ValidationError, match="canonical"):
+        Candidate.model_validate(_direct_candidate_data(url))
+
+
+def test_candidate_rejects_input_that_pydantic_would_silently_canonicalize() -> None:
+    data = _direct_candidate_data("https://example.com/news")
+    data["canonical_url"] = "https://EXAMPLE.com/news"
+
+    with pytest.raises(ValidationError, match="canonical"):
+        Candidate.model_validate(data)
+
+
+def test_candidate_rejects_id_that_does_not_match_canonical_url_hash() -> None:
+    data = _direct_candidate_data("https://example.com/news")
+    data["id"] = "0000000000000000"
+
+    with pytest.raises(ValidationError, match="id"):
+        Candidate.model_validate(data)
+
+
+def test_candidate_rejects_raw_url_that_canonicalizes_to_another_url() -> None:
+    data = _direct_candidate_data(
+        "https://example.com/news",
+        raw_url="https://example.com/other",
+    )
+
+    with pytest.raises(ValidationError, match="raw"):
+        Candidate.model_validate(data)
+
+
+def test_candidate_is_frozen() -> None:
+    candidate = to_candidate(_raw_item())
+
+    with pytest.raises(ValidationError, match="frozen"):
+        candidate.id = "0000000000000000"
+
+
+def test_candidate_nested_raw_item_is_frozen() -> None:
+    candidate = to_candidate(_raw_item())
+
+    with pytest.raises(ValidationError, match="frozen"):
+        candidate.raw.title = "Mutated"

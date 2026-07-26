@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import datetime
 from enum import StrEnum
@@ -122,6 +123,8 @@ class Settings(BaseModel):
 
 
 class RawItem(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     source_id: str
     source_name: str
     source_weight: int = Field(ge=1, le=10)
@@ -134,11 +137,45 @@ class RawItem(BaseModel):
 
 
 class Candidate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: str = Field(pattern=r"^[0-9a-f]{16}$")
     canonical_url: HttpUrl
     raw: RawItem
+
+    @field_validator("canonical_url", mode="before")
+    @classmethod
+    def reject_noncanonical_input(cls, value: object) -> object:
+        from ai_news.pipeline.normalize import canonical_url
+
+        original_url = str(value)
+        try:
+            normalized_url = canonical_url(original_url)
+        except (TypeError, ValueError) as error:
+            raise ValueError("canonical_url must be a canonical HTTPS URL") from error
+        if normalized_url != original_url:
+            raise ValueError("canonical_url must already be canonical")
+        return value
+
+    @model_validator(mode="after")
+    def require_canonical_consistency(self) -> Candidate:
+        from ai_news.pipeline.normalize import canonical_url
+
+        candidate_url = str(self.canonical_url)
+        try:
+            normalized_candidate_url = canonical_url(candidate_url)
+        except ValueError as error:
+            raise ValueError("canonical_url must be a canonical HTTPS URL") from error
+        if normalized_candidate_url != candidate_url:
+            raise ValueError("canonical_url must already be canonical")
+
+        expected_id = hashlib.sha256(candidate_url.encode("utf-8")).hexdigest()[:16]
+        if self.id != expected_id:
+            raise ValueError("id must match the canonical_url SHA-256 prefix")
+
+        if canonical_url(self.raw.url) != candidate_url:
+            raise ValueError("raw URL must resolve to canonical_url")
+        return self
 
 
 class Analysis(BaseModel):
