@@ -193,7 +193,18 @@ Anthropic 等没有稳定公开 Feed 的站点不在首批通用网页抓取范�
 - `schedule` 和手动运行：采集、分析、保存、提交、构建、部署。
 - 推送到 `main`：只用已有数据执行 CI、构建和部署，不重复调用 LLM。
 
-每日生成工作流使用 `concurrency` 防止多个任务同时写数据。机器人通过默认 `GITHUB_TOKEN` 提交生成内容；同一工作流直接继续 Pages 部署，不依赖机器人提交触发第二个工作流。
+定时项显式使用 `cron: "17 8 * * *"` 和 `timezone: "Asia/Shanghai"`，避免用 UTC
+换算代替已批准的北京时间语义。手动入口的可选 `date` 使用 `YYYY-MM-DD`，CLI
+不带日期时按上海时区当天运行。
+
+每日生成工作流使用 `concurrency` 防止多个任务同时写数据。机器人通过默认
+`GITHUB_TOKEN` 提交生成内容；同一工作流直接继续 Pages 部署，不依赖机器人提交触发
+第二个工作流。提交前执行敏感信息扫描。若远端 `main` 在运行期间前进，提交步骤先
+fetch、rebase，再 push，竞争失败最多重试 3 次；rebase 冲突或重试耗尽时失败退出，
+不得强推。
+
+首次 Pages 部署前必须通过手动工作流真实生成至少一份日报。空数据仓库仅 push
+`main` 不会调用 LLM，也不能生成可用站点。
 
 ### 7.2 权限
 
@@ -202,6 +213,10 @@ Anthropic 等没有稳定公开 Feed 的站点不在首批通用网页抓取范�
 - Pages 部署：`pages: write` 和 `id-token: write`。
 
 权限按作业声明，不给整个工作流不必要的写权限。
+
+第三方 Actions 必须固定到不可变 commit SHA，并在配置中保留版本来源注释。CI 对
+workflow 执行语法检查；如检查器版本尚未识别 GitHub 已支持的 `schedule.timezone`
+字段，只允许忽略这一条精确的旧 Schema 诊断，不得整体跳过 workflow lint。
 
 ### 7.3 LLM 配置
 
@@ -213,11 +228,17 @@ GitHub Repository Variables：
 
 - `ANTHROPIC_BASE_URL`
 - `ANTHROPIC_DEFAULT_OPUS_MODEL`
-- `SITE_BASE_PATH=/ai-news/`
+- `ANTHROPIC_AUTH_SCHEME`
+
+站点路径 `SITE_BASE_PATH=/ai-news/` 固定写在每日工作流中，不作为 Repository Variable
+交给部署时修改。这样项目子路径、静态校验和 Pages URL 使用同一契约。
 
 适配器不得把任何密钥写入错误信息、日报、构建产物或日志。提供 `.env.example`，其中只有占位符。
 
-所提供的 Base URL 具有 Coding Plan 特征。生产工作流启用前必须确认该凭证允许无人值守的资讯总结；若服务条款只允许 AI 编码工具，则必须替换为允许普通服务端调用的模型 API Key。实现保持 Anthropic 协议兼容，不与具体计费套餐耦合。
+所提供的 Base URL 具有 Coding Plan 特征。生产工作流启用前必须确认该凭证允许无人值守
+的非编码资讯摘要；若服务条款只允许 AI 编码工具，则必须替换为允许普通服务端调用和
+摘要任务的标准模型 API 凭证。不得通过伪装客户端或修改请求标识绕过 provider 限制。
+实现保持 Anthropic 协议兼容，不与具体计费套餐耦合。
 
 ## 8. 页面与视觉
 
@@ -285,7 +306,7 @@ GitHub Repository Variables：
 - 对来源 HTML 清理，模板默认转义全部文本。
 - 密钥只通过 GitHub Secrets 和进程环境传递。
 - Actions 日志、测试快照和错误对象不得包含密钥。
-- 当前截图中的密钥不得进入本地文件或 Git 历史。
+- 聊天、截图、日志或本地环境中的密钥不得进入仓库、测试快照或 Git 历史。
 - 生成前后执行敏感信息模式扫描。
 - 不保存媒体全文，仅保存必要元数据、短摘录和原创分析。
 
