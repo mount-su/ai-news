@@ -128,6 +128,86 @@ def test_scan_allows_references_but_rejects_shell_fallback_literals(tmp_path: Pa
     assert "live-fallback-secret" not in "\n".join(finding.render() for finding in findings)
 
 
+def test_scan_detects_indented_multiline_token_and_bearer_values_at_key_line(
+    tmp_path: Path,
+) -> None:
+    token_key = "ANTHROPIC_AUTH_" + "TOKEN"
+    header_key = "Author" + "ization"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "multiline.yaml": "\n".join(
+                [
+                    f"{token_key}:",
+                    "  live-yaml-secret",
+                    f'"{token_key}":',
+                    ' "live-json-secret"',
+                    f"{header_key}:",
+                    "  Bearer live-yaml-bearer-secret",
+                    f'"{header_key}":',
+                    ' "Bearer live-json-bearer-secret"',
+                ]
+            )
+        },
+    )
+
+    findings = scan_repository(repository)
+
+    assert [(finding.line_number, finding.rule) for finding in findings] == [
+        (1, "credential assignment"),
+        (3, "credential assignment"),
+        (5, "bearer credential"),
+        (7, "bearer credential"),
+    ]
+
+
+def test_scan_does_not_consume_unindented_next_key_as_multiline_value(tmp_path: Path) -> None:
+    token_key = "ANTHROPIC_AUTH_" + "TOKEN"
+    header_key = "Author" + "ization"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "null-values.yaml": "\n".join(
+                [
+                    f"{token_key}:",
+                    "NEXT_KEY: harmless",
+                    f"{header_key}:",
+                    "NEXT_HEADER: Bearer harmless",
+                ]
+            )
+        },
+    )
+
+    assert scan_repository(repository) == []
+
+
+def test_bearer_github_references_pass_but_literal_fallback_is_reported(
+    tmp_path: Path,
+) -> None:
+    header_key = "Author" + "ization"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "headers.yaml": "\n".join(
+                [
+                    f"{header_key}: Bearer ${{{{ secrets.GITHUB_TOKEN }}}}",
+                    f"{header_key}:",
+                    "  Bearer ${{ secrets.GITHUB_TOKEN }}",
+                    f"{header_key}: Bearer ${{TOKEN}}",
+                    f"{header_key}: Bearer ${{TOKEN:-live-bearer-fallback}}",
+                ]
+            )
+        },
+    )
+
+    findings = scan_repository(repository)
+
+    assert [(finding.line_number, finding.rule) for finding in findings] == [
+        (5, "bearer credential")
+    ]
+    assert "live-bearer-fallback" not in findings[0].render()
+
+
 @pytest.mark.parametrize(
     "authorization_line",
     [

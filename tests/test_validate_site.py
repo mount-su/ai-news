@@ -107,15 +107,28 @@ def test_validator_rejects_authority_ambiguity_and_dangerous_schemes(
     assert "invalid-url" in {issue.code for issue in issues}
 
 
-def test_validator_rejects_invalid_percent_encoding_in_query(tmp_path: Path) -> None:
+@pytest.mark.parametrize("invalid_query", ["%ZZ", "%FF", "%00"])
+def test_validator_rejects_invalid_percent_encoding_in_query(
+    tmp_path: Path,
+    invalid_query: str,
+) -> None:
     dist = _write_site(
         tmp_path / "dist",
-        {"index.html": _page('<a href="/ai-news/?q=%ZZ">bad query</a>')},
+        {"index.html": _page(f'<a href="/ai-news/?q={invalid_query}">bad query</a>')},
     )
 
     issues = validate_site(dist, BASE_PATH)
 
     assert "invalid-url" in {issue.code for issue in issues}
+
+
+def test_validator_allows_percent_encoded_backslash_in_query(tmp_path: Path) -> None:
+    dist = _write_site(
+        tmp_path / "dist",
+        {"index.html": _page('<a href="/ai-news/?q=%5C">valid query</a>')},
+    )
+
+    assert validate_site(dist, BASE_PATH) == []
 
 
 def test_validation_issue_render_escapes_control_characters_in_path(tmp_path: Path) -> None:

@@ -104,6 +104,14 @@ def _decode_url_component(value: str) -> str:
     return decoded
 
 
+def _validate_query(value: str) -> None:
+    if _INVALID_PERCENT.search(value):
+        raise ValueError("invalid percent escape")
+    decoded = unquote(value, errors="strict")
+    if "\x00" in decoded:
+        raise ValueError("invalid URL query")
+
+
 def _within_base_path(public_path: str, base_path: str) -> bool:
     if base_path == "/":
         return public_path.startswith("/")
@@ -209,7 +217,7 @@ def _reference_issues(
         return [ValidationIssue(source_path, "invalid-url", "page contains an invalid URL")]
     try:
         if parsed.query:
-            _decode_url_component(parsed.query)
+            _validate_query(parsed.query)
     except (UnicodeDecodeError, ValueError):
         return [ValidationIssue(source_path, "invalid-url", "page contains an invalid URL")]
     if parsed.scheme:

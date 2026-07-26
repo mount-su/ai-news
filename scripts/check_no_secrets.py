@@ -9,6 +9,7 @@ import re
 import stat
 import subprocess
 import sys
+from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -20,7 +21,12 @@ _ASSIGNMENT_PATTERN = re.compile(
         |
         \bANTHROPIC_AUTH_TOKEN\b
     )
-    \s*(?:=(?!=)|:)\s*
+    [ \t]*(?:=(?!=)|:)
+    (?:
+        [ \t]*
+        |
+        [ \t]*\r?\n[ \t]+
+    )
     (?P<value>
         \$\{\{[^\r\n]*?\}\}
         |
@@ -39,14 +45,27 @@ _BEARER_PATTERN = re.compile(
         |
         \bAuthorization\b
     )
-    \s*:\s*
+    [ \t]*:
     (?:
-        (?P<container_quote>["'])Bearer\s+
+        [ \t]*
+        |
+        [ \t]*\r?\n[ \t]+
+    )
+    (?:
+        (?P<container_quote>["'])Bearer[ \t]+
         (?P<contained_value>[^"'\r\n]+?)
         (?P=container_quote)
         |
-        Bearer\s+
-        (?P<value>"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;`]+)
+        Bearer[ \t]+
+        (?P<value>
+            \$\{\{[^\r\n]*?\}\}
+            |
+            "[^"\r\n]*"
+            |
+            '[^'\r\n]*'
+            |
+            [^\s,;`]+
+        )
     )
     """
 )
@@ -174,14 +193,15 @@ def scan_repository(repository: Path) -> list[Finding]:
         if b"\0" in content:
             continue
         text = content.decode("utf-8", errors="replace")
-        for line_number, line in enumerate(text.splitlines(), start=1):
-            for rule, pattern in _PATTERNS:
-                for match in pattern.finditer(line):
-                    value = match.groupdict().get("value") or match.groupdict().get(
-                        "contained_value"
-                    )
-                    if value is not None and not _is_placeholder(display_path, value):
-                        findings.append(Finding(display_path, line_number, rule))
+        newline_positions = [
+            position for position, character in enumerate(text) if character == "\n"
+        ]
+        for rule, pattern in _PATTERNS:
+            for match in pattern.finditer(text):
+                value = match.groupdict().get("value") or match.groupdict().get("contained_value")
+                if value is not None and not _is_placeholder(display_path, value):
+                    line_number = bisect_right(newline_positions, match.start()) + 1
+                    findings.append(Finding(display_path, line_number, rule))
     return sorted(set(findings))
 
 
