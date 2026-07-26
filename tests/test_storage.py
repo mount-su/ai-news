@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
+import os
+import threading
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -21,9 +24,76 @@ from ai_news.models import (
 )
 from ai_news.pipeline.normalize import to_candidate
 from ai_news.storage import load_history_urls, load_reports, save_report
+from ai_news.storage import repository as storage_repository
 
 RUN_DATE = date(2026, 7, 26)
 GENERATED_AT = datetime(2026, 7, 26, 10, 30, tzinfo=UTC)
+TRANSACTION_JOURNAL = ".ai-news-transaction.json"
+
+
+def _crash_after_first_report_replace(root_text: str, report_json: str) -> None:
+    root = Path(root_text)
+    report = DailyReport.model_validate_json(report_json)
+    report_path = _target_paths(root, report.date)[0]
+    original_replace = Path.replace
+
+    def crash_after_replace(self: Path, target: Path) -> Path:
+        result = original_replace(self, target)
+        if target == report_path:
+            os._exit(91)
+        return result
+
+    Path.replace = crash_after_replace
+    save_report(root, report)
+
+
+def _run_crashing_save(root: Path, report: DailyReport) -> None:
+    context = multiprocessing.get_context("fork")
+    process = context.Process(
+        target=_crash_after_first_report_replace,
+        args=(str(root), report.model_dump_json()),
+    )
+    process.start()
+    process.join(timeout=10)
+    if process.is_alive():
+        process.kill()
+        process.join(timeout=5)
+        pytest.fail("crashing save process did not exit")
+    assert process.exitcode == 91
+
+
+def _coordinated_process_save(
+    root_text: str,
+    report_json: str,
+    first_replaced: Any,
+    release_first: Any,
+    save_finished: Any,
+    pause_after_first: bool,
+) -> None:
+    root = Path(root_text)
+    report = DailyReport.model_validate_json(report_json)
+    report_path = _target_paths(root, report.date)[0]
+    original_replace = Path.replace
+
+    def pause_selected_writer(self: Path, target: Path) -> Path:
+        result = original_replace(self, target)
+        if pause_after_first and target == report_path:
+            first_replaced.set()
+            if not release_first.wait(timeout=10):
+                os._exit(92)
+        return result
+
+    Path.replace = pause_selected_writer
+    save_report(root, report)
+    save_finished.set()
+
+
+def _join_process(process: multiprocessing.Process) -> None:
+    process.join(timeout=10)
+    if process.is_alive():
+        process.kill()
+        process.join(timeout=5)
+        pytest.fail("coordinated save process did not exit")
 
 
 def _candidate(
@@ -113,7 +183,12 @@ def _repository_artifacts(root: Path) -> list[Path]:
     return [
         path
         for path in root.rglob("*")
-        if path.is_file() and (path.name.endswith(".tmp") or path.name.endswith(".bak"))
+        if path.is_file()
+        and (
+            path.name.endswith(".tmp")
+            or path.name.endswith(".bak")
+            or path.name == TRANSACTION_JOURNAL
+        )
     ]
 
 
@@ -349,7 +424,7 @@ def test_save_report_rolls_back_all_existing_files_when_any_replace_fails(
 
     def fail_selected_replace(self: Path, target: Path) -> Path:
         nonlocal replacement_count
-        if self.name.endswith(".tmp"):
+        if target in targets:
             replacement_count += 1
             if replacement_count == failure_number:
                 raise OSError("simulated commit failure")
@@ -376,7 +451,7 @@ def test_save_report_removes_partial_first_write_when_any_replace_fails(
 
     def fail_selected_replace(self: Path, target: Path) -> Path:
         nonlocal replacement_count
-        if self.name.endswith(".tmp"):
+        if target in targets:
             replacement_count += 1
             if replacement_count == failure_number:
                 raise OSError("simulated first-write failure")
@@ -552,3 +627,320 @@ def test_root_symlink_uses_resolved_repository_as_storage_boundary(tmp_path: Pat
 
     assert [report.date for report in load_reports(root_alias)] == [RUN_DATE]
     assert _target_paths(actual_root)[0].is_file()
+
+
+def test_load_reports_recovers_old_transaction_after_process_crash(tmp_path: Path) -> None:
+    old_report = _report(slugs=("old",), model="old-model")
+    save_report(tmp_path, old_report)
+    targets = _target_paths(tmp_path)
+    old_bytes = {path: path.read_bytes() for path in targets}
+    crashing_report = _report(slugs=("crash",), model="sensitive-crash-model")
+
+    _run_crashing_save(tmp_path, crashing_report)
+
+    assert targets[0].read_bytes() != old_bytes[targets[0]]
+    journal = tmp_path / TRANSACTION_JOURNAL
+    assert journal.is_file()
+    assert "sensitive-crash-model" not in journal.read_text(encoding="utf-8")
+
+    assert load_reports(tmp_path) == [old_report]
+    assert {path: path.read_bytes() for path in targets} == old_bytes
+    assert not _repository_artifacts(tmp_path)
+
+
+def test_save_report_recovers_crash_before_starting_next_transaction(tmp_path: Path) -> None:
+    save_report(tmp_path, _report(slugs=("old",), model="old-model"))
+    _run_crashing_save(
+        tmp_path,
+        _report(slugs=("crash",), model="crash-model"),
+    )
+    final_report = _report(slugs=("final", "items"), model="final-model")
+
+    save_report(tmp_path, final_report)
+
+    assert load_reports(tmp_path) == [final_report]
+    assert not _repository_artifacts(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "journal_text",
+    [
+        "{not-json",
+        json.dumps(
+            {
+                "version": "1.0",
+                "transaction_id": "a" * 32,
+                "entries": [
+                    {
+                        "target": "../../victim.txt",
+                        "temporary": "../../victim.tmp",
+                        "backup": "../../victim.bak",
+                        "existed": True,
+                    },
+                    {
+                        "target": "content/2026-07-26.md",
+                        "temporary": "content/.2026-07-26.md." + "a" * 32 + ".tmp",
+                        "backup": "content/.2026-07-26.md." + "a" * 32 + ".bak",
+                        "existed": True,
+                    },
+                    {
+                        "target": "data/index.json",
+                        "temporary": "data/.index.json." + "a" * 32 + ".tmp",
+                        "backup": "data/.index.json." + "a" * 32 + ".bak",
+                        "existed": True,
+                    },
+                ],
+            }
+        ),
+    ],
+)
+def test_corrupt_or_escaping_transaction_journal_is_rejected_without_writes(
+    tmp_path: Path,
+    journal_text: str,
+) -> None:
+    victim = tmp_path.parent / f"{tmp_path.name}-victim.txt"
+    victim.write_bytes(b"untouched")
+    (tmp_path / TRANSACTION_JOURNAL).write_text(journal_text, encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        load_reports(tmp_path)
+
+    assert victim.read_bytes() == b"untouched"
+
+
+def test_cross_process_same_date_saves_are_serialized_and_consistent(
+    tmp_path: Path,
+) -> None:
+    save_report(tmp_path, _report(slugs=("initial",), model="initial-model"))
+    writer_a = _report(slugs=("writer-a",), model="writer-a-model")
+    writer_b = _report(slugs=("writer-b", "second"), model="writer-b-model")
+    context = multiprocessing.get_context("fork")
+    first_replaced = context.Event()
+    release_first = context.Event()
+    first_finished = context.Event()
+    second_finished = context.Event()
+    process_a = context.Process(
+        target=_coordinated_process_save,
+        args=(
+            str(tmp_path),
+            writer_a.model_dump_json(),
+            first_replaced,
+            release_first,
+            first_finished,
+            True,
+        ),
+    )
+    process_b = context.Process(
+        target=_coordinated_process_save,
+        args=(
+            str(tmp_path),
+            writer_b.model_dump_json(),
+            first_replaced,
+            release_first,
+            second_finished,
+            False,
+        ),
+    )
+
+    process_a.start()
+    assert first_replaced.wait(timeout=5)
+    process_b.start()
+    second_was_blocked = not second_finished.wait(timeout=0.4)
+    release_first.set()
+    _join_process(process_a)
+    _join_process(process_b)
+
+    assert second_was_blocked
+    assert process_a.exitcode == 0
+    assert process_b.exitcode == 0
+    assert first_finished.is_set()
+    assert second_finished.is_set()
+    assert load_reports(tmp_path) == [writer_b]
+    markdown = _target_paths(tmp_path)[1].read_text(encoding="utf-8")
+    assert "writer\\-b\\-model" in markdown
+    assert "writer\\-a\\-model" not in markdown
+    assert not _repository_artifacts(tmp_path)
+
+
+def test_cross_process_different_date_saves_do_not_lose_index_updates(
+    tmp_path: Path,
+) -> None:
+    date_a = date(2026, 7, 26)
+    date_b = date(2026, 7, 27)
+    writer_a = _report(date_a, slugs=("writer-a",), model="writer-a-model")
+    writer_b = _report(date_b, slugs=("writer-b",), model="writer-b-model")
+    context = multiprocessing.get_context("fork")
+    first_replaced = context.Event()
+    release_first = context.Event()
+    first_finished = context.Event()
+    second_finished = context.Event()
+    process_a = context.Process(
+        target=_coordinated_process_save,
+        args=(
+            str(tmp_path),
+            writer_a.model_dump_json(),
+            first_replaced,
+            release_first,
+            first_finished,
+            True,
+        ),
+    )
+    process_b = context.Process(
+        target=_coordinated_process_save,
+        args=(
+            str(tmp_path),
+            writer_b.model_dump_json(),
+            first_replaced,
+            release_first,
+            second_finished,
+            False,
+        ),
+    )
+
+    process_a.start()
+    assert first_replaced.wait(timeout=5)
+    process_b.start()
+    second_was_blocked = not second_finished.wait(timeout=0.4)
+    release_first.set()
+    _join_process(process_a)
+    _join_process(process_b)
+
+    assert second_was_blocked
+    assert process_a.exitcode == 0
+    assert process_b.exitcode == 0
+    assert load_reports(tmp_path) == [writer_b, writer_a]
+    assert not _repository_artifacts(tmp_path)
+
+
+def test_same_process_threads_are_serialized_before_recovery_or_index_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    save_report(tmp_path, _report(slugs=("initial",), model="initial-model"))
+    writer_a = _report(slugs=("thread-a",), model="thread-a-model")
+    writer_b = _report(slugs=("thread-b",), model="thread-b-model")
+    report_path = _target_paths(tmp_path)[0]
+    original_replace = Path.replace
+    first_replaced = threading.Event()
+    release_first = threading.Event()
+    second_finished = threading.Event()
+    errors: list[BaseException] = []
+
+    def pause_first_thread(self: Path, target: Path) -> Path:
+        result = original_replace(self, target)
+        if threading.current_thread().name == "writer-a" and target == report_path:
+            first_replaced.set()
+            if not release_first.wait(timeout=10):
+                raise TimeoutError("writer-a was not released")
+        return result
+
+    def run_save(report: DailyReport, finished: threading.Event | None = None) -> None:
+        try:
+            save_report(tmp_path, report)
+        except BaseException as error:
+            errors.append(error)
+        finally:
+            if finished is not None:
+                finished.set()
+
+    monkeypatch.setattr(Path, "replace", pause_first_thread)
+    thread_a = threading.Thread(target=run_save, args=(writer_a,), name="writer-a")
+    thread_b = threading.Thread(
+        target=run_save,
+        args=(writer_b, second_finished),
+        name="writer-b",
+    )
+
+    thread_a.start()
+    assert first_replaced.wait(timeout=5)
+    thread_b.start()
+    second_was_blocked = not second_finished.wait(timeout=0.4)
+    release_first.set()
+    thread_a.join(timeout=10)
+    thread_b.join(timeout=10)
+
+    assert second_was_blocked
+    assert not thread_a.is_alive()
+    assert not thread_b.is_alive()
+    assert errors == []
+    assert load_reports(tmp_path) == [writer_b]
+
+
+def test_rollback_failure_preserves_journal_and_backups_for_next_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old_report = _report(slugs=("old",), model="old-model")
+    save_report(tmp_path, old_report)
+    targets = _target_paths(tmp_path)
+    old_bytes = {path: path.read_bytes() for path in targets}
+    original_replace = Path.replace
+    commit_count = 0
+    restore_failed = False
+
+    def fail_commit_then_restore(self: Path, target: Path) -> Path:
+        nonlocal commit_count, restore_failed
+        if self.name.endswith(".recover.tmp") and not restore_failed:
+            restore_failed = True
+            raise OSError("simulated restore failure")
+        if target in targets and not self.name.endswith(".recover.tmp"):
+            commit_count += 1
+            if commit_count == 2:
+                raise OSError("simulated second commit failure")
+        return original_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", fail_commit_then_restore)
+
+    with pytest.raises(RuntimeError, match="rollback failed"):
+        save_report(tmp_path, _report(slugs=("new",), model="new-model"))
+
+    assert (tmp_path / TRANSACTION_JOURNAL).is_file()
+    assert any(path.name.endswith(".bak") for path in _repository_artifacts(tmp_path))
+    monkeypatch.setattr(Path, "replace", original_replace)
+
+    assert load_reports(tmp_path) == [old_report]
+    assert {path: path.read_bytes() for path in targets} == old_bytes
+    assert not _repository_artifacts(tmp_path)
+
+
+def test_first_save_fsyncs_created_parent_chain_and_cleanup_directories(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_open = storage_repository.os.open
+    original_fsync = storage_repository.os.fsync
+    directory_descriptors: dict[int, Path] = {}
+    synced_directories: list[Path] = []
+
+    def tracking_open(path: str | os.PathLike[str], flags: int, mode: int = 0o777) -> int:
+        descriptor = original_open(path, flags, mode)
+        if Path(path).is_dir():
+            directory_descriptors[descriptor] = Path(path).resolve()
+        return descriptor
+
+    def tracking_fsync(descriptor: int) -> None:
+        directory = directory_descriptors.get(descriptor)
+        if directory is not None:
+            synced_directories.append(directory)
+        original_fsync(descriptor)
+
+    monkeypatch.setattr(storage_repository.os, "open", tracking_open)
+    monkeypatch.setattr(storage_repository.os, "fsync", tracking_fsync)
+
+    save_report(tmp_path, _report(slugs=("fsync",)))
+
+    root = tmp_path.resolve()
+    report_parent = root / "data/2026/07"
+    content_parent = root / "content"
+    expected_parent_chain = {
+        root,
+        root / "data",
+        root / "data/2026",
+        report_parent,
+        content_parent,
+    }
+    assert expected_parent_chain <= set(synced_directories)
+    assert synced_directories.count(root) >= 2
+    assert synced_directories.count(report_parent) >= 3
+    assert synced_directories.count(content_parent) >= 3
+    assert not _repository_artifacts(tmp_path)
