@@ -1,0 +1,106 @@
+sources:
+  - id: openai
+    name: OpenAI
+    kind: feed
+    url: https://openai.com/news/rss.xml
+    category: 大模型
+    weight: 10
+    official: true
+  - id: google-ai
+    name: Google AI
+    kind: feed
+    url: https://blog.google/technology/ai/rss/
+    category: 大模型
+    weight: 9
+    official: true
+  - id: deepmind
+    name: DeepMind
+    kind: feed
+    url: https://deepmind.google/blog/rss.xml
+    category: 论文研究
+    weight: 9
+    official: true
+  - id: hugging-face
+    name: Hugging Face
+    kind: feed
+    url: https://huggingface.co/blog/feed.xml
+    category: 开源项目
+    weight: 8
+    official: true
+  - id: arxiv-ai
+    name: arXiv AI
+    kind: arxiv
+    url: https://export.arxiv.org/api/query?search_query=cat%3Acs.AI%20OR%20cat%3Acs.CL%20OR%20cat%3Acs.LG&sortBy=submittedDate&sortOrder=descending&start=0&max_results=40
+    category: 论文研究
+    weight: 7
+    official: true
+  - id: github-codex
+    name: OpenAI Codex
+    kind: github
+    repo: openai/codex
+    category: Coding Agent
+    weight: 10
+    official: true
+  - id: github-claude-code
+    name: Claude Code
+    kind: github
+    repo: anthropics/claude-code
+    category: Coding Agent
+    weight: 10
+    official: true
+  - id: github-gemini-cli
+    name: Gemini CLI
+    kind: github
+    repo: google-gemini/gemini-cli
+    category: Coding Agent
+    weight: 9
+    official: true
+  - id: github-langchain
+    name: LangChain
+    kind: github
+    repo: langchain-ai/langchain
+    category: Agent
+    weight: 8
+    official: true
+  - id: github-crewai
+    name: CrewAI
+    kind: github
+    repo: crewAIInc/crewAI
+    category: Agent
+    weight: 8
+    official: true
+  - id: github-llama-index
+    name: LlamaIndex
+    kind: github
+    repo: run-llama/llama_index
+    category: Agent
+    weight: 7
+    official: true
+  - id: github-transformers
+    name: Transformers
+    kind: github
+    repo: huggingface/transformers
+    category: 开源项目
+    weight: 8
+    official: true
+  - id: github-vllm
+    name: vLLM
+    kind: github
+    repo: vllm-project/vllm
+    category: 开源项目
+    weight: 8
+    official: true
+  - id: github-ollama
+    name: Ollama
+    kind: github
+    repo: ollama/ollama
+    category: AI 工具
+    weight: 8
+    official: true
+  - id: github-cline
+    name: Cline
+    kind: github
+    repo: cline/cline
+    category: Coding Agent
+    weight: 8
+    official: true
