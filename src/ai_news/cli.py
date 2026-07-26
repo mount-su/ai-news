@@ -61,7 +61,7 @@ def _safe_error(category: str, error: BaseException) -> None:
 
 
 def _build_site(root: Path, output: Path) -> None:
-    from ai_news.site.build import build_site
+    from ai_news.site.builder import build_site
 
     build_site(root, output)
 

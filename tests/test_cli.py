@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import types
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -178,6 +179,24 @@ def test_build_dispatches_paths_without_loading_llm_settings(
     result = cli.main(["build", "--root", str(tmp_path), "--output", str(output)])
 
     assert result == 0
+    assert calls == [(tmp_path, output)]
+
+
+def test_lazy_build_adapter_imports_task8_builder_module(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "dist"
+    calls: list[tuple[Path, Path]] = []
+    site_package = types.ModuleType("ai_news.site")
+    site_package.__path__ = []
+    builder_module = types.ModuleType("ai_news.site.builder")
+    builder_module.build_site = lambda root, selected_output: calls.append((root, selected_output))
+    monkeypatch.setitem(sys.modules, "ai_news.site", site_package)
+    monkeypatch.setitem(sys.modules, "ai_news.site.builder", builder_module)
+
+    cli._build_site(tmp_path, output)
+
     assert calls == [(tmp_path, output)]
 
 

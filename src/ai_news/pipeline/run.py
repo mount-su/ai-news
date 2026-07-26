@@ -268,7 +268,6 @@ async def _run_with_client(
     model: str,
     monotonic: Callable[[], float],
     history_loader: HistoryLoader,
-    report_saver: ReportSaver,
 ) -> DailyReport:
     selected_collector = collector or _collect_live
     enabled_sources = [source for source in source_config.sources if source.enabled]
@@ -332,10 +331,6 @@ async def _run_with_client(
     except Exception:
         raise ReportValidationError("report validation failed") from None
 
-    try:
-        report_saver(root, report)
-    except Exception:
-        raise PersistencePipelineError("report persistence failed") from None
     return report
 
 
@@ -371,7 +366,7 @@ async def run_daily(
     factory = client_factory or httpx.AsyncClient
     try:
         async with factory(timeout=20) as client:
-            return await _run_with_client(
+            report = await _run_with_client(
                 client=client,
                 root=Path(root),
                 run_date=run_date,
@@ -383,12 +378,17 @@ async def run_daily(
                 model=selected_model,
                 monotonic=monotonic,
                 history_loader=history_loader,
-                report_saver=report_saver,
             )
     except PipelineError:
         raise
     except Exception:
         raise CollectionPipelineError("client initialization failed") from None
+
+    try:
+        report_saver(Path(root), report)
+    except Exception:
+        raise PersistencePipelineError("report persistence failed") from None
+    return report
 
 
 __all__ = [

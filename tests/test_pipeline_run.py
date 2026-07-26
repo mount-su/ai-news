@@ -25,6 +25,7 @@ from ai_news.pipeline.run import (
     ReportValidationError,
     run_daily,
 )
+from ai_news.storage import save_report
 
 RUN_DATE = date(2026, 7, 26)
 NOW = datetime(2026, 7, 26, 12, tzinfo=UTC)
@@ -494,3 +495,66 @@ def test_fixed_clocks_make_the_report_deterministic() -> None:
 
     assert first == second
     assert all(source_run.elapsed_ms == 0 for source_run in first.source_runs)
+
+
+def test_client_exit_failure_is_safe_and_prevents_all_persistence(
+    tmp_path: Path,
+) -> None:
+    source = _source(0)
+    saves: list[DailyReport] = []
+
+    class _FailingExitContext:
+        async def __aenter__(self) -> object:
+            return object()
+
+        async def __aexit__(self, *_args: object) -> None:
+            raise RuntimeError("client-exit-secret?token=value")
+
+    def saver(root: Path, report: DailyReport) -> None:
+        saves.append(report)
+        save_report(root, report)
+
+    with pytest.raises(CollectionPipelineError) as exit_error:
+        _run(
+            root=tmp_path,
+            collector=_collector({source.id: [_raw(index, source=source) for index in range(5)]}),
+            analyzer=_Analyzer(),
+            client_factory=lambda *, timeout: _FailingExitContext(),
+            report_saver=saver,
+        )
+
+    assert str(exit_error.value) == "client initialization failed"
+    assert "secret" not in str(exit_error.value)
+    assert saves == []
+    assert not (tmp_path / "data/2026/07/2026-07-26.json").exists()
+    assert not (tmp_path / "content/2026-07-26.md").exists()
+    assert not (tmp_path / "data/index.json").exists()
+
+
+def test_report_is_saved_once_only_after_normal_client_exit(tmp_path: Path) -> None:
+    source = _source(0)
+    events: list[str] = []
+    saves: list[DailyReport] = []
+
+    class _SuccessfulContext:
+        async def __aenter__(self) -> object:
+            events.append("enter")
+            return object()
+
+        async def __aexit__(self, *_args: object) -> None:
+            events.append("exit")
+
+    def saver(_root: Path, report: DailyReport) -> None:
+        events.append("save")
+        saves.append(report)
+
+    report = _run(
+        root=tmp_path,
+        collector=_collector({source.id: [_raw(index, source=source) for index in range(5)]}),
+        analyzer=_Analyzer(),
+        client_factory=lambda *, timeout: _SuccessfulContext(),
+        report_saver=saver,
+    )
+
+    assert events == ["enter", "exit", "save"]
+    assert saves == [report]
