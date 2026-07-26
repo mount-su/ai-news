@@ -6,10 +6,19 @@ import asyncio
 import json
 import re
 from collections.abc import Awaitable, Callable
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+    ValidationError,
+    field_validator,
+)
 
 from ai_news.llm.prompt import SYSTEM_PROMPT, build_analysis_prompt
 from ai_news.models import Analysis, Candidate, Category, Settings
@@ -27,16 +36,26 @@ class AnalysisError(RuntimeError):
 class _AnalysisRow(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(pattern=r"^[0-9a-f]{16}$")
-    title: str
+    id: Annotated[StrictStr, Field(pattern=r"^[0-9a-f]{16}$")]
+    title: StrictStr
     category: Category
-    summary: str = Field(min_length=20, max_length=1200)
-    importance: int = Field(ge=1, le=10)
-    why_it_matters: str = Field(min_length=10, max_length=800)
-    tags: list[str] = Field(min_length=1, max_length=6)
-    is_official: bool
+    summary: Annotated[StrictStr, Field(min_length=20, max_length=1200)]
+    importance: Annotated[StrictInt, Field(ge=1, le=10)]
+    why_it_matters: Annotated[StrictStr, Field(min_length=10, max_length=800)]
+    tags: list[Annotated[StrictStr, Field(min_length=1, max_length=50)]] = Field(
+        min_length=1,
+        max_length=6,
+    )
+    is_official: StrictBool
     marketing_risk: Literal["low", "medium", "high"]
-    tracking_signal: str = Field(min_length=5, max_length=500)
+    tracking_signal: Annotated[StrictStr, Field(min_length=5, max_length=500)]
+
+    @field_validator("tags")
+    @classmethod
+    def reject_blank_tags(cls, tags: list[str]) -> list[str]:
+        if any(not tag.strip() for tag in tags):
+            raise ValueError("tags must not be blank")
+        return tags
 
 
 def _validated_endpoint(base_url: str) -> httpx.URL | None:
@@ -47,6 +66,7 @@ def _validated_endpoint(base_url: str) -> httpx.URL | None:
         return None
     try:
         parsed = httpx.URL(base_url)
+        endpoint = httpx.URL(f"{base_url.rstrip('/')}/v1/messages")
     except (TypeError, ValueError):
         return None
     if (
@@ -57,8 +77,7 @@ def _validated_endpoint(base_url: str) -> httpx.URL | None:
         or parsed.fragment
     ):
         return None
-    path = re.sub(r"/+", "/", parsed.path).rstrip("/")
-    return parsed.copy_with(path=f"{path}/v1/messages", query=None, fragment=None)
+    return endpoint
 
 
 async def _read_bounded(response: httpx.Response) -> bytes | None:

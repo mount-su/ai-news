@@ -7,6 +7,8 @@ import json
 from ai_news.models import Candidate, Category
 
 _MAX_EXCERPT_CHARS = 2_000
+_MAX_SOURCE_CHARS = 200
+_MAX_TITLE_CHARS = 500
 _CATEGORY_VALUES = "、".join(category.value for category in Category)
 _ROW_SCHEMA = (
     '{"id":"16位小写十六进制ID","title":"标题","category":"六类之一",'
@@ -39,8 +41,8 @@ def build_analysis_prompt(items: list[Candidate]) -> str:
     rows = [
         {
             "id": item.id,
-            "title": item.raw.title,
-            "source": item.raw.source_name,
+            "title": item.raw.title[:_MAX_TITLE_CHARS],
+            "source": item.raw.source_name[:_MAX_SOURCE_CHARS],
             "published_at": item.raw.published_at.isoformat(),
             "excerpt": item.raw.excerpt[:_MAX_EXCERPT_CHARS],
             "category_hint": item.raw.category_hint.value,
