@@ -1,0 +1,29 @@
+[
+  {
+    "name": "  Stable   release  ",
+    "tag_name": "v2.0.0",
+    "body": "<p>Production <strong>ready</strong>\n release.</p>",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-07-25T18:30:00+08:00",
+    "html_url": "https://github.com/example/project/releases/tag/v2.0.0"
+  },
+  {
+    "name": "Release candidate",
+    "tag_name": "v2.1.0-rc1",
+    "body": "Not final",
+    "draft": false,
+    "prerelease": true,
+    "published_at": "2026-07-25T11:00:00Z",
+    "html_url": "https://github.com/example/project/releases/tag/v2.1.0-rc1"
+  },
+  {
+    "name": "Unpublished draft",
+    "tag_name": "v3.0.0",
+    "body": "Not published",
+    "draft": true,
+    "prerelease": false,
+    "published_at": "2026-07-25T12:00:00Z",
+    "html_url": "https://github.com/example/project/releases/tag/v3.0.0"
+  }
+]

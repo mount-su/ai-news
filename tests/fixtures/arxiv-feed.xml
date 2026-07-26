@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>arXiv example feed</title>
+  <entry>
+    <id>https://arxiv.org/abs/2607.12345</id>
+    <link href="https://arxiv.org/abs/2607.12345" rel="alternate" />
+    <title>
+      Reliable   Agents
+      for Research
+    </title>
+    <summary type="html">
+      &lt;p&gt;A   practical &lt;strong&gt;agent&lt;/strong&gt;
+      study.&lt;/p&gt;
+    </summary>
+    <published>2026-07-25T18:30:00+08:00</published>
+    <author>
+      <name>Ada Researcher</name>
+    </author>
+  </entry>
+</feed>
