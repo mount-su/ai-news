@@ -55,12 +55,17 @@ def test_readme_documents_exact_repository_configuration() -> None:
     readme = _readme()
 
     for variable in [
-        "ANTHROPIC_BASE_URL",
-        "ANTHROPIC_DEFAULT_OPUS_MODEL",
-        "ANTHROPIC_AUTH_SCHEME",
+        "LLM_PROTOCOL",
+        "LLM_BASE_URL",
+        "LLM_API_KEY",
+        "LLM_MODEL",
+        "LLM_AUTH_SCHEME",
     ]:
         assert variable in readme
-    assert "ANTHROPIC_AUTH_TOKEN" in readme
+    assert "https://ark.cn-beijing.volces.com/api/v3" in readme
+    assert "gh secret set LLM_API_KEY" in readme
+    assert "/api/coding" in readme
+    assert "不能用于" in readme
     assert "SITE_BASE_PATH=/ai-news/" in readme
     assert "08:17" in readme
     assert "Asia/Shanghai" in readme
@@ -105,7 +110,7 @@ def test_readme_does_not_contain_screenshot_markup_or_token_assignment() -> None
     assert "![" not in readme
     assert "当前截图中的凭证" not in readme
     assert not re.search(
-        r"ANTHROPIC_AUTH_TOKEN\s*=\s*[\"']?[A-Za-z0-9_-]{16,}",
+        r"LLM_API_KEY\s*=\s*[\"']?[A-Za-z0-9_-]{16,}",
         readme,
     )
 
@@ -132,12 +137,48 @@ def test_docs_describe_strict_batch_analysis_failure() -> None:
         assert "个别分析无效会被丢弃" not in document
 
 
-def test_coding_plan_warning_is_generic_and_session_independent() -> None:
+def test_runtime_docs_do_not_instruct_use_of_legacy_model_variables() -> None:
     readme = _readme()
+    env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+
+    assert "ANTHROPIC_" not in readme
+    assert "ANTHROPIC_" not in env_example
+
+
+def test_env_example_uses_safe_non_secret_placeholders() -> None:
+    env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+
+    assert "LLM_PROTOCOL=openai-chat" in env_example
+    assert "LLM_BASE_URL=https://ark.cn-beijing.volces.com/api/v3" in env_example
+    assert "LLM_API_" + "KEY=replace-with-a-repository-secret" in env_example
+    assert "LLM_MODEL=replace-with-a-standard-api-model-id" in env_example
+    assert "LLM_AUTH_SCHEME=bearer" in env_example
+    assert "SITE_BASE_PATH=/ai-news/" in env_example
+
+
+def test_readme_documents_standard_ark_operator_boundaries() -> None:
+    readme = _readme()
+
+    required_fragments = [
+        "`/api/coding` 端点和 Coding Plan 密钥不能用于本项目",
+        "标准 Ark API 使用 `/api/v3`",
+        "provider 控制台",
+        "标准 API 模型 ID",
+        "直接写入 GitHub Secret",
+        "隐藏终端输入",
+        "不能发送到聊天",
+        "不能写入文件",
+        "至少一份成功生成的真实日报",
+        "双协议模型适配与严格响应校验",
+    ]
+
+    for fragment in required_fragments:
+        assert fragment in readme
+
+
+def test_original_design_points_to_the_canonical_protocol_supplement() -> None:
     design = DESIGN.read_text(encoding="utf-8")
 
-    assert "若选择带 Coding Plan 特征的兼容端点" in readme
-    assert "这类 Base URL" in design
-    for session_specific_text in ["所给火山端点", "所提供的 Base URL"]:
-        assert session_specific_text not in readme
-        assert session_specific_text not in design
+    assert "## 2026-07-27 模型协议补充" in design
+    assert "docs/superpowers/specs/2026-07-27-standard-ark-api-design.md" in design
+    assert "以该补充设计为准" in design

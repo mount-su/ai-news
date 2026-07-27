@@ -86,16 +86,23 @@ python -m http.server 8000 --directory .preview
 
 ## 使用真实模型生成
 
-先确认模型服务允许该用途，再通过环境变量注入配置。不要把 token 写入命令历史、
-`.env`、README、日志或仓库；下面用隐藏输入读取本地 token：
+本项目支持 OpenAI Chat 和 Anthropic 两种协议适配器，运行时统一使用 `LLM_*`
+环境变量。标准 Ark API 使用 `/api/v3`；先在 provider 控制台确认当前标准账号可用的
+标准 API 模型 ID，不要根据 Coding Plan 中显示的模型名推测该值。
+
+真实密钥不能发送到聊天，也不能写入文件、命令历史、README、日志或仓库；应直接写入 GitHub Secret，
+或通过隐藏终端输入注入本地进程。下面的命令不会回显密钥：
 
 ```bash
-export ANTHROPIC_BASE_URL="<Anthropic-compatible API base URL>"
-export ANTHROPIC_DEFAULT_OPUS_MODEL="<model name>"
-export ANTHROPIC_AUTH_SCHEME="bearer"
-read -r -s ANTHROPIC_AUTH_TOKEN
-export ANTHROPIC_AUTH_TOKEN
+export LLM_PROTOCOL="openai-chat"
+export LLM_BASE_URL="https://ark.cn-beijing.volces.com/api/v3"
+read -r LLM_MODEL
+export LLM_MODEL
+export LLM_AUTH_SCHEME="bearer"
+read -r -s LLM_API_KEY
+export LLM_API_KEY
 export SITE_BASE_PATH="/ai-news/"
+python -m ai_news check-config
 python -m ai_news generate --root .
 ```
 
@@ -107,13 +114,10 @@ python -m ai_news build --root . --output .preview/ai-news
 python scripts/validate_site.py .preview/ai-news --base-path /ai-news/
 ```
 
-若选择带 Coding Plan 特征的兼容端点，只有在 provider 明确允许无人值守的非编码资讯摘要
-时，才可将其 Coding Plan 凭证用于本项目；否则必须替换为允许普通服务端摘要任务的
-标准模型 API 凭证。不得通过更改请求标识、伪装客户端或其他方式绕过 provider 限制。
-
-在已经确认条款允许的前提下，非敏感配置可使用
-`https://ark.cn-beijing.volces.com/api/coding` 和模型名 `glm-5.2`；真实 token
-仍只能通过环境变量或 GitHub Secret 提供。
+`/api/coding` 端点和 Coding Plan 密钥不能用于本项目；它们不适用于无人值守的非编码资讯摘要。
+配置检查会在发出网络请求前拒绝该端点。必须使用标准模型 API 凭证和在
+provider 控制台确认过的标准 API 模型 ID，不得通过更改请求标识、伪装客户端或其他
+方式绕过 provider 限制。
 
 ## GitHub Secrets 与 Variables
 
@@ -121,23 +125,26 @@ python scripts/validate_site.py .preview/ai-news --base-path /ai-news/
 
 | 类型 | 名称 | 用途 |
 | --- | --- | --- |
-| Variable | `ANTHROPIC_BASE_URL` | Anthropic 协议兼容端点 |
-| Variable | `ANTHROPIC_DEFAULT_OPUS_MODEL` | 模型标识 |
-| Variable | `ANTHROPIC_AUTH_SCHEME` | 鉴权方案；当前实现默认 `bearer` |
-| Secret | `ANTHROPIC_AUTH_TOKEN` | 模型服务凭证 |
+| Variable | `LLM_PROTOCOL` | 协议；标准 Ark 使用 `openai-chat` |
+| Variable | `LLM_BASE_URL` | 标准 Ark 使用 `https://ark.cn-beijing.volces.com/api/v3` |
+| Variable | `LLM_MODEL` | provider 控制台确认的标准 API 模型 ID |
+| Variable | `LLM_AUTH_SCHEME` | 鉴权方案；标准 Ark 使用 `bearer` |
+| Secret | `LLM_API_KEY` | 标准模型 API 凭证 |
 
 `SITE_BASE_PATH=/ai-news/` 已固定在 `.github/workflows/daily-news.yml`，不是第四个
 Repository Variable。GitHub Actions 只把 token 注入生成步骤；Secret 扫描在提交
 生成数据前执行。
 
-可以使用 GitHub CLI 配置非敏感 Variables；Secret 应通过交互式输入设置，避免进入
-shell 历史：
+可以使用 GitHub CLI 配置非敏感 Variables。先把 provider 控制台中确认的标准 API
+模型 ID 填入 `LLM_MODEL`；Secret 必须直接通过 `gh secret set LLM_API_KEY` 的隐藏
+交互式输入设置，不能先保存到文件或发送到聊天：
 
 ```bash
-gh variable set ANTHROPIC_BASE_URL --repo mount-su/ai-news
-gh variable set ANTHROPIC_DEFAULT_OPUS_MODEL --repo mount-su/ai-news
-gh variable set ANTHROPIC_AUTH_SCHEME --repo mount-su/ai-news
-gh secret set ANTHROPIC_AUTH_TOKEN --repo mount-su/ai-news
+gh variable set LLM_PROTOCOL --body openai-chat --repo mount-su/ai-news
+gh variable set LLM_BASE_URL --body https://ark.cn-beijing.volces.com/api/v3 --repo mount-su/ai-news
+gh variable set LLM_MODEL --body "<provider-console-model-id>" --repo mount-su/ai-news
+gh variable set LLM_AUTH_SCHEME --body bearer --repo mount-su/ai-news
+gh secret set LLM_API_KEY --repo mount-su/ai-news
 ```
 
 ## GitHub Actions
@@ -155,9 +162,10 @@ gh secret set ANTHROPIC_AUTH_TOKEN --repo mount-su/ai-news
 最小化权限：生成任务才有 `contents: write`，部署任务才有 `pages: write` 和
 `id-token: write`。
 
-首次启用 Pages 前，仓库中必须先有至少一份真实日报。配置合规凭证和 Pages 来源
-（GitHub Actions）后，手动运行每日工作流；首次真实生成成功后才会有可构建的数据和
-可部署页面。仅 push 空数据仓库的 `main` 不会调用模型，也无法替代首次真实生成。
+首次启用 Pages 前，仓库中必须先有至少一份成功生成的真实日报。配置标准 API 凭证、
+provider 控制台确认的模型 ID 和 Pages 来源（GitHub Actions）后，手动运行每日工作流；
+首次真实生成成功后才会有可构建的数据和可部署页面。仅 push 空数据仓库的 `main`
+不会调用模型，也无法替代首次真实生成。
 
 手动补跑示例：
 
@@ -222,10 +230,10 @@ gh workflow run daily-news.yml --repo mount-su/ai-news -f date=YYYY-MM-DD
 元数据和本项目生成的中文分析。版权归原作者或发布方；摘要用于索引与研判，读者应访问
 原文核对事实、上下文和许可。若来源要求移除，应从配置和后续数据中删除相应内容。
 
-真实凭证只允许存在于进程环境和 GitHub Secrets。不要提交聊天、截图、日志或本地环境中的凭证
-与令牌，也不要让它们进入 Git 历史、测试快照、Actions 日志或 Pages artifact；若曾暴露，
-应立即在 provider 侧撤销并轮换。`scripts/check_no_secrets.py` 是提交前门禁，但不能替代
-凭证轮换。
+真实凭证只允许存在于进程环境和 GitHub Secrets。聊天、截图、日志或本地环境中的凭证
+与令牌不能进入 Git 历史、测试快照、Actions 日志或 Pages artifact；真实密钥不能发送到
+聊天，也不能写入文件。若曾暴露，应立即在 provider 侧撤销并轮换。
+`scripts/check_no_secrets.py` 是提交前门禁，但不能替代凭证轮换。
 
 ## 项目结构
 
@@ -235,7 +243,7 @@ gh workflow run daily-news.yml --repo mount-su/ai-news -f date=YYYY-MM-DD
 ├── sources/feeds.yaml        # 允许的数据源
 ├── src/ai_news/
 │   ├── collectors/           # Feed、GitHub Releases、arXiv
-│   ├── llm/                  # Anthropic 协议适配与响应校验
+│   ├── llm/                  # 双协议模型适配与严格响应校验
 │   ├── pipeline/             # 规范化、去重、排序与日流水线
 │   ├── site/                 # Jinja 模板、样式、脚本与构建器
 │   ├── storage/              # 原子写入、索引与恢复
