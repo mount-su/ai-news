@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Mapping
 from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
@@ -93,12 +94,12 @@ class Settings(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def redact_invalid_token_input(cls, values: object) -> object:
-        if not isinstance(values, dict):
+        if not isinstance(values, Mapping):
             return values
         token = values.get("llm_token")
         if token is None or isinstance(token, str | SecretStr):
             return values
-        sanitized = values.copy()
+        sanitized = dict(values)
         sanitized["llm_token"] = b""
         return sanitized
 

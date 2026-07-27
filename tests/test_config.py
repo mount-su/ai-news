@@ -1,6 +1,8 @@
 import json
+from collections import UserDict
 from datetime import UTC, datetime
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 from pydantic import SecretStr, ValidationError
@@ -124,6 +126,51 @@ def test_settings_non_string_token_never_leaks_from_validation_error_surfaces(
             llm_token=invalid_token,
             llm_model="ark-standard-model",
         )
+
+    error = exc_info.value
+    rendered_errors = (
+        str(error),
+        repr(error),
+        json.dumps(error.errors(), default=str),
+        error.json(),
+    )
+    assert all(sensitive_value not in rendered for rendered in rendered_errors)
+    assert any(item["loc"] == ("llm_token",) for item in error.errors())
+
+
+@pytest.mark.parametrize(
+    ("mapped_values", "sensitive_value"),
+    [
+        (
+            UserDict(
+                {
+                    "llm_protocol": "openai-chat",
+                    "llm_base_url": "https://ark.cn-beijing.volces.com/api/v3",
+                    "llm_token": b"userdict-mapped-secret-7e91",
+                    "llm_model": "ark-standard-model",
+                }
+            ),
+            "userdict-mapped-secret-7e91",
+        ),
+        (
+            MappingProxyType(
+                {
+                    "llm_protocol": "openai-chat",
+                    "llm_base_url": "https://ark.cn-beijing.volces.com/api/v3",
+                    "llm_token": ["proxy-mapped-secret-7e91"],
+                    "llm_model": "ark-standard-model",
+                }
+            ),
+            "proxy-mapped-secret-7e91",
+        ),
+    ],
+)
+def test_settings_mapped_non_string_token_never_leaks_from_error_surfaces(
+    mapped_values: object,
+    sensitive_value: str,
+) -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        Settings.model_validate(mapped_values)
 
     error = exc_info.value
     rendered_errors = (
