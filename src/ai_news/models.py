@@ -13,6 +13,7 @@ from pydantic import (
     HttpUrl,
     SecretStr,
     StrictStr,
+    ValidationInfo,
     field_validator,
     model_validator,
 )
@@ -126,11 +127,16 @@ class Settings(BaseModel):
             raise ValueError("site_base_path must start and end with '/'")
         return value
 
-    @model_validator(mode="after")
-    def require_protocol_auth_scheme(self) -> Settings:
-        if self.llm_protocol == "openai-chat" and self.llm_auth_scheme != "bearer":
+    @field_validator("llm_auth_scheme")
+    @classmethod
+    def require_protocol_auth_scheme(
+        cls,
+        value: Literal["bearer", "x-api-key"],
+        info: ValidationInfo,
+    ) -> Literal["bearer", "x-api-key"]:
+        if info.data.get("llm_protocol") == "openai-chat" and value != "bearer":
             raise ValueError("openai-chat requires bearer authentication")
-        return self
+        return value
 
 
 class RawItem(BaseModel):

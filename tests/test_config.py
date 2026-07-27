@@ -1,8 +1,9 @@
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from ai_news.config import load_settings, load_source_config
 from ai_news.models import Analysis, Category, RawItem, Settings, SourceSpec
@@ -197,6 +198,28 @@ def test_openai_chat_rejects_x_api_key_auth_without_echoing_key() -> None:
         )
 
     assert "standard-api-secret" not in str(exc_info.value)
+
+
+def test_protocol_auth_validation_redacts_token_from_structured_errors() -> None:
+    unique_secret = "structured-error-secret-7e91b2"
+
+    with pytest.raises(ValidationError) as exc_info:
+        Settings(
+            llm_protocol="openai-chat",
+            llm_base_url="https://ark.cn-beijing.volces.com/api/v3",
+            llm_token=unique_secret,
+            llm_model="ark-standard-model",
+            llm_auth_scheme="x-api-key",
+        )
+
+    error = exc_info.value
+    rendered_errors = (
+        str(error),
+        repr(error),
+        json.dumps(error.errors(), default=str),
+        error.json(),
+    )
+    assert all(unique_secret not in rendered for rendered in rendered_errors)
 
 
 def test_anthropic_accepts_x_api_key_auth() -> None:
