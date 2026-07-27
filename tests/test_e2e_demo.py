@@ -36,7 +36,13 @@ def test_demo_cli_is_network_free_complete_and_deterministic(
     contract = json.loads(DEMO_CONTRACT.read_text(encoding="utf-8"))
     monkeypatch.setattr(socket, "create_connection", _deny_network)
     monkeypatch.setattr(socket.socket, "connect", _deny_network)
-    for variable in ("LLM_TOKEN", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"):
+    for variable in (
+        "LLM_PROTOCOL",
+        "LLM_BASE_URL",
+        "LLM_API_KEY",
+        "LLM_MODEL",
+        "LLM_AUTH_SCHEME",
+    ):
         monkeypatch.delenv(variable, raising=False)
 
     first_root = tmp_path / "first"

@@ -4,14 +4,15 @@ from pathlib import Path
 import pytest
 
 from ai_news.config import load_settings, load_source_config
-from ai_news.models import Analysis, Category, RawItem, SourceSpec
+from ai_news.models import Analysis, Category, RawItem, Settings, SourceSpec
 
 
 def _set_valid_settings_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://api.example.com")
-    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "test-secret")
-    monkeypatch.setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
-    monkeypatch.setenv("ANTHROPIC_AUTH_SCHEME", "bearer")
+    monkeypatch.setenv("LLM_PROTOCOL", "openai-chat")
+    monkeypatch.setenv("LLM_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")
+    monkeypatch.setenv("LLM_API_KEY", "test-secret")
+    monkeypatch.setenv("LLM_MODEL", "ark-standard-model")
+    monkeypatch.setenv("LLM_AUTH_SCHEME", "bearer")
     monkeypatch.setenv("SITE_BASE_PATH", "/ai-news/")
 
 
@@ -40,9 +41,10 @@ def test_load_settings_reads_expected_environment_variables(
 
     settings = load_settings()
 
-    assert settings.llm_base_url == "https://api.example.com"
+    assert settings.llm_protocol == "openai-chat"
+    assert settings.llm_base_url == "https://ark.cn-beijing.volces.com/api/v3"
     assert settings.llm_token.get_secret_value() == "test-secret"
-    assert settings.llm_model == "test-model"
+    assert settings.llm_model == "ark-standard-model"
     assert settings.llm_auth_scheme == "bearer"
     assert settings.site_base_path == "/ai-news/"
 
@@ -50,12 +52,14 @@ def test_load_settings_reads_expected_environment_variables(
 @pytest.mark.parametrize(
     ("environment_name", "invalid_value"),
     [
-        ("ANTHROPIC_BASE_URL", ""),
-        ("ANTHROPIC_BASE_URL", "   "),
-        ("ANTHROPIC_AUTH_TOKEN", ""),
-        ("ANTHROPIC_AUTH_TOKEN", "   "),
-        ("ANTHROPIC_DEFAULT_OPUS_MODEL", ""),
-        ("ANTHROPIC_DEFAULT_OPUS_MODEL", "   "),
+        ("LLM_PROTOCOL", ""),
+        ("LLM_PROTOCOL", "   "),
+        ("LLM_BASE_URL", ""),
+        ("LLM_BASE_URL", "   "),
+        ("LLM_API_KEY", ""),
+        ("LLM_API_KEY", "   "),
+        ("LLM_MODEL", ""),
+        ("LLM_MODEL", "   "),
     ],
 )
 def test_load_settings_rejects_blank_required_values(
@@ -76,12 +80,14 @@ def test_load_settings_strips_required_values_and_preserves_custom_base_url_path
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _set_valid_settings_environment(monkeypatch)
-    monkeypatch.setenv("ANTHROPIC_BASE_URL", "  https://api.example.com/custom/v1  ")
-    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "  test-secret  ")
-    monkeypatch.setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "  test-model  ")
+    monkeypatch.setenv("LLM_PROTOCOL", "  anthropic  ")
+    monkeypatch.setenv("LLM_BASE_URL", "  https://API.EXAMPLE.COM/custom/v1  ")
+    monkeypatch.setenv("LLM_API_KEY", "  test-secret  ")
+    monkeypatch.setenv("LLM_MODEL", "  test-model  ")
 
     settings = load_settings()
 
+    assert settings.llm_protocol == "anthropic"
     assert settings.llm_base_url == "https://api.example.com/custom/v1"
     assert settings.llm_token.get_secret_value() == "test-secret"
     assert settings.llm_model == "test-model"
@@ -100,12 +106,91 @@ def test_load_settings_requires_valid_https_base_url(
     base_url: str,
 ) -> None:
     _set_valid_settings_environment(monkeypatch)
-    monkeypatch.setenv("ANTHROPIC_BASE_URL", base_url)
+    monkeypatch.setenv("LLM_BASE_URL", base_url)
 
     with pytest.raises(ValueError) as exc_info:
         load_settings()
 
     assert "test-secret" not in str(exc_info.value)
+
+
+@pytest.mark.parametrize("protocol", ["openai", "anthropic-messages", "OPENAI-CHAT"])
+def test_load_settings_rejects_unknown_protocol(
+    monkeypatch: pytest.MonkeyPatch,
+    protocol: str,
+) -> None:
+    _set_valid_settings_environment(monkeypatch)
+    monkeypatch.setenv("LLM_PROTOCOL", protocol)
+
+    with pytest.raises(ValueError) as exc_info:
+        load_settings()
+
+    assert "test-secret" not in str(exc_info.value)
+
+
+def test_openai_chat_rejects_x_api_key_auth_without_echoing_key() -> None:
+    with pytest.raises(ValueError) as exc_info:
+        Settings(
+            llm_protocol="openai-chat",
+            llm_base_url="https://ark.cn-beijing.volces.com/api/v3",
+            llm_token="standard-api-secret",
+            llm_model="ark-standard-model",
+            llm_auth_scheme="x-api-key",
+        )
+
+    assert "standard-api-secret" not in str(exc_info.value)
+
+
+def test_anthropic_accepts_x_api_key_auth() -> None:
+    settings = Settings(
+        llm_protocol="anthropic",
+        llm_base_url="https://api.anthropic.com",
+        llm_token="anthropic-secret",
+        llm_model="claude-test",
+        llm_auth_scheme="x-api-key",
+    )
+
+    assert settings.llm_auth_scheme == "x-api-key"
+
+
+def test_load_settings_rejects_coding_plan_url_without_echoing_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_valid_settings_environment(monkeypatch)
+    monkeypatch.setenv(
+        "LLM_BASE_URL",
+        "https://ark.cn-beijing.volces.com/api/coding",
+    )
+    monkeypatch.setenv("LLM_API_KEY", "standard-api-secret")
+
+    with pytest.raises(ValueError) as exc_info:
+        load_settings()
+
+    error = str(exc_info.value)
+    assert "Ark Coding Plan endpoints are not allowed" in error
+    assert "standard-api-secret" not in error
+
+
+def test_load_settings_does_not_fall_back_to_legacy_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for environment_name in (
+        "LLM_PROTOCOL",
+        "LLM_BASE_URL",
+        "LLM_API_KEY",
+        "LLM_MODEL",
+        "LLM_AUTH_SCHEME",
+    ):
+        monkeypatch.delenv(environment_name, raising=False)
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "legacy-secret")
+    monkeypatch.setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "legacy-model")
+    monkeypatch.setenv("ANTHROPIC_AUTH_SCHEME", "x-api-key")
+
+    with pytest.raises(ValueError) as exc_info:
+        load_settings()
+
+    assert "legacy-secret" not in str(exc_info.value)
 
 
 def test_load_source_config_rejects_empty_sources(tmp_path: Path) -> None:
@@ -251,22 +336,28 @@ def test_load_settings_rejects_base_path_without_boundary_slashes(
     monkeypatch: pytest.MonkeyPatch,
     base_path: str,
 ) -> None:
-    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://api.example.com")
-    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "test-secret")
-    monkeypatch.setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
+    _set_valid_settings_environment(monkeypatch)
     monkeypatch.setenv("SITE_BASE_PATH", base_path)
 
     with pytest.raises(ValueError):
         load_settings()
 
 
-def test_load_settings_rejects_missing_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://api.example.com")
-    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "test-secret")
-    monkeypatch.delenv("ANTHROPIC_DEFAULT_OPUS_MODEL", raising=False)
+@pytest.mark.parametrize(
+    "environment_name",
+    ["LLM_PROTOCOL", "LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL"],
+)
+def test_load_settings_rejects_missing_required_value(
+    monkeypatch: pytest.MonkeyPatch,
+    environment_name: str,
+) -> None:
+    _set_valid_settings_environment(monkeypatch)
+    monkeypatch.delenv(environment_name, raising=False)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as exc_info:
         load_settings()
+
+    assert "test-secret" not in str(exc_info.value)
 
 
 def test_repository_source_manifest_contains_only_verified_sources() -> None:

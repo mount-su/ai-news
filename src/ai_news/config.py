@@ -17,10 +17,11 @@ def load_source_config(path: Path) -> SourceConfig:
 
 def load_settings() -> Settings:
     environment_names = {
-        "llm_base_url": "ANTHROPIC_BASE_URL",
-        "llm_token": "ANTHROPIC_AUTH_TOKEN",
-        "llm_model": "ANTHROPIC_DEFAULT_OPUS_MODEL",
-        "llm_auth_scheme": "ANTHROPIC_AUTH_SCHEME",
+        "llm_protocol": "LLM_PROTOCOL",
+        "llm_base_url": "LLM_BASE_URL",
+        "llm_token": "LLM_API_KEY",
+        "llm_model": "LLM_MODEL",
+        "llm_auth_scheme": "LLM_AUTH_SCHEME",
         "site_base_path": "SITE_BASE_PATH",
     }
     values = {

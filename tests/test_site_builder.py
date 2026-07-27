@@ -521,10 +521,11 @@ def test_cli_demo_builds_real_site_through_safe_alias_with_default_base_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for environment_name in (
-        "ANTHROPIC_BASE_URL",
-        "ANTHROPIC_AUTH_TOKEN",
-        "ANTHROPIC_DEFAULT_OPUS_MODEL",
-        "ANTHROPIC_AUTH_SCHEME",
+        "LLM_PROTOCOL",
+        "LLM_BASE_URL",
+        "LLM_API_KEY",
+        "LLM_MODEL",
+        "LLM_AUTH_SCHEME",
     ):
         monkeypatch.delenv(environment_name, raising=False)
     real_parent = tmp_path / "real-demo"

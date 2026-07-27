@@ -242,6 +242,7 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     report = _run(
         source_config=SourceConfig(sources=sources),
         settings=Settings(
+            llm_protocol="anthropic",
             llm_base_url="https://api.example.com",
             llm_token="llm-secret",
             llm_model="live-model",

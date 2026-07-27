@@ -63,6 +63,7 @@ def _settings(
     auth_scheme: str = "bearer",
 ) -> Settings:
     return Settings(
+        llm_protocol="anthropic",
         llm_base_url=base_url,
         llm_token=SecretStr(token),
         llm_model="claude-test",
@@ -308,7 +309,7 @@ def test_unsafe_base_url_components_are_rejected_without_request(base_url: str) 
         return httpx.Response(200)
 
     candidate = _candidate("unsafe-base")
-    with pytest.raises(AnalysisError) as exc_info:
+    with pytest.raises(ValueError) as exc_info:
         _run_analyze(handler, [candidate], settings=_settings(base_url=base_url))
 
     assert requests == []
@@ -343,25 +344,15 @@ def test_base_url_validation_preserves_valid_ipv6_and_path_at_sign(
 
 
 @pytest.mark.parametrize(
-    ("base_url", "expected_url"),
+    "base_url",
     [
-        (
-            "https://proxy.example/root//tenant/",
-            "https://proxy.example/root//tenant/v1/messages",
-        ),
-        (
-            "https://proxy.example/a%2Fb/",
-            "https://proxy.example/a%2Fb/v1/messages",
-        ),
-        (
-            "https://proxy.example/%3Ftenant/",
-            "https://proxy.example/%3Ftenant/v1/messages",
-        ),
+        "https://proxy.example/root//tenant/",
+        "https://proxy.example/a%2Fb/",
+        "https://proxy.example/%3Ftenant/",
     ],
 )
-def test_endpoint_preserves_original_encoded_and_repeated_slash_path(
+def test_settings_rejects_encoded_and_repeated_slash_path_without_request(
     base_url: str,
-    expected_url: str,
 ) -> None:
     candidate = _candidate("raw-endpoint")
     captured: list[httpx.Request] = []
@@ -370,11 +361,10 @@ def test_endpoint_preserves_original_encoded_and_repeated_slash_path(
         captured.append(request)
         return httpx.Response(200, content=_anthropic_response([_analysis_row(candidate)]))
 
-    result = _run_analyze(handler, [candidate], settings=_settings(base_url=base_url))
+    with pytest.raises(ValueError):
+        _run_analyze(handler, [candidate], settings=_settings(base_url=base_url))
 
-    assert list(result) == [candidate.id]
-    assert str(captured[0].url) == expected_url
-    assert captured[0].url.query == b""
+    assert captured == []
 
 
 def test_429_and_5xx_are_retried_three_times_with_exponential_delays() -> None:

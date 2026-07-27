@@ -34,6 +34,7 @@ def _source_config() -> SourceConfig:
 
 def _settings() -> Settings:
     return Settings(
+        llm_protocol="anthropic",
         llm_base_url="https://api.example.com",
         llm_token="llm-secret",
         llm_model="test-model",
@@ -228,10 +229,11 @@ def test_demo_is_offline_deterministic_and_builds_from_a_real_saved_report(
     output = tmp_path / "dist"
     calls: list[tuple[Path, Path]] = []
     for environment_name in (
-        "ANTHROPIC_BASE_URL",
-        "ANTHROPIC_AUTH_TOKEN",
-        "ANTHROPIC_DEFAULT_OPUS_MODEL",
-        "ANTHROPIC_AUTH_SCHEME",
+        "LLM_PROTOCOL",
+        "LLM_BASE_URL",
+        "LLM_API_KEY",
+        "LLM_MODEL",
+        "LLM_AUTH_SCHEME",
     ):
         monkeypatch.delenv(environment_name, raising=False)
     monkeypatch.setattr(
@@ -255,7 +257,7 @@ def test_demo_is_offline_deterministic_and_builds_from_a_real_saved_report(
     assert first_report == second_report
     assert first_report.model == "offline-demo"
     assert calls == [(tmp_path, output), (tmp_path, output)]
-    assert not any("ANTHROPIC" in name for name in os.environ)
+    assert not any(name.startswith("LLM_") for name in os.environ)
 
 
 def test_python_m_ai_news_dispatches_to_cli() -> None:

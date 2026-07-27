@@ -5,7 +5,6 @@ import re
 from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
-from urllib.parse import urlsplit
 
 from pydantic import (
     BaseModel,
@@ -13,12 +12,10 @@ from pydantic import (
     Field,
     HttpUrl,
     SecretStr,
-    TypeAdapter,
     field_validator,
     model_validator,
 )
 
-_HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
 _GITHUB_OWNER_PATTERN = re.compile(r"^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")
 _GITHUB_REPO_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
 
@@ -82,13 +79,16 @@ class SourceConfig(BaseModel):
 
 
 class Settings(BaseModel):
+    model_config = ConfigDict(hide_input_in_errors=True)
+
+    llm_protocol: Literal["openai-chat", "anthropic"]
     llm_base_url: str
     llm_token: SecretStr
     llm_model: str
     llm_auth_scheme: Literal["bearer", "x-api-key"] = "bearer"
     site_base_path: str = "/ai-news/"
 
-    @field_validator("llm_base_url", "llm_model", mode="before")
+    @field_validator("llm_protocol", "llm_base_url", "llm_model", mode="before")
     @classmethod
     def strip_required_text(cls, value: object) -> object:
         if isinstance(value, str):
@@ -100,11 +100,9 @@ class Settings(BaseModel):
     @field_validator("llm_base_url")
     @classmethod
     def require_https_base_url(cls, value: str) -> str:
-        parsed_url = _HTTP_URL_ADAPTER.validate_python(value)
-        original_url = urlsplit(value)
-        if parsed_url.scheme != "https" or original_url.hostname is None:
-            raise ValueError("llm_base_url must use https")
-        return value
+        from ai_news.llm.endpoint import validate_llm_base_url
+
+        return validate_llm_base_url(value)
 
     @field_validator("llm_token")
     @classmethod
@@ -120,6 +118,12 @@ class Settings(BaseModel):
         if not value.startswith("/") or not value.endswith("/"):
             raise ValueError("site_base_path must start and end with '/'")
         return value
+
+    @model_validator(mode="after")
+    def require_protocol_auth_scheme(self) -> Settings:
+        if self.llm_protocol == "openai-chat" and self.llm_auth_scheme != "bearer":
+            raise ValueError("openai-chat requires bearer authentication")
+        return self
 
 
 class RawItem(BaseModel):
