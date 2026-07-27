@@ -292,9 +292,7 @@ def test_analyzer_factory_failure_does_not_expose_or_retain_sensitive_state(
 
     with pytest.raises(AnalysisPipelineError) as exc_info:
         _run(
-            collector=_collector(
-                {source.id: [_raw(index, source=source) for index in range(5)]}
-            ),
+            collector=_collector({source.id: [_raw(index, source=source) for index in range(5)]}),
             settings=Settings(
                 llm_protocol="openai-chat",
                 llm_base_url="https://ark.cn-beijing.volces.com/api/v3",

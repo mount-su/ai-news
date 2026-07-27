@@ -148,9 +148,7 @@ def test_request_uses_exact_ark_endpoint_headers_body_and_isolates_client_defaul
 
     assert list(result) == [candidate.id]
     request = captured[0]
-    assert str(request.url) == (
-        "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
-    )
+    assert str(request.url) == ("https://ark.cn-beijing.volces.com/api/v3/chat/completions")
     assert request.url.query == b""
     assert request.headers["authorization"] == "Bearer top-secret-token"
     assert request.headers["content-type"] == "application/json"
@@ -258,9 +256,7 @@ def test_retryable_statuses_use_four_total_attempts_and_one_two_four_delays() ->
         nonlocal requests
         requests += 1
         status = next(statuses)
-        content = (
-            _openai_response([_analysis_row(candidate)]) if status == 200 else b"retry"
-        )
+        content = _openai_response([_analysis_row(candidate)]) if status == 200 else b"retry"
         return httpx.Response(status, content=content)
 
     async def record_sleep(delay: float) -> None:

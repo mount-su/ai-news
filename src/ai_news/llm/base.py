@@ -113,10 +113,7 @@ def _parse_analysis(
     if any(expected_id not in set(row_ids) for expected_id in expected_ids):
         return None, "missing"
 
-    by_id = {
-        row.id: Analysis.model_validate(row.model_dump(exclude={"id"}))
-        for row in parsed_rows
-    }
+    by_id = {row.id: Analysis.model_validate(row.model_dump(exclude={"id"})) for row in parsed_rows}
     return {candidate_id: by_id[candidate_id] for candidate_id in expected_ids}, None
 
 

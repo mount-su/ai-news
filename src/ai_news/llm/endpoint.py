@@ -49,9 +49,7 @@ def _decode_path(path: str) -> tuple[str, bool]:
 
 def _normalized_path(path: str) -> tuple[str, bool, bool]:
     separator_normalized = path.replace("\\", "/")
-    has_dot_segment = any(
-        segment in {".", ".."} for segment in separator_normalized.split("/")
-    )
+    has_dot_segment = any(segment in {".", ".."} for segment in separator_normalized.split("/"))
     normalized = posixpath.normpath(f"/{separator_normalized.lstrip('/')}")
     boundary_stripped = separator_normalized.rstrip("/") or "/"
     return normalized, has_dot_segment, normalized != boundary_stripped
@@ -93,11 +91,7 @@ def validate_llm_base_url(value: str) -> str:
     except (TypeError, ValueError):
         raise _invalid() from None
 
-    if (
-        "%" in parsed.netloc
-        or "\\" in parsed.netloc
-        or _contains_control(parsed.netloc)
-    ):
+    if "%" in parsed.netloc or "\\" in parsed.netloc or _contains_control(parsed.netloc):
         raise _invalid()
 
     try:
@@ -124,8 +118,7 @@ def validate_llm_base_url(value: str) -> str:
     )
 
     if canonical_host == _ARK_HOST and (
-        normalized_path == "/api/coding"
-        or normalized_path.startswith("/api/coding/")
+        normalized_path == "/api/coding" or normalized_path.startswith("/api/coding/")
     ):
         raise _invalid("Ark Coding Plan endpoints are not allowed.")
 
