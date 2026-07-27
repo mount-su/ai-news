@@ -251,6 +251,27 @@ def test_scan_allows_nonliteral_references_in_runtime_files(tmp_path: Path) -> N
     assert scan_repository(repository) == []
 
 
+def test_scan_continues_after_valid_reference_to_later_assignment_on_same_line(
+    tmp_path: Path,
+) -> None:
+    token_key = "LLM_API_" + "KEY"
+    legacy_key = "ANTHROPIC_AUTH_" + "TOKEN"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "runtime.env": (
+                f'{token_key}: ${{{{ secrets.LLM_API_KEY }}}}, {legacy_key}: "live-later-secret"'
+            )
+        },
+    )
+
+    findings = scan_repository(repository)
+
+    assert [(finding.path, finding.line_number, finding.rule) for finding in findings] == [
+        ("runtime.env", 1, "credential assignment")
+    ]
+
+
 @pytest.mark.parametrize(
     "token_key",
     [
@@ -641,6 +662,30 @@ def test_scan_large_comment_chain_completes_within_timeout(tmp_path: Path) -> No
     assert completed.returncode == 0
     assert completed.stdout == ""
     assert completed.stderr == ""
+
+
+def test_scan_many_unterminated_same_line_expressions_completes_within_timeout(
+    tmp_path: Path,
+) -> None:
+    malformed_fragment = "LLM_API_" + "KEY=${{unterminated "
+    repository = _tracked_repository(
+        tmp_path,
+        {"malformed.env": malformed_fragment * 8_000},
+    )
+
+    completed = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH)],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    assert completed.stdout == ""
+    assert "malformed.env:1: potential credential assignment" in completed.stderr
+    assert "unterminated" not in completed.stderr
 
 
 def test_scan_ignores_documented_specification_placeholders_in_inline_code(

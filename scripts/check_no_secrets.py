@@ -45,8 +45,6 @@ _STRUCTURED_KEY_PATTERN = re.compile(
     """,
     re.VERBOSE,
 )
-_GITHUB_VALUE_PATTERN = re.compile(r"\$\{\{.*?\}\}")
-_SHELL_VALUE_PATTERN = re.compile(r"\$\{[^\s}]*\}")
 _UNQUOTED_ASSIGNMENT_VALUE_PATTERN = re.compile(r"""[^\s\#;'"`:]+""")
 _UNQUOTED_BEARER_VALUE_PATTERN = re.compile(r"[^\s,;`]+")
 _BEARER_PREFIX_PATTERN = re.compile(r"Bearer[ \t]+", re.IGNORECASE)
@@ -59,6 +57,7 @@ _GITHUB_SECRET_REFERENCE_PATTERN = re.compile(
     r"^\$\{\{\s*secrets\.[A-Za-z_][A-Za-z0-9_]*\s*\}\}$",
     re.IGNORECASE,
 )
+_MAX_DELIMITED_VALUE_LENGTH = 4_096
 _MISSING_VALUE = object()
 _INVALID_VALUE = object()
 
@@ -197,11 +196,29 @@ def _skip_horizontal_whitespace(text: str, position: int) -> int:
     return position
 
 
+def _delimited_value(
+    text: str,
+    position: int,
+    opening: str,
+    closing: str,
+) -> str | None:
+    if not text.startswith(opening, position):
+        return None
+    scan_end = min(len(text), position + _MAX_DELIMITED_VALUE_LENGTH)
+    closing_start = text.find(closing, position + len(opening), scan_end)
+    if closing_start < 0:
+        # An unclosed or exceptionally long value is still suspicious. Return
+        # a bounded token so callers report it without rescanning the suffix.
+        return text[position:scan_end]
+    return text[position : closing_start + len(closing)]
+
+
 def _quoted_value(text: str, position: int) -> str | object:
     quote = text[position]
-    quote_end = text.find(quote, position + 1)
+    scan_end = min(len(text), position + _MAX_DELIMITED_VALUE_LENGTH)
+    quote_end = text.find(quote, position + 1, scan_end)
     if quote_end < 0:
-        return _INVALID_VALUE
+        return text[position:scan_end]
     after_quote = _skip_horizontal_whitespace(text, quote_end + 1)
     if after_quote < len(text) and text[after_quote] == ":":
         return _INVALID_VALUE
@@ -212,32 +229,35 @@ def _assignment_value(text: str, position: int = 0) -> str | object:
     position = _skip_horizontal_whitespace(text, position)
     if position >= len(text) or text[position] == "#":
         return _MISSING_VALUE
-    github_value = _GITHUB_VALUE_PATTERN.match(text, position)
+    github_value = _delimited_value(text, position, "${{", "}}")
     if github_value is not None:
-        return github_value.group(0)
-    shell_value = _SHELL_VALUE_PATTERN.match(text, position)
+        return github_value
+    shell_value = _delimited_value(text, position, "${", "}")
     if shell_value is not None:
-        return shell_value.group(0)
+        return shell_value
     if text[position] in "'\"":
         return _quoted_value(text, position)
-    value = _UNQUOTED_ASSIGNMENT_VALUE_PATTERN.match(text, position)
+    scan_end = min(len(text), position + _MAX_DELIMITED_VALUE_LENGTH)
+    value = _UNQUOTED_ASSIGNMENT_VALUE_PATTERN.match(text, position, scan_end)
     return value.group(0) if value is not None else _INVALID_VALUE
 
 
 def _bearer_credential(text: str, position: int) -> str | object:
-    prefix = _BEARER_PREFIX_PATTERN.match(text, position)
+    scan_end = min(len(text), position + _MAX_DELIMITED_VALUE_LENGTH)
+    prefix = _BEARER_PREFIX_PATTERN.match(text, position, scan_end)
     if prefix is None:
         return _INVALID_VALUE
     position = prefix.end()
-    github_value = _GITHUB_VALUE_PATTERN.match(text, position)
+    github_value = _delimited_value(text, position, "${{", "}}")
     if github_value is not None:
-        return github_value.group(0)
-    shell_value = _SHELL_VALUE_PATTERN.match(text, position)
+        return github_value
+    shell_value = _delimited_value(text, position, "${", "}")
     if shell_value is not None:
-        return shell_value.group(0)
+        return shell_value
     if position < len(text) and text[position] in "'\"":
         return _quoted_value(text, position)
-    value = _UNQUOTED_BEARER_VALUE_PATTERN.match(text, position)
+    scan_end = min(len(text), position + _MAX_DELIMITED_VALUE_LENGTH)
+    value = _UNQUOTED_BEARER_VALUE_PATTERN.match(text, position, scan_end)
     return value.group(0) if value is not None else _INVALID_VALUE
 
 
@@ -248,9 +268,10 @@ def _bearer_value(text: str, position: int = 0) -> str | object:
     if text[position] not in "'\"":
         return _bearer_credential(text, position)
     quote = text[position]
-    quote_end = text.find(quote, position + 1)
+    scan_end = min(len(text), position + _MAX_DELIMITED_VALUE_LENGTH)
+    quote_end = text.find(quote, position + 1, scan_end)
     if quote_end < 0:
-        return _INVALID_VALUE
+        return text[position:scan_end]
     after_quote = _skip_horizontal_whitespace(text, quote_end + 1)
     if after_quote < len(text) and text[after_quote] == ":":
         return _INVALID_VALUE
