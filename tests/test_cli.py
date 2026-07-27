@@ -157,7 +157,7 @@ def test_generate_maps_safe_exit_categories(
     stderr = capsys.readouterr().err
 
     assert result == expected_code
-    assert stderr == f"{expected_category}: {type(error).__name__}\n"
+    assert stderr == f"{expected_category}: Error\n"
     assert "secret" not in stderr
     assert "token=value" not in stderr
 
@@ -205,9 +205,11 @@ def test_check_config_failure_is_safe_and_does_not_retain_error(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     secret = "live-standard-api-key"
+    secret_class_name = "UniqueSecretClassKey_7Z9"
+    secret_error = type(secret_class_name, (ValueError,), {})
 
     def broken_load_settings() -> object:
-        raise ValueError(f"invalid token {secret}")
+        raise secret_error(f"invalid token {secret}")
 
     monkeypatch.setattr(cli, "load_settings", broken_load_settings)
 
@@ -216,8 +218,9 @@ def test_check_config_failure_is_safe_and_does_not_retain_error(
 
     assert result == 2
     assert captured.out == ""
-    assert captured.err == "configuration_error: ValueError\n"
+    assert captured.err == "configuration_error: Error\n"
     assert secret not in captured.err
+    assert secret_class_name not in captured.err
     assert all(not isinstance(value, BaseException) for value in vars(cli).values())
 
 
@@ -289,7 +292,7 @@ def test_build_failure_returns_five_with_safe_stderr(
     stderr = capsys.readouterr().err
 
     assert result == 5
-    assert stderr == "site_build_error: RuntimeError\n"
+    assert stderr == "site_build_error: Error\n"
     assert "secret" not in stderr
     assert "token=value" not in stderr
 

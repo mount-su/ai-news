@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import re
 import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -28,14 +27,17 @@ from ai_news.pipeline.run import (
 )
 from ai_news.storage import save_report
 
-_SAFE_EXCEPTION_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,127}$")
+_CONFIGURATION_ERROR = "configuration_error"
+_PIPELINE_ERROR = "pipeline_error"
+_PUBLICATION_THRESHOLD = "publication_threshold"
+_SITE_BUILD_ERROR = "site_build_error"
 _DEMO_DATE = date(2026, 7, 26)
 _DEMO_GENERATED_AT = datetime(2026, 7, 26, 8, tzinfo=UTC)
 
 
 class _SafeArgumentParser(argparse.ArgumentParser):
     def error(self, _message: str) -> None:
-        print("configuration_error: ArgumentError", file=sys.stderr)
+        print(f"{_CONFIGURATION_ERROR}: ArgumentError", file=sys.stderr)
         raise SystemExit(2)
 
 
@@ -53,11 +55,8 @@ def _shanghai_today() -> date:
     return datetime.now(ZoneInfo("Asia/Shanghai")).date()
 
 
-def _safe_error(category: str, error: BaseException) -> None:
-    error_name = type(error).__name__
-    if _SAFE_EXCEPTION_NAME.fullmatch(error_name) is None:
-        error_name = "Error"
-    print(f"{category}: {error_name}", file=sys.stderr)
+def _safe_error(category: str, _error: BaseException) -> None:
+    print(f"{category}: Error", file=sys.stderr)
 
 
 def _build_site(root: Path, output: Path) -> None:
@@ -120,7 +119,7 @@ def _generate(root: Path, run_date: date | None) -> int:
         source_config = load_source_config(root / "sources/feeds.yaml")
         settings = load_settings()
     except Exception as error:
-        _safe_error("configuration_error", error)
+        _safe_error(_CONFIGURATION_ERROR, error)
         return 2
 
     try:
@@ -133,16 +132,16 @@ def _generate(root: Path, run_date: date | None) -> int:
             )
         )
     except ConfigurationPipelineError as error:
-        _safe_error("configuration_error", error)
+        _safe_error(_CONFIGURATION_ERROR, error)
         return 2
     except PublicationThresholdError as error:
-        _safe_error("publication_threshold", error)
+        _safe_error(_PUBLICATION_THRESHOLD, error)
         return 3
     except PipelineError as error:
-        _safe_error("pipeline_error", error)
+        _safe_error(_PIPELINE_ERROR, error)
         return 4
     except Exception as error:
-        _safe_error("pipeline_error", error)
+        _safe_error(_PIPELINE_ERROR, error)
         return 4
     return 0
 
@@ -151,7 +150,7 @@ def _check_config() -> int:
     try:
         load_settings()
     except Exception as error:
-        _safe_error("configuration_error", error)
+        _safe_error(_CONFIGURATION_ERROR, error)
         return 2
     return 0
 
@@ -160,7 +159,7 @@ def _build(root: Path, output: Path) -> int:
     try:
         _build_site(root, output)
     except Exception as error:
-        _safe_error("site_build_error", error)
+        _safe_error(_SITE_BUILD_ERROR, error)
         return 5
     return 0
 
@@ -170,7 +169,7 @@ def _demo(root: Path, output: Path) -> int:
         save_report(root, _demo_report())
         _build_site(root, output)
     except Exception as error:
-        _safe_error("site_build_error", error)
+        _safe_error(_SITE_BUILD_ERROR, error)
         return 5
     return 0
 
