@@ -12,6 +12,7 @@ from pydantic import (
     Field,
     HttpUrl,
     SecretStr,
+    StrictStr,
     field_validator,
     model_validator,
 )
@@ -82,11 +83,11 @@ class Settings(BaseModel):
     model_config = ConfigDict(hide_input_in_errors=True)
 
     llm_protocol: Literal["openai-chat", "anthropic"]
-    llm_base_url: str
+    llm_base_url: StrictStr
     llm_token: SecretStr
-    llm_model: str
+    llm_model: StrictStr
     llm_auth_scheme: Literal["bearer", "x-api-key"] = "bearer"
-    site_base_path: str = "/ai-news/"
+    site_base_path: StrictStr = "/ai-news/"
 
     @field_validator("llm_protocol", "llm_base_url", "llm_model", mode="before")
     @classmethod
@@ -104,10 +105,16 @@ class Settings(BaseModel):
 
         return validate_llm_base_url(value)
 
-    @field_validator("llm_token")
+    @field_validator("llm_token", mode="before")
     @classmethod
-    def strip_and_require_token(cls, value: SecretStr) -> SecretStr:
-        secret_value = value.get_secret_value().strip()
+    def strip_and_require_token(cls, value: object) -> SecretStr:
+        if isinstance(value, SecretStr):
+            secret_value = value.get_secret_value()
+        elif isinstance(value, str):
+            secret_value = value
+        else:
+            raise ValueError("llm_token must be a string")
+        secret_value = secret_value.strip()
         if not secret_value:
             raise ValueError("llm_token must not be empty")
         return SecretStr(secret_value)

@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from pydantic import SecretStr
 
 from ai_news.config import load_settings, load_source_config
 from ai_news.models import Analysis, Category, RawItem, Settings, SourceSpec
@@ -47,6 +48,63 @@ def test_load_settings_reads_expected_environment_variables(
     assert settings.llm_model == "ark-standard-model"
     assert settings.llm_auth_scheme == "bearer"
     assert settings.site_base_path == "/ai-news/"
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value", "sensitive_value"),
+    [
+        ("llm_protocol", b"openai-chat", None),
+        ("llm_protocol", 101, None),
+        (
+            "llm_base_url",
+            b"https://secret-host.example/api",
+            "secret-host.example",
+        ),
+        ("llm_base_url", 102, "102"),
+        ("llm_token", b"bytes-token-secret", "bytes-token-secret"),
+        ("llm_token", 103, "103"),
+        ("llm_model", b"bytes-model-secret", "bytes-model-secret"),
+        ("llm_model", 104, "104"),
+        ("llm_auth_scheme", b"bearer", None),
+        ("llm_auth_scheme", 105, None),
+        ("site_base_path", b"/ai-news/", None),
+        ("site_base_path", 106, None),
+    ],
+)
+def test_settings_rejects_non_string_values_without_leaking_input(
+    field_name: str,
+    invalid_value: object,
+    sensitive_value: str | None,
+) -> None:
+    values = {
+        "llm_protocol": "openai-chat",
+        "llm_base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "llm_token": "test-secret",
+        "llm_model": "ark-standard-model",
+        "llm_auth_scheme": "bearer",
+        "site_base_path": "/ai-news/",
+    }
+    values[field_name] = invalid_value
+
+    with pytest.raises(ValueError) as exc_info:
+        Settings.model_validate(values)
+
+    error = str(exc_info.value)
+    if sensitive_value is not None:
+        assert sensitive_value not in error
+    assert "test-secret" not in error
+
+
+def test_settings_strips_existing_secret_str_token() -> None:
+    settings = Settings(
+        llm_protocol="anthropic",
+        llm_base_url="https://api.anthropic.com",
+        llm_token=SecretStr("  existing-secret  "),
+        llm_model="claude-test",
+    )
+
+    assert settings.llm_token.get_secret_value() == "existing-secret"
+    assert "existing-secret" not in repr(settings)
 
 
 @pytest.mark.parametrize(
