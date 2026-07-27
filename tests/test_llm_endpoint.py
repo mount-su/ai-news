@@ -49,6 +49,8 @@ def test_build_llm_endpoint_preserves_safe_base_path(
         "https://ark.cn-beijing.volces.com/api/coding",
         "https://ark.cn-beijing.volces.com/api/coding/",
         "https://ark.cn-beijing.volces.com/api/coding/v3",
+        "https://ark.cn-beijing.volces.com/API/CODING",
+        "https://ark.cn-beijing.volces.com/Api/Coding/v3",
         "https://ARK.CN-BEIJING.VOLCES.COM/api/v3/../coding",
         "https://ark.cn-beijing.volces.com/api%2fcoding",
         "https://ark.cn-beijing.volces.com/api%252fcoding",
@@ -58,6 +60,35 @@ def test_build_llm_endpoint_preserves_safe_base_path(
 def test_validate_llm_base_url_rejects_ark_coding_plan(base_url: str) -> None:
     with pytest.raises(InvalidLLMEndpoint, match="not allowed"):
         validate_llm_base_url(base_url)
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "https://api.example.com/chat/completions",
+        "https://api.example.com/chat/completions/",
+        "https://api.example.com/v1/messages",
+        "https://api.example.com/v1/messages/",
+        "https://proxy.example/tenant/Chat/Completions/",
+    ],
+)
+def test_validate_llm_base_url_rejects_full_request_endpoint(base_url: str) -> None:
+    with pytest.raises(InvalidLLMEndpoint):
+        validate_llm_base_url(base_url)
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "https://proxy.example/api/coding",
+        "https://proxy.example/tenant/chat/completions-v2",
+        "https://proxy.example/tenant/v1/messages-api",
+    ],
+)
+def test_validate_llm_base_url_preserves_non_ark_and_tenant_path_boundaries(
+    base_url: str,
+) -> None:
+    assert validate_llm_base_url(base_url) == base_url
 
 
 @pytest.mark.parametrize(

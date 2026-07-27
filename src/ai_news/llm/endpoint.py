@@ -116,11 +116,14 @@ def validate_llm_base_url(value: str) -> str:
         host,
         bracketed="[" in parsed.netloc or "]" in parsed.netloc,
     )
+    comparable_path = normalized_path.casefold()
 
     if canonical_host == _ARK_HOST and (
-        normalized_path == "/api/coding" or normalized_path.startswith("/api/coding/")
+        comparable_path == "/api/coding" or comparable_path.startswith("/api/coding/")
     ):
         raise _invalid("Ark Coding Plan endpoints are not allowed.")
+    if any(comparable_path.endswith(f"/{suffix}") for suffix in _ALLOWED_SUFFIXES):
+        raise _invalid()
 
     if (
         has_encoded_separator
