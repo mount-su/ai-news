@@ -65,6 +65,17 @@ def validate_llm_base_url(value: str) -> str:
 
     try:
         parsed = urlsplit(value)
+    except (TypeError, ValueError):
+        raise _invalid() from None
+
+    if (
+        "%" in parsed.netloc
+        or "\\" in parsed.netloc
+        or _has_unsafe_character(parsed.netloc)
+    ):
+        raise _invalid()
+
+    try:
         host = parsed.hostname
         port = parsed.port
     except (TypeError, ValueError):
@@ -96,6 +107,7 @@ def validate_llm_base_url(value: str) -> str:
         or _has_unsafe_character(decoded_path)
         or has_dot_segment
         or path_was_rewritten
+        or decoded_path.endswith("//")
         or "?" in decoded_path
         or "#" in decoded_path
     ):
@@ -107,7 +119,7 @@ def validate_llm_base_url(value: str) -> str:
 
     try:
         canonical = httpx.URL(f"https://{authority}{normalized_path}")
-    except (TypeError, ValueError):
+    except (httpx.InvalidURL, TypeError, ValueError):
         raise _invalid() from None
     if not canonical.host or canonical.query or canonical.fragment or canonical.userinfo:
         raise _invalid()
@@ -124,4 +136,7 @@ def build_llm_endpoint(base_url: str, suffix: str) -> httpx.URL:
         raise _invalid()
 
     canonical_base = validate_llm_base_url(base_url)
-    return httpx.URL(f"{canonical_base.rstrip('/')}/{normalized_suffix}")
+    try:
+        return httpx.URL(f"{canonical_base.rstrip('/')}/{normalized_suffix}")
+    except (httpx.InvalidURL, TypeError, ValueError):
+        raise _invalid() from None
