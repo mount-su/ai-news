@@ -104,6 +104,17 @@ def test_scan_does_not_match_generic_key_as_identifier_substring(tmp_path: Path)
     assert scan_repository(repository) == []
 
 
+def test_scan_does_not_match_generic_key_after_unicode_identifier_character(
+    tmp_path: Path,
+) -> None:
+    repository = _tracked_repository(
+        tmp_path,
+        {"settings.env": "éLLM_API_" + "KEY=live-but-unrelated-value"},
+    )
+
+    assert scan_repository(repository) == []
+
+
 def test_scan_does_not_treat_equality_comparison_as_assignment(tmp_path: Path) -> None:
     comparison = "ANTHROPIC_AUTH_" + 'TOKEN == "not-an-assignment"'
     repository = _tracked_repository(tmp_path, {"condition.py": comparison})
@@ -170,6 +181,76 @@ def test_scan_allows_generic_key_documentation_placeholders(
     assert scan_repository(repository) == []
 
 
+def test_scan_rejects_literal_placeholders_in_generated_runtime_files(tmp_path: Path) -> None:
+    token_key = "LLM_API_" + "KEY"
+    literal_values = (
+        "your-prod-live-9f3d3f8e",
+        "replace-with-real-looking-value",
+        "<live-looking-value>",
+    )
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            path: "\n".join(f"{token_key}: {value}" for value in literal_values)
+            for path in ("data/report.json", "content/report.md")
+        },
+    )
+
+    findings = scan_repository(repository)
+
+    assert [(finding.path, finding.line_number, finding.rule) for finding in findings] == [
+        ("content/report.md", 1, "credential assignment"),
+        ("content/report.md", 2, "credential assignment"),
+        ("content/report.md", 3, "credential assignment"),
+        ("data/report.json", 1, "credential assignment"),
+        ("data/report.json", 2, "credential assignment"),
+        ("data/report.json", 3, "credential assignment"),
+    ]
+    rendered = "\n".join(finding.render() for finding in findings)
+    assert all(value not in rendered for value in literal_values)
+
+
+def test_scan_allows_literal_placeholders_only_in_explicit_example_paths(
+    tmp_path: Path,
+) -> None:
+    token_key = "LLM_API_" + "KEY"
+    literal_values = (
+        "your-prod-live-9f3d3f8e",
+        "replace-with-real-looking-value",
+        "<live-looking-value>",
+    )
+    content = "\n".join(f"{token_key}: {value}" for value in literal_values)
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            ".env.example": content,
+            "README.md": content,
+            "docs/superpowers/plans/example.md": content,
+            "docs/superpowers/specs/example.md": content,
+        },
+    )
+
+    assert scan_repository(repository) == []
+
+
+def test_scan_allows_nonliteral_references_in_runtime_files(tmp_path: Path) -> None:
+    token_key = "LLM_API_" + "KEY"
+    shell_reference = "LLM_API_" + "KEY"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "data/report.json": "\n".join(
+                [
+                    f"{token_key}: ${{{shell_reference}}}",
+                    f"{token_key}: ${{{{ secrets.LLM_API_KEY }}}}",
+                ]
+            )
+        },
+    )
+
+    assert scan_repository(repository) == []
+
+
 @pytest.mark.parametrize(
     "token_key",
     [
@@ -207,6 +288,46 @@ def test_scan_detects_indented_multiline_token_and_bearer_values_at_key_line(
         (3, "credential assignment"),
         (5, "bearer credential"),
         (7, "bearer credential"),
+    ]
+
+
+def test_scan_detects_cr_only_json_assignment(tmp_path: Path) -> None:
+    token_key = "LLM_API_" + "KEY"
+    repository = _tracked_repository(
+        tmp_path,
+        {"settings.json": f'{{"{token_key}":\r"live-json-secret"}}'},
+    )
+
+    findings = scan_repository(repository)
+
+    assert [(finding.path, finding.line_number, finding.rule) for finding in findings] == [
+        ("settings.json", 1, "credential assignment")
+    ]
+
+
+def test_scan_detects_cr_only_multiline_values_with_key_line_numbers(tmp_path: Path) -> None:
+    token_key = "LLM_API_" + "KEY"
+    header_key = "Author" + "ization"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "settings.yaml": "\r".join(
+                [
+                    "safe: true",
+                    f"{token_key}:",
+                    "  live-assignment-secret",
+                    f"{header_key}:",
+                    "  Bearer live-bearer-secret",
+                ]
+            )
+        },
+    )
+
+    findings = scan_repository(repository)
+
+    assert [(finding.path, finding.line_number, finding.rule) for finding in findings] == [
+        ("settings.yaml", 2, "credential assignment"),
+        ("settings.yaml", 4, "bearer credential"),
     ]
 
 
@@ -489,7 +610,7 @@ def test_scan_ignores_placeholders_untracked_files_and_binary_data(tmp_path: Pat
         tmp_path,
         {
             ".env.example": (
-                "ANTHROPIC_AUTH_TOKEN=replace-with-a-repository-secret\n"
+                "ANTHROPIC_AUTH_" + "TOKEN=replace-with-a-repository-secret\n"
                 "Author" + "ization: Bearer ${GITHUB_TOKEN}\n"
             ),
             "asset.bin": binary_secret,
@@ -499,6 +620,27 @@ def test_scan_ignores_placeholders_untracked_files_and_binary_data(tmp_path: Pat
     (repository / "untracked.env").write_text(untracked_secret, encoding="utf-8")
 
     assert scan_repository(repository) == []
+
+
+def test_scan_large_comment_chain_completes_within_timeout(tmp_path: Path) -> None:
+    repeated_line = "# LLM_API_" + "KEY: # intentionally empty\n"
+    repository = _tracked_repository(
+        tmp_path,
+        {"large-comments.txt": repeated_line * 8_000},
+    )
+
+    completed = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH)],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout == ""
+    assert completed.stderr == ""
 
 
 def test_scan_ignores_documented_specification_placeholders_in_inline_code(

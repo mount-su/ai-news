@@ -9,92 +9,58 @@ import re
 import stat
 import subprocess
 import sys
-from bisect import bisect_right
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-_STRUCTURED_VALUE_SEPARATOR = r"""
-    (?:
-        [ \t]*
-        |
-        [ \t]*(?:\#[^\r\n]*)?\r?\n
-        (?:
-            [ \t]*\r?\n
-            |
-            [ \t]*\#[^\r\n]*\r?\n
-        )*
-        (?:
-            [ \t]+
-            |
-            (?=["'])
-        )
-    )
-"""
 _ASSIGNMENT_PATTERN = re.compile(
     r"""
-    (?<![A-Za-z0-9_])
+    (?<!\w)
     (?P<assignment_quote>["'])?
     (?P<credential_key>LLM_API_KEY|ANTHROPIC_AUTH_TOKEN)
-    (?(assignment_quote)(?P=assignment_quote)|(?![A-Za-z0-9_]))
+    (?(assignment_quote)(?P=assignment_quote)|(?!\w))
     [ \t]*(?:=(?!=)|:)
-    """
-    + _STRUCTURED_VALUE_SEPARATOR
-    + r"""
-    (?P<value>
-        \$\{\{[^\r\n]*?\}\}
-        |
-        \$\{[^\r\n\s]*\}
-        |
-        "[^"\r\n]*"(?![ \t]*:)
-        |
-        '[^'\r\n]*'(?![ \t]*:)
-        |
-        [^\s\#;'":]+
-    )
     """,
     re.IGNORECASE | re.VERBOSE,
 )
 _BEARER_PATTERN = re.compile(
     r"""
-    (?:
-        (?P<header_quote>["'])Authorization(?P=header_quote)
-        |
-        \bAuthorization\b
-    )
+    (?<!\w)
+    (?P<header_quote>["'])?
+    Authorization
+    (?(header_quote)(?P=header_quote)|(?!\w))
     [ \t]*:
-    """
-    + _STRUCTURED_VALUE_SEPARATOR
-    + r"""
-    (?:
-        (?P<container_quote>["'])Bearer[ \t]+
-        (?P<contained_value>[^"'\r\n]+?)
-        (?P=container_quote)(?![ \t]*:)
-        |
-        Bearer[ \t]+
-        (?P<value>
-            \$\{\{[^\r\n]*?\}\}
-            |
-            "[^"\r\n]*"(?![ \t]*:)
-            |
-            '[^'\r\n]*'(?![ \t]*:)
-            |
-            [^\s,;`]+
-        )
-    )
     """,
     re.IGNORECASE | re.VERBOSE,
 )
-_PATTERNS = (
-    ("credential assignment", _ASSIGNMENT_PATTERN),
-    ("bearer credential", _BEARER_PATTERN),
+_STRUCTURED_KEY_PATTERN = re.compile(
+    r"""
+    ^[ \t]*
+    (?:
+        (?P<structured_quote>["'])[^"'\r\n]+(?P=structured_quote)
+        |
+        [^\s\#="'`:]+
+    )
+    [ \t]*(?:=(?!=)|:)
+    """,
+    re.VERBOSE,
 )
-_SPECIFICATION_DIRECTORY = PurePosixPath("docs/superpowers/plans")
+_GITHUB_VALUE_PATTERN = re.compile(r"\$\{\{.*?\}\}")
+_SHELL_VALUE_PATTERN = re.compile(r"\$\{[^\s}]*\}")
+_UNQUOTED_ASSIGNMENT_VALUE_PATTERN = re.compile(r"""[^\s\#;'"`:]+""")
+_UNQUOTED_BEARER_VALUE_PATTERN = re.compile(r"[^\s,;`]+")
+_BEARER_PREFIX_PATTERN = re.compile(r"Bearer[ \t]+", re.IGNORECASE)
+_DOCUMENTATION_DIRECTORIES = (
+    PurePosixPath("docs/superpowers/plans"),
+    PurePosixPath("docs/superpowers/specs"),
+)
 _SHELL_REFERENCE_PATTERN = re.compile(r"^\$\{[A-Za-z_][A-Za-z0-9_]*\}$")
 _GITHUB_SECRET_REFERENCE_PATTERN = re.compile(
     r"^\$\{\{\s*secrets\.[A-Za-z_][A-Za-z0-9_]*\s*\}\}$",
     re.IGNORECASE,
 )
+_MISSING_VALUE = object()
+_INVALID_VALUE = object()
 
 
 class SecretScanError(RuntimeError):
@@ -112,6 +78,12 @@ class Finding:
         if any(character.isspace() or not character.isprintable() for character in display_path):
             display_path = json.dumps(display_path, ensure_ascii=True)
         return f"{display_path}:{self.line_number}: potential {self.rule}"
+
+
+@dataclass(frozen=True)
+class _PendingValue:
+    kind: str
+    line_number: int
 
 
 def _tracked_paths(repository: Path) -> list[tuple[bytes, str]]:
@@ -161,14 +133,25 @@ def _unquote(value: str) -> str:
     return stripped
 
 
+def _allows_literal_placeholder(path: str) -> bool:
+    relative_path = PurePosixPath(path)
+    return relative_path in {PurePosixPath(".env.example"), PurePosixPath("README.md")} or any(
+        relative_path.is_relative_to(directory) for directory in _DOCUMENTATION_DIRECTORIES
+    )
+
+
 def _is_placeholder(path: str, value: str) -> bool:
     normalized = _unquote(value).casefold()
     if not normalized:
         return True
-    if (
-        _SHELL_REFERENCE_PATTERN.fullmatch(normalized)
-        or _GITHUB_SECRET_REFERENCE_PATTERN.fullmatch(normalized)
-        or (normalized.startswith("<") and normalized.endswith(">"))
+    if _SHELL_REFERENCE_PATTERN.fullmatch(normalized) or _GITHUB_SECRET_REFERENCE_PATTERN.fullmatch(
+        normalized
+    ):
+        return True
+    if not _allows_literal_placeholder(path):
+        return False
+    return (
+        (normalized.startswith("<") and normalized.endswith(">"))
         or normalized.startswith("replace-with-")
         or normalized.startswith("your-")
         or normalized
@@ -180,19 +163,148 @@ def _is_placeholder(path: str, value: str) -> bool:
             "example-token",
             "placeholder",
             "test",
+            "test-secret",
             "xxx",
+            "real-value",
         }
-    ):
-        return True
+    )
 
-    # The committed implementation specification contains the literal values it
-    # requires this scanner to reject. Keep this allowance limited to those
-    # non-runtime design documents rather than exempting Markdown or source code.
-    relative_path = PurePosixPath(path)
-    return relative_path.is_relative_to(_SPECIFICATION_DIRECTORY) and normalized in {
-        "real-value",
-        "test-secret",
-    }
+
+def _iter_logical_lines(text: str) -> Iterator[tuple[int, str]]:
+    """Yield logical lines while treating LF, CRLF, and bare CR as newlines."""
+
+    line_number = 1
+    line_start = 0
+    position = 0
+    while position < len(text):
+        character = text[position]
+        if character not in "\r\n":
+            position += 1
+            continue
+        yield line_number, text[line_start:position]
+        if character == "\r" and position + 1 < len(text) and text[position + 1] == "\n":
+            position += 1
+        position += 1
+        line_start = position
+        line_number += 1
+    if line_start < len(text):
+        yield line_number, text[line_start:]
+
+
+def _skip_horizontal_whitespace(text: str, position: int) -> int:
+    while position < len(text) and text[position] in " \t":
+        position += 1
+    return position
+
+
+def _quoted_value(text: str, position: int) -> str | object:
+    quote = text[position]
+    quote_end = text.find(quote, position + 1)
+    if quote_end < 0:
+        return _INVALID_VALUE
+    after_quote = _skip_horizontal_whitespace(text, quote_end + 1)
+    if after_quote < len(text) and text[after_quote] == ":":
+        return _INVALID_VALUE
+    return text[position : quote_end + 1]
+
+
+def _assignment_value(text: str, position: int = 0) -> str | object:
+    position = _skip_horizontal_whitespace(text, position)
+    if position >= len(text) or text[position] == "#":
+        return _MISSING_VALUE
+    github_value = _GITHUB_VALUE_PATTERN.match(text, position)
+    if github_value is not None:
+        return github_value.group(0)
+    shell_value = _SHELL_VALUE_PATTERN.match(text, position)
+    if shell_value is not None:
+        return shell_value.group(0)
+    if text[position] in "'\"":
+        return _quoted_value(text, position)
+    value = _UNQUOTED_ASSIGNMENT_VALUE_PATTERN.match(text, position)
+    return value.group(0) if value is not None else _INVALID_VALUE
+
+
+def _bearer_credential(text: str, position: int) -> str | object:
+    prefix = _BEARER_PREFIX_PATTERN.match(text, position)
+    if prefix is None:
+        return _INVALID_VALUE
+    position = prefix.end()
+    github_value = _GITHUB_VALUE_PATTERN.match(text, position)
+    if github_value is not None:
+        return github_value.group(0)
+    shell_value = _SHELL_VALUE_PATTERN.match(text, position)
+    if shell_value is not None:
+        return shell_value.group(0)
+    if position < len(text) and text[position] in "'\"":
+        return _quoted_value(text, position)
+    value = _UNQUOTED_BEARER_VALUE_PATTERN.match(text, position)
+    return value.group(0) if value is not None else _INVALID_VALUE
+
+
+def _bearer_value(text: str, position: int = 0) -> str | object:
+    position = _skip_horizontal_whitespace(text, position)
+    if position >= len(text) or text[position] == "#":
+        return _MISSING_VALUE
+    if text[position] not in "'\"":
+        return _bearer_credential(text, position)
+    quote = text[position]
+    quote_end = text.find(quote, position + 1)
+    if quote_end < 0:
+        return _INVALID_VALUE
+    after_quote = _skip_horizontal_whitespace(text, quote_end + 1)
+    if after_quote < len(text) and text[after_quote] == ":":
+        return _INVALID_VALUE
+    return _bearer_credential(text[position + 1 : quote_end], 0)
+
+
+def _append_finding(
+    findings: list[Finding],
+    path: str,
+    line_number: int,
+    rule: str,
+    value: str | object,
+) -> None:
+    if isinstance(value, str) and not _is_placeholder(path, value):
+        findings.append(Finding(path, line_number, rule))
+
+
+def _scan_text(path: str, text: str) -> list[Finding]:
+    findings: list[Finding] = []
+    pending: _PendingValue | None = None
+    for line_number, line in _iter_logical_lines(text):
+        stripped = line.lstrip(" \t")
+        if pending is not None:
+            if not stripped or stripped.startswith("#"):
+                continue
+            if _STRUCTURED_KEY_PATTERN.match(line) is not None:
+                pending = None
+            elif len(stripped) != len(line) or stripped.startswith(("'", '"')):
+                if pending.kind == "assignment":
+                    value = _assignment_value(stripped)
+                    rule = "credential assignment"
+                else:
+                    value = _bearer_value(stripped)
+                    rule = "bearer credential"
+                _append_finding(findings, path, pending.line_number, rule, value)
+                pending = None
+                continue
+            else:
+                pending = None
+
+        for match in _ASSIGNMENT_PATTERN.finditer(line):
+            value = _assignment_value(line, match.end())
+            if value is _MISSING_VALUE:
+                pending = _PendingValue("assignment", line_number)
+                break
+            _append_finding(findings, path, line_number, "credential assignment", value)
+
+        for match in _BEARER_PATTERN.finditer(line):
+            value = _bearer_value(line, match.end())
+            if value is _MISSING_VALUE:
+                pending = _PendingValue("bearer", line_number)
+                break
+            _append_finding(findings, path, line_number, "bearer credential", value)
+    return findings
 
 
 def scan_repository(repository: Path) -> list[Finding]:
@@ -209,15 +321,7 @@ def scan_repository(repository: Path) -> list[Finding]:
         if b"\0" in content:
             continue
         text = content.decode("utf-8", errors="replace")
-        newline_positions = [
-            position for position, character in enumerate(text) if character == "\n"
-        ]
-        for rule, pattern in _PATTERNS:
-            for match in pattern.finditer(text):
-                value = match.groupdict().get("value") or match.groupdict().get("contained_value")
-                if value is not None and not _is_placeholder(display_path, value):
-                    line_number = bisect_right(newline_positions, match.start()) + 1
-                    findings.append(Finding(display_path, line_number, rule))
+        findings.extend(_scan_text(display_path, text))
     return sorted(set(findings))
 
 

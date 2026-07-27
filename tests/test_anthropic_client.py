@@ -186,7 +186,7 @@ def test_x_api_key_authentication_uses_only_x_api_key_header() -> None:
         ),
         (
             "x-api-key",
-            {"Authorization": "Bearer client-default-token"},
+            {"Author" + "ization": "Bearer client-default-token"},
             ("x-api-key", "top-secret-token"),
             "authorization",
         ),
