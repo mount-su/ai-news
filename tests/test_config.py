@@ -96,6 +96,46 @@ def test_settings_rejects_non_string_values_without_leaking_input(
     assert "test-secret" not in error
 
 
+@pytest.mark.parametrize(
+    "invalid_token",
+    [
+        b"structured-bytes-secret-7e91",
+        ["structured-list-secret-7e91"],
+        {"nested": {"token": "structured-dict-secret-7e91"}},
+    ],
+)
+def test_settings_non_string_token_never_leaks_from_validation_error_surfaces(
+    invalid_token: object,
+) -> None:
+    sensitive_value = (
+        "structured-"
+        + {
+            bytes: "bytes",
+            list: "list",
+            dict: "dict",
+        }[type(invalid_token)]
+        + "-secret-7e91"
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        Settings(
+            llm_protocol="openai-chat",
+            llm_base_url="https://ark.cn-beijing.volces.com/api/v3",
+            llm_token=invalid_token,
+            llm_model="ark-standard-model",
+        )
+
+    error = exc_info.value
+    rendered_errors = (
+        str(error),
+        repr(error),
+        json.dumps(error.errors(), default=str),
+        error.json(),
+    )
+    assert all(sensitive_value not in rendered for rendered in rendered_errors)
+    assert any(item["loc"] == ("llm_token",) for item in error.errors())
+
+
 def test_settings_strips_existing_secret_str_token() -> None:
     settings = Settings(
         llm_protocol="anthropic",

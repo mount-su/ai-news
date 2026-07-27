@@ -210,6 +210,22 @@ def test_scan_rejects_literal_placeholders_in_generated_runtime_files(tmp_path: 
     assert all(value not in rendered for value in literal_values)
 
 
+def test_scan_cannot_identify_unlabelled_runtime_secret_in_public_report(
+    tmp_path: Path,
+) -> None:
+    runtime_secret = "arbitrary-runtime-value-7e91"
+    repository = _tracked_repository(
+        tmp_path,
+        {
+            "data/report.json": (
+                f'{{"summary":"public analysis accidentally contains {runtime_secret}"}}'
+            )
+        },
+    )
+
+    assert scan_repository(repository) == []
+
+
 def test_scan_allows_literal_placeholders_only_in_explicit_example_paths(
     tmp_path: Path,
 ) -> None:

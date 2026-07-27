@@ -160,6 +160,42 @@ def test_request_endpoint_bearer_headers_and_body_preserve_base_path() -> None:
     assert candidate.id in body["messages"][0]["content"]
 
 
+@pytest.mark.parametrize("leak_stage", ["initial", "repair"])
+def test_anthropic_rejects_current_token_in_successful_analysis(
+    leak_stage: str,
+) -> None:
+    candidate = _candidate(f"secret-{leak_stage}")
+    attempts = 0
+    leaked_row = _analysis_row(
+        candidate,
+        why_it_matters="公开字段不得包含 top-secret-token 或任何运行时凭据。",
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if leak_stage == "repair" and attempts == 1:
+            return httpx.Response(
+                200,
+                content=_anthropic_response("not json"),
+                request=request,
+            )
+        return httpx.Response(
+            200,
+            content=_anthropic_response([leaked_row]),
+            request=request,
+        )
+
+    with pytest.raises(
+        AnalysisError,
+        match=r"^LLM analysis contains sensitive data$",
+    ) as exc_info:
+        _run_analyze(handler, [candidate])
+
+    assert attempts == (1 if leak_stage == "initial" else 2)
+    _assert_exception_has_no_sensitive_state(exc_info.value, {"top-secret-token"})
+
+
 def test_x_api_key_authentication_uses_only_x_api_key_header() -> None:
     candidate = _candidate("x-api-key")
     headers: list[httpx.Headers] = []

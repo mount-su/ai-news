@@ -6,7 +6,7 @@ import asyncio
 import json
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Annotated, Any, Literal
 
 import httpx
@@ -115,6 +115,23 @@ def _parse_analysis(
 
     by_id = {row.id: Analysis.model_validate(row.model_dump(exclude={"id"})) for row in parsed_rows}
     return {candidate_id: by_id[candidate_id] for candidate_id in expected_ids}, None
+
+
+def _contains_secret(value: object, token: str) -> bool:
+    if not token:
+        return False
+    if isinstance(value, str):
+        return token in value
+    if isinstance(value, BaseModel):
+        return _contains_secret(value.model_dump(mode="python"), token)
+    if isinstance(value, Mapping):
+        return any(
+            _contains_secret(key, token) or _contains_secret(item, token)
+            for key, item in value.items()
+        )
+    if isinstance(value, list | tuple | set | frozenset):
+        return any(_contains_secret(item, token) for item in value)
+    return False
 
 
 def _escape_delimiters(value: str) -> str:
@@ -230,6 +247,8 @@ class BaseAnalyzer(ABC):
         first_text = await self._request(client, build_analysis_prompt(items))
         parsed, error_kind = _parse_analysis(first_text, expected_ids)
         if parsed is not None:
+            if _contains_secret(parsed, self._token):
+                raise AnalysisError("LLM analysis contains sensitive data")
             return parsed
 
         repair = _repair_prompt(items, first_text, error_kind or "schema", self._token)
@@ -237,6 +256,8 @@ class BaseAnalyzer(ABC):
         repaired, _ = _parse_analysis(repaired_text, expected_ids)
         if repaired is None:
             raise AnalysisError("invalid LLM analysis after repair")
+        if _contains_secret(repaired, self._token):
+            raise AnalysisError("LLM analysis contains sensitive data")
         return repaired
 
     async def _analyze_with_client(

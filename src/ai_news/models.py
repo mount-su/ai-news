@@ -90,6 +90,18 @@ class Settings(BaseModel):
     llm_auth_scheme: Literal["bearer", "x-api-key"] = "bearer"
     site_base_path: StrictStr = "/ai-news/"
 
+    @model_validator(mode="before")
+    @classmethod
+    def redact_invalid_token_input(cls, values: object) -> object:
+        if not isinstance(values, dict):
+            return values
+        token = values.get("llm_token")
+        if token is None or isinstance(token, str | SecretStr):
+            return values
+        sanitized = values.copy()
+        sanitized["llm_token"] = b""
+        return sanitized
+
     @field_validator("llm_protocol", "llm_base_url", "llm_model", mode="before")
     @classmethod
     def strip_required_text(cls, value: object) -> object:

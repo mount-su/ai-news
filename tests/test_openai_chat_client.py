@@ -174,6 +174,34 @@ def test_request_uses_exact_ark_endpoint_headers_body_and_isolates_client_defaul
     assert "header-secret" not in rendered
 
 
+@pytest.mark.parametrize("leak_stage", ["initial", "repair"])
+def test_openai_rejects_current_token_in_successful_analysis(
+    leak_stage: str,
+) -> None:
+    candidate = _candidate(f"secret-{leak_stage}")
+    attempts = 0
+    leaked_row = _analysis_row(
+        candidate,
+        tags=["标准接口", "prefix-top-secret-token-suffix"],
+    )
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if leak_stage == "repair" and attempts == 1:
+            return httpx.Response(200, content=_openai_response("not json"))
+        return httpx.Response(200, content=_openai_response([leaked_row]))
+
+    with pytest.raises(
+        AnalysisError,
+        match=r"^LLM analysis contains sensitive data$",
+    ) as exc_info:
+        _run_analyze(handler, [candidate])
+
+    assert attempts == (1 if leak_stage == "initial" else 2)
+    _assert_safe_error(exc_info.value, {"top-secret-token"})
+
+
 @pytest.mark.parametrize(
     "response_body",
     [
