@@ -147,6 +147,15 @@ def _generate(root: Path, run_date: date | None) -> int:
     return 0
 
 
+def _check_config() -> int:
+    try:
+        load_settings()
+    except Exception as error:
+        _safe_error("configuration_error", error)
+        return 2
+    return 0
+
+
 def _build(root: Path, output: Path) -> int:
     try:
         _build_site(root, output)
@@ -170,6 +179,11 @@ def _parser() -> argparse.ArgumentParser:
     parser = _SafeArgumentParser(prog="ai-news")
     commands = parser.add_subparsers(dest="command", required=True)
 
+    commands.add_parser(
+        "check-config",
+        help="validate model configuration without a request",
+    )
+
     generate = commands.add_parser("generate", help="generate a daily report")
     generate.add_argument("--date", type=_parse_iso_date)
     generate.add_argument("--root", type=Path, required=True)
@@ -186,6 +200,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
+    if arguments.command == "check-config":
+        return _check_config()
     if arguments.command == "generate":
         return _generate(arguments.root, arguments.date)
     if arguments.command == "build":

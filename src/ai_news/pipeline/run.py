@@ -19,7 +19,7 @@ from ai_news.collectors.arxiv import collect_arxiv
 from ai_news.collectors.feed import parse_feed
 from ai_news.collectors.github import collect_github_releases
 from ai_news.http import get_bytes
-from ai_news.llm.anthropic import AnthropicAnalyzer
+from ai_news.llm.factory import create_analyzer
 from ai_news.models import (
     Analysis,
     Candidate,
@@ -453,9 +453,12 @@ async def _run_with_client(
     if selected_analyzer is None:
         if settings is None:
             raise ConfigurationPipelineError("settings are required")
+        initialization_failed = False
         try:
-            selected_analyzer = AnthropicAnalyzer(settings, client=client)
+            selected_analyzer = create_analyzer(settings, client=client)
         except Exception:
+            initialization_failed = True
+        if initialization_failed:
             raise AnalysisPipelineError("analyzer initialization failed") from None
 
     try:

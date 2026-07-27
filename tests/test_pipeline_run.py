@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 
 from ai_news.models import (
@@ -194,6 +195,7 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     client = object()
     factory_timeouts: list[int] = []
     seen_clients: list[object] = []
+    seen_settings: list[Settings] = []
     analyzer = _Analyzer()
 
     class _ClientContext:
@@ -228,7 +230,7 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
         return [_raw(4, source=source), _raw(5, source=source)]
 
     def analyzer_factory(settings: Settings, *, client: object) -> _Analyzer:
-        assert settings.llm_model == "live-model"
+        seen_settings.append(settings)
         seen_clients.append(client)
         return analyzer
 
@@ -236,17 +238,18 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     monkeypatch.setattr(run_module, "parse_feed", fake_parse_feed)
     monkeypatch.setattr(run_module, "collect_arxiv", fake_arxiv)
     monkeypatch.setattr(run_module, "collect_github_releases", fake_github)
-    monkeypatch.setattr(run_module, "AnthropicAnalyzer", analyzer_factory)
+    monkeypatch.setattr(run_module, "create_analyzer", analyzer_factory)
     monkeypatch.setenv("GITHUB_TOKEN", "github-secret")
 
+    settings = Settings(
+        llm_protocol="openai-chat",
+        llm_base_url="https://ark.cn-beijing.volces.com/api/v3",
+        llm_token="llm-secret",
+        llm_model="live-model",
+    )
     report = _run(
         source_config=SourceConfig(sources=sources),
-        settings=Settings(
-            llm_protocol="anthropic",
-            llm_base_url="https://api.example.com",
-            llm_token="llm-secret",
-            llm_model="live-model",
-        ),
+        settings=settings,
         model=None,
         client_factory=client_factory,
         collector=None,
@@ -254,9 +257,63 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     )
 
     assert factory_timeouts == [20]
+    assert seen_settings == [settings]
+    assert seen_settings[0].llm_protocol == "openai-chat"
+    assert seen_settings[0].llm_model == "live-model"
     assert seen_clients == [client, client, client, client]
     assert len(report.source_runs) == 3
     assert len(analyzer.calls) == 1
+
+
+def test_analyzer_factory_failure_does_not_expose_or_retain_sensitive_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ai_news.pipeline import run as run_module
+
+    secret = "unique-live-standard-api-key"
+    request = httpx.Request(
+        "POST",
+        "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+        headers={"Authorization": f"Bearer {secret}"},
+    )
+
+    class _UnsafeFactoryError(RuntimeError):
+        def __init__(self) -> None:
+            super().__init__(f"factory rejected {secret}")
+            self.request = request
+            self.headers = request.headers
+
+    def broken_factory(_settings: Settings, *, client: object) -> _Analyzer:
+        del client
+        raise _UnsafeFactoryError
+
+    monkeypatch.setattr(run_module, "create_analyzer", broken_factory)
+    source = _source(0)
+
+    with pytest.raises(AnalysisPipelineError) as exc_info:
+        _run(
+            collector=_collector(
+                {source.id: [_raw(index, source=source) for index in range(5)]}
+            ),
+            settings=Settings(
+                llm_protocol="openai-chat",
+                llm_base_url="https://ark.cn-beijing.volces.com/api/v3",
+                llm_token=secret,
+                llm_model="live-model",
+            ),
+            model=None,
+            analyzer=None,
+        )
+
+    error = exc_info.value
+    assert str(error) == "analyzer initialization failed"
+    assert repr(error) == "AnalysisPipelineError('analyzer initialization failed')"
+    assert error.__cause__ is None
+    assert error.__context__ is None
+    assert secret not in f"{error!s} {error!r}"
+    for value in vars(error).values():
+        assert not isinstance(value, httpx.Request | httpx.Response | httpx.Headers)
+        assert secret not in f"{value!s} {value!r}"
 
 
 def test_time_window_includes_both_boundaries_and_excludes_future() -> None:

@@ -162,6 +162,78 @@ def test_generate_maps_safe_exit_categories(
     assert "token=value" not in stderr
 
 
+def test_check_config_loads_only_settings_and_is_silent(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    settings = object()
+    calls: list[str] = []
+
+    def load_settings() -> object:
+        calls.append("load_settings")
+        return settings
+
+    monkeypatch.setattr(cli, "load_settings", load_settings)
+    monkeypatch.setattr(
+        cli,
+        "load_source_config",
+        lambda *_args, **_kwargs: pytest.fail("check-config must not load sources"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "run_daily",
+        lambda *_args, **_kwargs: pytest.fail("check-config must not make requests"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_build_site",
+        lambda *_args, **_kwargs: pytest.fail("check-config must not build or write"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "save_report",
+        lambda *_args, **_kwargs: pytest.fail("check-config must not write reports"),
+    )
+
+    assert cli.main(["check-config"]) == 0
+    assert calls == ["load_settings"]
+    assert capsys.readouterr() == ("", "")
+
+
+def test_check_config_failure_is_safe_and_does_not_retain_error(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    secret = "live-standard-api-key"
+
+    def broken_load_settings() -> object:
+        raise ValueError(f"invalid token {secret}")
+
+    monkeypatch.setattr(cli, "load_settings", broken_load_settings)
+
+    result = cli.main(["check-config"])
+    captured = capsys.readouterr()
+
+    assert result == 2
+    assert captured.out == ""
+    assert captured.err == "configuration_error: ValueError\n"
+    assert secret not in captured.err
+    assert all(not isinstance(value, BaseException) for value in vars(cli).values())
+
+
+def test_check_config_ignores_model_and_source_files_and_needs_no_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "sources").mkdir()
+    (tmp_path / "sources/feeds.yaml").write_text("not: valid: yaml", encoding="utf-8")
+    (tmp_path / "models.yaml").write_text("not: valid: yaml", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "load_settings", lambda: object())
+
+    assert cli.main(["check-config"]) == 0
+
+
 def test_build_dispatches_paths_without_loading_llm_settings(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -273,3 +345,5 @@ def test_python_m_ai_news_dispatches_to_cli() -> None:
     assert "generate" in completed.stdout
     assert "build" in completed.stdout
     assert "demo" in completed.stdout
+    assert "check-config" in completed.stdout
+    assert "validate model configuration without a request" in completed.stdout
