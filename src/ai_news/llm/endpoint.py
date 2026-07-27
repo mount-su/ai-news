@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import posixpath
 import re
 from urllib.parse import unquote, urlsplit
@@ -8,6 +9,7 @@ import httpx
 
 _ALLOWED_SUFFIXES = frozenset({"chat/completions", "v1/messages"})
 _ARK_HOST = "ark.cn-beijing.volces.com"
+_DNS_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", re.ASCII)
 _ENCODED_SEPARATOR = re.compile(r"%(?:2f|5c)", re.IGNORECASE)
 _INVALID_PERCENT_ESCAPE = re.compile(r"%(?![0-9a-fA-F]{2})")
 _MAX_DECODE_PASSES = 16
@@ -55,6 +57,24 @@ def _normalized_path(path: str) -> tuple[str, bool, bool]:
     return normalized, has_dot_segment, normalized != boundary_stripped
 
 
+def _validated_host(host: str) -> str:
+    canonical = host.lower()
+    try:
+        ipaddress.ip_address(canonical)
+    except ValueError:
+        labels = canonical.split(".")
+        is_invalid_numeric_address = len(labels) > 1 and all(
+            label.isascii() and label.isdigit() for label in labels
+        )
+        if (
+            len(canonical) > 253
+            or is_invalid_numeric_address
+            or any(not _DNS_LABEL.fullmatch(label) for label in labels)
+        ):
+            raise _invalid() from None
+    return canonical
+
+
 def validate_llm_base_url(value: str) -> str:
     """Return a canonical HTTPS LLM base URL or raise a credential-safe error."""
 
@@ -93,7 +113,7 @@ def validate_llm_base_url(value: str) -> str:
 
     decoded_path, has_encoded_separator = _decode_path(parsed.path or "/")
     normalized_path, has_dot_segment, path_was_rewritten = _normalized_path(decoded_path)
-    canonical_host = host.lower()
+    canonical_host = _validated_host(host)
 
     if canonical_host == _ARK_HOST and (
         normalized_path == "/api/coding"
