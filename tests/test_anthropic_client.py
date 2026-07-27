@@ -58,7 +58,7 @@ def _candidate(
 
 def _settings(
     *,
-    base_url: str = "https://proxy.example/api/coding/",
+    base_url: str = "https://proxy.example/tenant/",
     token: str = "top-secret-token",
     auth_scheme: str = "bearer",
 ) -> Settings:
@@ -144,7 +144,7 @@ def test_request_endpoint_bearer_headers_and_body_preserve_base_path() -> None:
 
     assert list(result) == [candidate.id]
     request = captured[0]
-    assert str(request.url) == "https://proxy.example/api/coding/v1/messages"
+    assert str(request.url) == "https://proxy.example/tenant/v1/messages"
     assert request.headers["authorization"] == "Bearer top-secret-token"
     assert "x-api-key" not in request.headers
     assert request.headers["anthropic-version"] == "2023-06-01"
@@ -276,7 +276,7 @@ def test_request_does_not_inherit_client_default_params_cookies_or_unrelated_hea
     asyncio.run(exercise())
 
     request = captured[0]
-    assert str(request.url) == "https://proxy.example/api/coding/v1/messages"
+    assert str(request.url) == "https://proxy.example/tenant/v1/messages"
     assert request.url.query == b""
     assert "cookie" not in request.headers
     assert "x-unrelated" not in request.headers
@@ -322,6 +322,7 @@ def test_unsafe_base_url_components_are_rejected_without_request(base_url: str) 
 @pytest.mark.parametrize(
     ("base_url", "expected_path"),
     [
+        ("https://proxy.example/api/coding", "/api/coding/v1/messages"),
         ("https://[2001:db8::1]/api/coding", "/api/coding/v1/messages"),
         ("https://proxy.example/api/@scope", "/api/@scope/v1/messages"),
     ],
@@ -649,7 +650,7 @@ def test_http_failure_exception_chain_does_not_retain_request_headers_or_secrets
             "Authorization",
             "Bearer",
             "private=query",
-            "https://proxy.example/api/coding",
+            "https://proxy.example/tenant",
         },
     )
 
