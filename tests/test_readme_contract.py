@@ -6,6 +6,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 README = ROOT / "README.md"
 DESIGN = ROOT / "docs" / "superpowers" / "specs" / "2026-07-26-ai-news-github-pages-design.md"
+OLD_IMPLEMENTATION_PLAN = (
+    ROOT / "docs" / "superpowers" / "plans" / "2026-07-26-ai-news-github-pages.md"
+)
 
 EXPECTED_HEADINGS = [
     "# AI 情报雷达",
@@ -101,7 +104,22 @@ def test_readme_links_the_design_and_implementation_plan() -> None:
     readme = _readme()
 
     assert "docs/superpowers/specs/2026-07-26-ai-news-github-pages-design.md" in readme
-    assert "docs/superpowers/plans/2026-07-26-ai-news-github-pages.md" in readme
+    assert "docs/superpowers/plans/2026-07-27-standard-ark-api.md" in readme
+    assert "当前实施计划" in readme
+    assert "docs/superpowers/plans/2026-07-26-ai-news-github-pages.md" not in readme
+
+
+def test_superseded_plan_warns_before_any_executable_content() -> None:
+    old_plan = OLD_IMPLEMENTATION_PLAN.read_text(encoding="utf-8")
+    canonical_plan = "docs/superpowers/plans/2026-07-27-standard-ark-api.md"
+
+    assert old_plan.startswith("> [!WARNING]\n")
+    warning_end = old_plan.index("# AI 情报雷达 Implementation Plan")
+    warning = old_plan[:warning_end]
+    assert "模型配置步骤已废弃" in warning
+    assert "请勿执行" in warning
+    assert canonical_plan in warning
+    assert "取代" in warning
 
 
 def test_readme_does_not_contain_screenshot_markup_or_token_assignment() -> None:

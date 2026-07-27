@@ -7,7 +7,8 @@ JSON、Markdown 日报写入仓库，再用 Jinja 构建 GitHub Pages。
 预期 Pages 地址（完成部署后）：<https://mount-su.github.io/ai-news/>
 
 实现约束与决策见[设计规格](docs/superpowers/specs/2026-07-26-ai-news-github-pages-design.md)，
-逐步实现记录见[实施计划](docs/superpowers/plans/2026-07-26-ai-news-github-pages.md)。
+模型接入与部署的当前步骤见
+[当前实施计划](docs/superpowers/plans/2026-07-27-standard-ark-api.md)。
 
 ## 它如何工作
 

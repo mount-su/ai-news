@@ -1,3 +1,8 @@
+> [!WARNING]
+> **本文的模型配置步骤已废弃，请勿执行。** 当前模型接入方案已由
+> `docs/superpowers/plans/2026-07-27-standard-ark-api.md` 取代；配置端点、模型和
+> 凭证时必须使用该当前实施计划。
+
 # AI 情报雷达 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
