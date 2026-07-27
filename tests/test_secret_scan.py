@@ -61,18 +61,30 @@ def test_scan_reports_tracked_credentials_with_path_and_line_only(tmp_path: Path
 
 
 @pytest.mark.parametrize(
-    "assignment_line",
+    "key_name",
     [
-        "ANTHROPIC_AUTH_" + "TOKEN: live-yaml-secret",
-        '"ANTHROPIC_AUTH_' + 'TOKEN" : "live-json-secret"',
-        "'anthropic_auth_" + "token': 'live-mixed-secret'",
-        "ANTHROPIC_AUTH_" + "TOKEN = live-env-secret",
+        "ANTHROPIC_AUTH_" + "TOKEN",
+        "LLM_API_" + "KEY",
     ],
 )
-def test_scan_detects_colon_and_equals_token_assignments(
+@pytest.mark.parametrize(
+    "assignment_template",
+    [
+        "{key}: live-yaml-secret",
+        "{key} = live-env-secret",
+        '"{key}" : "live-json-secret"',
+        "'{lower_key}': 'live-mixed-secret'",
+    ],
+)
+def test_scan_detects_both_credential_keys_with_supported_assignment_forms(
     tmp_path: Path,
-    assignment_line: str,
+    key_name: str,
+    assignment_template: str,
 ) -> None:
+    assignment_line = assignment_template.format(
+        key=key_name,
+        lower_key=key_name.lower(),
+    )
     repository = _tracked_repository(tmp_path, {"settings.txt": assignment_line})
 
     findings = scan_repository(repository)
@@ -81,6 +93,15 @@ def test_scan_detects_colon_and_equals_token_assignments(
         ("settings.txt", 1, "credential assignment")
     ]
     assert "live-" not in findings[0].render()
+
+
+def test_scan_does_not_match_generic_key_as_identifier_substring(tmp_path: Path) -> None:
+    repository = _tracked_repository(
+        tmp_path,
+        {"settings.env": "MY_LLM_API_" + "KEY_BACKUP=live-but-unrelated-value"},
+    )
+
+    assert scan_repository(repository) == []
 
 
 def test_scan_does_not_treat_equality_comparison_as_assignment(tmp_path: Path) -> None:
@@ -104,16 +125,17 @@ def test_finding_render_escapes_control_characters_in_path(tmp_path: Path) -> No
 
 
 def test_scan_allows_references_but_rejects_shell_fallback_literals(tmp_path: Path) -> None:
-    key = "ANTHROPIC_AUTH_" + "TOKEN"
+    key = "LLM_API_" + "KEY"
+    shell_reference = "LLM_API_" + "KEY"
     repository = _tracked_repository(
         tmp_path,
         {
             "workflow.env": "\n".join(
                 [
-                    f"{key} = ${{{{ secrets.ANTHROPIC_AUTH_TOKEN }}}}",
-                    f"{key} = ${{TOKEN}}",
-                    f"{key} = ${{TOKEN:-live-fallback-secret}}",
-                    f"{key} = ${{TOKEN-live-fallback-secret}}",
+                    f"{key} = ${{{{ secrets.LLM_API_KEY }}}}",
+                    f"{key} = ${{{shell_reference}}}",
+                    f"{key} = ${{{shell_reference}:-live-fallback-secret}}",
+                    f"{key} = ${{{shell_reference}-live-fallback-secret}}",
                 ]
             )
         },
@@ -128,10 +150,37 @@ def test_scan_allows_references_but_rejects_shell_fallback_literals(tmp_path: Pa
     assert "live-fallback-secret" not in "\n".join(finding.render() for finding in findings)
 
 
+@pytest.mark.parametrize(
+    "placeholder",
+    [
+        "replace-with-a-repository-secret",
+        "your-api-key",
+        "test",
+    ],
+)
+def test_scan_allows_generic_key_documentation_placeholders(
+    tmp_path: Path,
+    placeholder: str,
+) -> None:
+    repository = _tracked_repository(
+        tmp_path,
+        {".env.example": f'LLM_API_{"KEY"}="{placeholder}"'},
+    )
+
+    assert scan_repository(repository) == []
+
+
+@pytest.mark.parametrize(
+    "token_key",
+    [
+        "ANTHROPIC_AUTH_" + "TOKEN",
+        "LLM_API_" + "KEY",
+    ],
+)
 def test_scan_detects_indented_multiline_token_and_bearer_values_at_key_line(
     tmp_path: Path,
+    token_key: str,
 ) -> None:
-    token_key = "ANTHROPIC_AUTH_" + "TOKEN"
     header_key = "Author" + "ization"
     repository = _tracked_repository(
         tmp_path,
@@ -259,10 +308,17 @@ def test_scan_does_not_allow_many_blank_and_comment_lines_to_bypass_detection(
     ]
 
 
+@pytest.mark.parametrize(
+    "token_key",
+    [
+        "ANTHROPIC_AUTH_" + "TOKEN",
+        "LLM_API_" + "KEY",
+    ],
+)
 def test_scan_detects_values_after_inline_yaml_comment_and_reports_key_line(
     tmp_path: Path,
+    token_key: str,
 ) -> None:
-    token_key = "ANTHROPIC_AUTH_" + "TOKEN"
     header_key = "Author" + "ization"
     repository = _tracked_repository(
         tmp_path,

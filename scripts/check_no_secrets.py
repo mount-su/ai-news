@@ -33,11 +33,10 @@ _STRUCTURED_VALUE_SEPARATOR = r"""
 """
 _ASSIGNMENT_PATTERN = re.compile(
     r"""
-    (?:
-        (?P<assignment_quote>["'])ANTHROPIC_AUTH_TOKEN(?P=assignment_quote)
-        |
-        \bANTHROPIC_AUTH_TOKEN\b
-    )
+    (?<![A-Za-z0-9_])
+    (?P<assignment_quote>["'])?
+    (?P<credential_key>LLM_API_KEY|ANTHROPIC_AUTH_TOKEN)
+    (?(assignment_quote)(?P=assignment_quote)|(?![A-Za-z0-9_]))
     [ \t]*(?:=(?!=)|:)
     """
     + _STRUCTURED_VALUE_SEPARATOR

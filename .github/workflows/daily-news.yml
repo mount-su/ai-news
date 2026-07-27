@@ -45,15 +45,17 @@ jobs:
 
       - name: Generate daily report
         env:
-          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL }}
-          ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
-          ANTHROPIC_DEFAULT_OPUS_MODEL: ${{ vars.ANTHROPIC_DEFAULT_OPUS_MODEL }}
-          ANTHROPIC_AUTH_SCHEME: ${{ vars.ANTHROPIC_AUTH_SCHEME || 'bearer' }}
+          LLM_PROTOCOL: ${{ vars.LLM_PROTOCOL }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          LLM_AUTH_SCHEME: ${{ vars.LLM_AUTH_SCHEME || 'bearer' }}
           SITE_BASE_PATH: /ai-news/
           GITHUB_TOKEN: ${{ github.token }}
           INPUT_DATE: ${{ inputs.date }}
         run: |
           set -euo pipefail
+          python -m ai_news check-config
           run_date="${INPUT_DATE:-}"
           args=(--root .)
           if [[ -n "$run_date" ]]; then

@@ -201,26 +201,60 @@ def test_daily_generate_is_write_scoped_conditional_and_maps_exact_environment()
     }
     generate_step = next(step for step in steps if step.get("name") == "Generate daily report")
     assert generate_step["env"] == {
-        "ANTHROPIC_BASE_URL": "${{ vars.ANTHROPIC_BASE_URL }}",
-        "ANTHROPIC_AUTH_TOKEN": "${{ secrets.ANTHROPIC_AUTH_TOKEN }}",
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": "${{ vars.ANTHROPIC_DEFAULT_OPUS_MODEL }}",
-        "ANTHROPIC_AUTH_SCHEME": "${{ vars.ANTHROPIC_AUTH_SCHEME || 'bearer' }}",
+        "LLM_PROTOCOL": "${{ vars.LLM_PROTOCOL }}",
+        "LLM_BASE_URL": "${{ vars.LLM_BASE_URL }}",
+        "LLM_API_KEY": "${{ secrets.LLM_API_KEY }}",
+        "LLM_MODEL": "${{ vars.LLM_MODEL }}",
+        "LLM_AUTH_SCHEME": "${{ vars.LLM_AUTH_SCHEME || 'bearer' }}",
         "SITE_BASE_PATH": "/ai-news/",
         "GITHUB_TOKEN": "${{ github.token }}",
         "INPUT_DATE": "${{ inputs.date }}",
     }
 
 
-def test_daily_generate_handles_optional_date_without_expression_interpolation() -> None:
+def test_daily_generate_preflights_then_handles_optional_date_without_interpolation() -> None:
     workflow = _load_workflow(DAILY_PATH)
     steps = _steps(workflow, "generate")
     generate_step = next(step for step in steps if step.get("name") == "Generate daily report")
     command = str(generate_step["run"])
 
+    command_lines = command.splitlines()
+    assert command_lines[:2] == ["set -euo pipefail", "python -m ai_news check-config"]
     assert "${{ inputs.date }}" not in command
     assert 'run_date="${INPUT_DATE:-}"' in command
     assert 'args+=(--date "$run_date")' in command
     assert 'python -m ai_news generate "${args[@]}"' in command
+    assert command.index("python -m ai_news check-config") < command.index(
+        'run_date="${INPUT_DATE:-}"'
+    )
+    assert command.index("python -m ai_news check-config") < command.index(
+        'python -m ai_news generate "${args[@]}"'
+    )
+    assert sum("python -m ai_news check-config" in str(step.get("run", "")) for step in steps) == 1
+
+
+def test_daily_generate_never_logs_environment_or_credential_values() -> None:
+    workflow = _load_workflow(DAILY_PATH)
+    generate_step = next(
+        step for step in _steps(workflow, "generate") if step.get("name") == "Generate daily report"
+    )
+    command = str(generate_step["run"])
+
+    forbidden_patterns = (
+        r"(?m)^\s*set\s+-[^#\n]*x",
+        r"(?m)^\s*printenv(?:\s|$)",
+        r"(?m)^\s*env(?:\s*(?:\||$))",
+        r"(?m)^\s*echo\s+.*\$(?:\{|\w)",
+        r"(?m)^\s*printf\s+.*\$(?:\{|\w)",
+    )
+    assert all(re.search(pattern, command) is None for pattern in forbidden_patterns)
+
+
+def test_daily_workflow_has_no_legacy_model_configuration_or_coding_endpoint() -> None:
+    source = DAILY_PATH.read_text(encoding="utf-8")
+
+    assert "ANTHROPIC_" not in source
+    assert "/api/coding" not in source.casefold()
 
 
 def test_daily_scans_then_commits_only_publication_data_with_default_token() -> None:
