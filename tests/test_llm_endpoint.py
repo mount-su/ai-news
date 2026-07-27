@@ -215,6 +215,45 @@ def test_validate_llm_base_url_allows_valid_dns_and_ip_hosts(
     assert validate_llm_base_url(base_url) == expected
 
 
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "https://[v1.com]/v1",
+        "https://[example.com]/v1",
+        "https://[api-example]/v1",
+    ],
+)
+def test_validate_llm_base_url_rejects_bracketed_non_ipv6_authorities(
+    base_url: str,
+) -> None:
+    with pytest.raises(InvalidLLMEndpoint) as captured:
+        validate_llm_base_url(base_url)
+
+    assert base_url not in str(captured.value)
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "https://api.example.com/%C2%80",
+        "https://api.example.com/%C2%9F",
+        "https://api.example.com/%25C2%2580",
+        "https://api.example.com/%2525C2%252580",
+    ],
+)
+def test_validate_llm_base_url_rejects_encoded_c1_controls(base_url: str) -> None:
+    with pytest.raises(InvalidLLMEndpoint) as captured:
+        validate_llm_base_url(base_url)
+
+    assert base_url not in str(captured.value)
+
+
+def test_validate_llm_base_url_allows_harmless_unicode_path_text() -> None:
+    result = validate_llm_base_url("https://api.example.com/模型/v1")
+
+    assert result == "https://api.example.com/%E6%A8%A1%E5%9E%8B/v1"
+
+
 def test_build_llm_endpoint_preserves_ipv6_authority() -> None:
     endpoint = build_llm_endpoint("https://[2001:db8::1]:8443/tenant/", "v1/messages")
 

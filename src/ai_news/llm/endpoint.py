@@ -23,9 +23,9 @@ def _invalid(message: str = "Invalid LLM endpoint configuration.") -> InvalidLLM
     return InvalidLLMEndpoint(message)
 
 
-def _has_unsafe_character(value: str) -> bool:
+def _contains_control(value: str) -> bool:
     return any(
-        character.isspace() or ord(character) < 32 or ord(character) == 127
+        character.isspace() or ord(character) < 32 or 127 <= ord(character) <= 159
         for character in value
     )
 
@@ -57,11 +57,13 @@ def _normalized_path(path: str) -> tuple[str, bool, bool]:
     return normalized, has_dot_segment, normalized != boundary_stripped
 
 
-def _validated_host(host: str) -> str:
+def _validated_host(host: str, *, bracketed: bool) -> str:
     canonical = host.lower()
     try:
-        ipaddress.ip_address(canonical)
+        address = ipaddress.ip_address(canonical)
     except ValueError:
+        if bracketed:
+            raise _invalid() from None
         labels = canonical.split(".")
         is_invalid_numeric_address = len(labels) > 1 and all(
             label.isascii() and label.isdigit() for label in labels
@@ -72,13 +74,16 @@ def _validated_host(host: str) -> str:
             or any(not _DNS_LABEL.fullmatch(label) for label in labels)
         ):
             raise _invalid() from None
+    else:
+        if bracketed and not isinstance(address, ipaddress.IPv6Address):
+            raise _invalid()
     return canonical
 
 
 def validate_llm_base_url(value: str) -> str:
     """Return a canonical HTTPS LLM base URL or raise a credential-safe error."""
 
-    if not isinstance(value, str) or not value or _has_unsafe_character(value):
+    if not isinstance(value, str) or not value or _contains_control(value):
         raise _invalid()
     if "?" in value or "#" in value or "\\" in value:
         raise _invalid()
@@ -91,7 +96,7 @@ def validate_llm_base_url(value: str) -> str:
     if (
         "%" in parsed.netloc
         or "\\" in parsed.netloc
-        or _has_unsafe_character(parsed.netloc)
+        or _contains_control(parsed.netloc)
     ):
         raise _invalid()
 
@@ -113,7 +118,10 @@ def validate_llm_base_url(value: str) -> str:
 
     decoded_path, has_encoded_separator = _decode_path(parsed.path or "/")
     normalized_path, has_dot_segment, path_was_rewritten = _normalized_path(decoded_path)
-    canonical_host = _validated_host(host)
+    canonical_host = _validated_host(
+        host,
+        bracketed="[" in parsed.netloc or "]" in parsed.netloc,
+    )
 
     if canonical_host == _ARK_HOST and (
         normalized_path == "/api/coding"
@@ -124,7 +132,7 @@ def validate_llm_base_url(value: str) -> str:
     if (
         has_encoded_separator
         or "\\" in decoded_path
-        or _has_unsafe_character(decoded_path)
+        or _contains_control(decoded_path)
         or has_dot_segment
         or path_was_rewritten
         or decoded_path.endswith("//")
