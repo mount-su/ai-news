@@ -192,6 +192,7 @@ def test_daily_generate_is_write_scoped_conditional_and_maps_exact_environment()
     assert generate["if"] == (
         "${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}"
     )
+    assert generate["timeout-minutes"] == 30
     assert generate["permissions"] == {"contents": "write"}
     steps = _steps(workflow, "generate")
     assert steps[0] == {
