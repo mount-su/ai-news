@@ -161,6 +161,7 @@ def test_request_uses_exact_ark_endpoint_headers_body_and_isolates_client_defaul
         "temperature": 0.2,
         "max_tokens": 6000,
         "n": 1,
+        "thinking": {"type": "disabled"},
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": body["messages"][1]["content"]},
