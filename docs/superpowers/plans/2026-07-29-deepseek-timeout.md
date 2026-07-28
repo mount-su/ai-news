@@ -52,7 +52,7 @@ assert body == {
 Run:
 
 ```bash
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
   tests/test_openai_chat_client.py::test_request_uses_exact_ark_endpoint_headers_body_and_isolates_client_defaults \
   -q
 ```
@@ -84,7 +84,7 @@ Do not change `AnthropicAnalyzer._body()`.
 Run:
 
 ```bash
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
   tests/test_openai_chat_client.py::test_request_uses_exact_ark_endpoint_headers_body_and_isolates_client_defaults \
   tests/test_anthropic_client.py::test_request_endpoint_bearer_headers_and_body_preserve_base_path \
   -q
@@ -143,7 +143,7 @@ Update the existing Anthropic timeout assertion to expect 120 for all four phase
 Run:
 
 ```bash
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
   tests/test_openai_chat_client.py::test_request_uses_exact_ark_endpoint_headers_body_and_isolates_client_defaults \
   tests/test_openai_chat_client.py::test_strict_analysis_failure_repairs_once_and_redacts_token \
   tests/test_anthropic_client.py::test_request_does_not_inherit_client_default_params_cookies_or_unrelated_headers \
@@ -175,7 +175,7 @@ Do not change retry count, retry statuses, delays, response bound, or client own
 Run:
 
 ```bash
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
   tests/test_openai_chat_client.py tests/test_anthropic_client.py tests/test_pipeline_run.py \
   -q
 ```
@@ -214,7 +214,7 @@ broaden Secret scope.
 Run:
 
 ```bash
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
   tests/test_workflows.py::test_daily_generate_is_write_scoped_conditional_and_maps_exact_environment \
   -q
 ```
@@ -241,9 +241,9 @@ generate:
 Run:
 
 ```bash
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
   tests/test_workflows.py tests/test_secret_scan.py -q
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/python \
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/python \
   scripts/check_no_secrets.py
 go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 \
   -ignore 'element of "schedule" section must be mapping and must contain one key "cron"' \
@@ -268,11 +268,11 @@ git commit -m "ci: bound daily generation runtime"
 - [ ] **Step 1: Run the complete local gate**
 
 ```bash
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/ruff check .
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/ruff format --check .
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/ruff check .
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/ruff format --check .
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest \
   --cov=ai_news --cov-report=term-missing --cov-fail-under=85
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/python \
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/python \
   scripts/check_no_secrets.py
 git diff --check main...HEAD
 git status --short --branch
@@ -284,9 +284,9 @@ Expected: 0 failures, coverage at least 85%, clean scanner/diff, and no uncommit
 
 ```bash
 verify_root="$(mktemp -d /tmp/ai-news-deepseek-verify.XXXXXX)"
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/python \
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/python \
   -m ai_news demo --root "$verify_root/demo" --output "$verify_root/dist"
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/python \
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/python \
   scripts/validate_site.py "$verify_root/dist" --base-path /ai-news/
 ```
 
@@ -309,7 +309,7 @@ From `/Users/suhuashan/Documents/AI资讯`:
 ```bash
 git fetch origin
 git merge --ff-only codex/deepseek-timeout
-/Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest -q
+PYTHONPATH=src /Users/suhuashan/.config/superpowers/worktrees/AI资讯/ai-news/.venv/bin/pytest -q
 git push origin main
 ```
 
