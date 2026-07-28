@@ -26,6 +26,7 @@ from ai_news.llm.prompt import build_analysis_prompt
 from ai_news.models import Analysis, Candidate, Category, Settings
 
 _BATCH_SIZE = 10
+_LLM_REQUEST_TIMEOUT_SECONDS = 120
 _MAX_RESPONSE_BYTES = 2_000_000
 _MAX_REPAIR_TEXT_CHARS = 20_000
 _OUTER_FENCE = re.compile(r"\A```(?:json)?[ \t]*\r?\n(.*?)\r?\n?```[ \t]*\Z", re.I | re.S)
@@ -193,7 +194,9 @@ class BaseAnalyzer(ABC):
             self._endpoint,
             headers=self._headers(),
             json=self._body(prompt),
-            extensions={"timeout": httpx.Timeout(30).as_dict()},
+            extensions={
+                "timeout": httpx.Timeout(_LLM_REQUEST_TIMEOUT_SECONDS).as_dict(),
+            },
         )
 
     async def _request(self, client: httpx.AsyncClient, prompt: str) -> str:

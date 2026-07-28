@@ -155,6 +155,12 @@ def test_request_uses_exact_ark_endpoint_headers_body_and_isolates_client_defaul
     assert "x-api-key" not in request.headers
     assert "cookie" not in request.headers
     assert "x-unrelated" not in request.headers
+    assert request.extensions["timeout"] == {
+        "connect": 120,
+        "read": 120,
+        "write": 120,
+        "pool": 120,
+    }
     body = json.loads(request.content)
     assert body == {
         "model": "ark-standard-model",
@@ -263,6 +269,16 @@ def test_strict_analysis_failure_repairs_once_and_redacts_token() -> None:
 
     assert list(result) == [candidate.id]
     assert len(requests) == 2
+    assert all(
+        request.extensions["timeout"]
+        == {
+            "connect": 120,
+            "read": 120,
+            "write": 120,
+            "pool": 120,
+        }
+        for request in requests
+    )
     repair_body = json.loads(requests[1].content)
     assert repair_body["messages"][0] == {
         "role": "system",

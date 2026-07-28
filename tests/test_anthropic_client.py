@@ -317,10 +317,10 @@ def test_request_does_not_inherit_client_default_params_cookies_or_unrelated_hea
     assert "cookie" not in request.headers
     assert "x-unrelated" not in request.headers
     assert request.extensions["timeout"] == {
-        "connect": 30,
-        "read": 30,
-        "write": 30,
-        "pool": 30,
+        "connect": 120,
+        "read": 120,
+        "write": 120,
+        "pool": 120,
     }
     rendered_request = f"{request.url!s} {request.headers!r}"
     assert all(secret not in rendered_request for secret in secrets)
