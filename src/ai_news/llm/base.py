@@ -35,6 +35,10 @@ _OUTER_FENCE = re.compile(r"\A```(?:json)?[ \t]*\r?\n(.*?)\r?\n?```[ \t]*\Z", re
 class AnalysisError(RuntimeError):
     """A safe public error for all analysis failures."""
 
+    def __init__(self, message: str, *, safe_code: str = "internal_error") -> None:
+        super().__init__(message)
+        self.safe_code = safe_code
+
 
 class _AnalysisRow(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -168,7 +172,7 @@ class BaseAnalyzer(ABC):
         try:
             endpoint = build_llm_endpoint(settings.llm_base_url, self.endpoint_suffix)
         except (InvalidLLMEndpoint, httpx.InvalidURL, TypeError, ValueError):
-            raise AnalysisError("invalid LLM base URL") from None
+            raise AnalysisError("invalid LLM base URL", safe_code="invalid_endpoint") from None
         self._endpoint = endpoint
         self._token = settings.llm_token.get_secret_value()
         self._model = settings.llm_model
@@ -203,6 +207,7 @@ class BaseAnalyzer(ABC):
         for retry_number in range(4):
             retry = False
             terminal_error: str | None = None
+            terminal_code: str | None = None
             response_body: bytes | None = None
             try:
                 response = await client.send(
@@ -216,28 +221,37 @@ class BaseAnalyzer(ABC):
                         retry = True
                     elif 300 <= response.status_code <= 399:
                         terminal_error = "LLM redirect rejected"
+                        terminal_code = "redirect"
                     elif not 200 <= response.status_code <= 299:
                         terminal_error = "LLM HTTP request failed"
+                        terminal_code = f"http_{response.status_code}"
                     else:
                         response_body = await _read_bounded(response)
                         if response_body is None:
                             terminal_error = "LLM response exceeds size limit"
+                            terminal_code = "response_too_large"
                 finally:
                     await response.aclose()
             except httpx.TransportError:
                 retry = True
 
             if terminal_error is not None:
-                raise AnalysisError(terminal_error)
+                raise AnalysisError(
+                    terminal_error,
+                    safe_code=terminal_code or "internal_error",
+                )
             if not retry:
                 if response_body is None:
-                    raise AnalysisError("invalid LLM response")
+                    raise AnalysisError("invalid LLM response", safe_code="invalid_response")
                 text = self._extract_text(response_body)
                 if text is None:
-                    raise AnalysisError("invalid LLM response")
+                    raise AnalysisError("invalid LLM response", safe_code="invalid_response")
                 return text
             if retry_number == 3:
-                raise AnalysisError("LLM request failed after retries")
+                raise AnalysisError(
+                    "LLM request failed after retries",
+                    safe_code="retry_exhausted",
+                )
             await self._sleep(2**retry_number)
         raise RuntimeError("unreachable")
 
@@ -251,16 +265,25 @@ class BaseAnalyzer(ABC):
         parsed, error_kind = _parse_analysis(first_text, expected_ids)
         if parsed is not None:
             if _contains_secret(parsed, self._token):
-                raise AnalysisError("LLM analysis contains sensitive data")
+                raise AnalysisError(
+                    "LLM analysis contains sensitive data",
+                    safe_code="sensitive_output",
+                )
             return parsed
 
         repair = _repair_prompt(items, first_text, error_kind or "schema", self._token)
         repaired_text = await self._request(client, repair)
         repaired, _ = _parse_analysis(repaired_text, expected_ids)
         if repaired is None:
-            raise AnalysisError("invalid LLM analysis after repair")
+            raise AnalysisError(
+                "invalid LLM analysis after repair",
+                safe_code="invalid_after_repair",
+            )
         if _contains_secret(repaired, self._token):
-            raise AnalysisError("LLM analysis contains sensitive data")
+            raise AnalysisError(
+                "LLM analysis contains sensitive data",
+                safe_code="sensitive_output",
+            )
         return repaired
 
     async def _analyze_with_client(
@@ -276,10 +299,10 @@ class BaseAnalyzer(ABC):
 
     async def analyze(self, items: list[Candidate]) -> dict[str, Analysis]:
         if not items:
-            raise AnalysisError("analysis items must not be empty")
+            raise AnalysisError("analysis items must not be empty", safe_code="invalid_input")
         ids = [item.id for item in items]
         if len(ids) != len(set(ids)):
-            raise AnalysisError("duplicate input candidate id")
+            raise AnalysisError("duplicate input candidate id", safe_code="invalid_input")
 
         safe_error: AnalysisError
         try:

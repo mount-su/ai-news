@@ -334,6 +334,7 @@ def test_non_retryable_http_failures_do_not_retry_or_repair(status: int) -> None
     assert requests == 1
     assert delays == []
     _assert_safe_error(exc_info.value, {"top-secret-token"})
+    assert exc_info.value.safe_code == f"http_{status}"
 
 
 @pytest.mark.parametrize(

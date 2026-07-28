@@ -162,6 +162,25 @@ def test_generate_maps_safe_exit_categories(
     assert "token=value" not in stderr
 
 
+def test_generate_prints_allowlisted_analysis_diagnostic_code(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "load_source_config", lambda _path: _source_config())
+    monkeypatch.setattr(cli, "load_settings", _settings)
+
+    async def broken_run_daily(**_kwargs: Any) -> object:
+        raise AnalysisPipelineError("analysis failed", safe_code="http_401")
+
+    monkeypatch.setattr(cli, "run_daily", broken_run_daily)
+
+    result = cli.main(["generate", "--date", RUN_DATE.isoformat(), "--root", str(tmp_path)])
+
+    assert result == 4
+    assert capsys.readouterr().err == "pipeline_error: http_401\n"
+
+
 def test_check_config_loads_only_settings_and_is_silent(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

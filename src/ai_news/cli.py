@@ -20,6 +20,7 @@ from ai_news.models import (
 )
 from ai_news.pipeline.normalize import to_candidate
 from ai_news.pipeline.run import (
+    AnalysisPipelineError,
     ConfigurationPipelineError,
     PipelineError,
     PublicationThresholdError,
@@ -55,7 +56,14 @@ def _shanghai_today() -> date:
     return datetime.now(ZoneInfo("Asia/Shanghai")).date()
 
 
-def _safe_error(category: str, _error: BaseException) -> None:
+def _safe_error(category: str, error: BaseException) -> None:
+    if (
+        category == _PIPELINE_ERROR
+        and isinstance(error, AnalysisPipelineError)
+        and error.safe_code is not None
+    ):
+        print(f"{category}: {error.safe_code}", file=sys.stderr)
+        return
     print(f"{category}: Error", file=sys.stderr)
 
 

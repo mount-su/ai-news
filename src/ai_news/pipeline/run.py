@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import AbstractAsyncContextManager
@@ -19,6 +20,7 @@ from ai_news.collectors.arxiv import collect_arxiv
 from ai_news.collectors.feed import parse_feed
 from ai_news.collectors.github import collect_github_releases
 from ai_news.http import get_bytes
+from ai_news.llm.base import AnalysisError
 from ai_news.llm.factory import create_analyzer
 from ai_news.models import (
     Analysis,
@@ -65,6 +67,18 @@ class DataPipelineError(PipelineError):
 
 class AnalysisPipelineError(PipelineError):
     """Safe analysis-stage failure."""
+
+    _SAFE_CODE = re.compile(
+        r"^(?:http_[45][0-9]{2}|invalid_endpoint|redirect|response_too_large|"
+        r"invalid_response|retry_exhausted|sensitive_output|invalid_input|"
+        r"invalid_after_repair|internal_error)$"
+    )
+
+    def __init__(self, message: str, *, safe_code: str | None = None) -> None:
+        super().__init__(message)
+        self.safe_code = (
+            safe_code if safe_code is not None and self._SAFE_CODE.fullmatch(safe_code) else None
+        )
 
 
 class ReportValidationError(PipelineError):
@@ -465,6 +479,11 @@ async def _run_with_client(
         raw_analyses = await selected_analyzer.analyze(selected)
     except PipelineError:
         raise
+    except AnalysisError as error:
+        raise AnalysisPipelineError(
+            "analysis failed",
+            safe_code=error.safe_code,
+        ) from None
     except Exception:
         raise AnalysisPipelineError("analysis failed") from None
     analyses = _validated_analyses(raw_analyses, selected)

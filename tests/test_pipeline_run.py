@@ -585,6 +585,17 @@ def test_no_healthy_source_and_analyzer_failure_are_safe_pipeline_errors() -> No
     assert str(analysis_error.value) == "analysis failed"
 
 
+def test_analysis_pipeline_error_accepts_only_safe_diagnostic_codes() -> None:
+    error = AnalysisPipelineError("analysis failed", safe_code="http_401")
+    unsafe = AnalysisPipelineError(
+        "secret model endpoint?token=value",
+        safe_code="secret-token-value",
+    )
+
+    assert error.safe_code == "http_401"
+    assert unsafe.safe_code is None
+
+
 def test_fixed_clocks_make_the_report_deterministic() -> None:
     sources = [_source(0), _source(1)]
     items = {
