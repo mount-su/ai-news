@@ -2,72 +2,139 @@
   "candidate_count": 30,
   "date": "2026-07-29",
   "degraded": true,
-  "generated_at": "2026-07-29T00:57:03.931394Z",
+  "generated_at": "2026-07-29T03:39:50.748220Z",
   "items": [
     {
-      "canonical_url": "https://arxiv.org/abs/2607.24743v1",
+      "canonical_url": "https://arxiv.org/abs/2607.26055v1",
       "category": "论文研究",
-      "id": "9c53f0e70bc1b908",
+      "id": "331c09b4cf18203c",
       "importance": 9,
       "is_official": true,
       "marketing_risk": "low",
-      "original_title": "ClinFusion: A Vision-Centric Multimodal LLM System for Holistic Medical Understanding",
-      "published_at": "2026-07-27T17:59:49Z",
+      "original_title": "$π\\mathbf{R}^2$: Reactive Real-time Flow Policies",
+      "published_at": "2026-07-28T17:59:31Z",
       "source": "arXiv AI",
-      "summary": "ClinFusion 是一个以视觉为中心的多模态大语言模型系统，旨在实现全面的医学理解。论文提出了级联空间感知局部融合算子，统一了 2D 和 3D 医学图像理解；并引入了基于视觉的评估框架 MedIF-Bench 和一种用于报告生成评估的临床对齐方法。ClinFusion 在 24 个基准测试中的 20 个上超越了领先的开源医学 MLLM，在 16 个基准测试中的 13 个上超越了 GPT-5.2 等专有模型，并通过放射科医生的盲审评估验证了其生成的报告质量最高。",
+      "summary": "论文提出 πR² 方法，使基于流模型的通用操作策略具备实时反应能力。通过将条件输入分为快速通道（本体感知）和慢速通道（视觉语言特征），并采用延迟自适应流调度，该策略能在单个去噪步骤内生成动作，实现高频闭环重规划。在真实机器人平台上，重规划速度提升约 4 倍，成功率达 25Hz，任务成功率提升高达 30%。",
       "tags": [
-        "多模态",
-        "医学AI",
-        "视觉语言模型",
-        "报告生成",
-        "评估基准"
+        "机器人操作",
+        "流模型",
+        "实时控制",
+        "闭环策略",
+        "具身智能"
       ],
-      "title": "ClinFusion: A Vision-Centric Multimodal LLM System for Holistic Medical Understanding",
-      "tracking_signal": "关注该论文的代码和模型权重是否开源，以及其在真实临床环境中的部署和验证进展，特别是与现有临床工作流的集成情况。",
-      "why_it_matters": "该研究直面医学多模态模型的核心挑战——视觉理解与临床评估对齐。其提出的架构和评估方法为构建更可信、更符合临床实践的医学 AI 系统提供了新范式。在多项基准上超越 GPT-5.2 等强大模型，并得到放射科医生认可，显示了其巨大的临床应用潜力，可能推动 AI 辅助诊断进入新阶段。"
+      "title": "$π\\mathbf{R}^2$: Reactive Real-time Flow Policies",
+      "tracking_signal": "关注该方法在更多机器人平台和任务上的迁移效果，以及是否开源代码和预训练模型。",
+      "why_it_matters": "该研究解决了大模型驱动机器人策略在动态环境中实时性不足的关键瓶颈，使得基于大规模预训练骨干的操作策略能够应用于需要快速反应的闭环控制任务。这对于推动通用操作机器人在真实世界非结构化环境中的实际部署具有里程碑意义。"
     },
     {
-      "canonical_url": "https://arxiv.org/abs/2607.24730v1",
+      "canonical_url": "https://github.com/cline/cline/releases/tag/sdk/sdk/v0.0.66",
+      "category": "Coding Agent",
+      "id": "5f442173ebc0ade6",
+      "importance": 8,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "SDK v0.0.66",
+      "published_at": "2026-07-28T22:35:13Z",
+      "source": "Cline",
+      "summary": "Cline 发布 SDK v0.0.66 版本，支持免费 Cline 模型并显示限制重置时间，代理压缩成为默认策略并修复了静默回退和无法找到切割点的问题，连接器会话现在持久化并自动重连，计划/行动模式等设置持久化且支持跨进程安全写入，内置提供商列表从 models.dev 生成以扩大覆盖范围，编辑器工具保留文件现有行尾符，SAP AI Core 设置计量头，无头计划任务默认自动批准，遥测增加任务生命周期事件和主机身份信息，移除未使用的回调并更新模型目录。",
+      "tags": [
+        "Cline",
+        "SDK",
+        "Coding Agent",
+        "代理压缩",
+        "版本发布"
+      ],
+      "title": "SDK v0.0.66",
+      "tracking_signal": "关注 SDK 更新后第三方集成的兼容性，以及代理压缩和连接器重连在生产环境中的表现。",
+      "why_it_matters": "SDK 更新是 Cline 生态的核心基础，代理压缩默认化和连接器持久化直接提升了代理的长期运行能力和稳定性。跨进程安全写入和提供商覆盖扩展增强了多宿主环境和多模型支持的鲁棒性。遥测改进为监控和调试提供了关键数据，对基于 Cline SDK 构建应用的开发者至关重要。"
+    },
+    {
+      "canonical_url": "https://arxiv.org/abs/2607.26057v1",
       "category": "论文研究",
-      "id": "58183fb0e2d0fb64",
+      "id": "585db2668852c018",
       "importance": 8,
       "is_official": true,
       "marketing_risk": "low",
-      "original_title": "KANEx: Translating Kolmogorov-Arnold Networks' Interpretability to Medical Explainability",
-      "published_at": "2026-07-27T17:57:02Z",
+      "original_title": "Pass the Baton: Trajectory-Relayed On-Policy Distillation",
+      "published_at": "2026-07-28T17:59:46Z",
       "source": "arXiv AI",
-      "summary": "论文提出了 KANEx 框架，利用 Kolmogorov-Arnold 网络的可解释性来增强医学影像分析的可信度。该框架通过 KAN 的透明架构生成忠实的热力图，并以此为基础，为下游视觉语言模型提供可解释的上下文，从而生成更值得信赖的文本解释。在 MIMIC-CXR 数据集上，KAN 架构在视觉定位和下游推理质量上提升了 10%。",
+      "summary": "该论文提出 Relay-OPD 方法，解决在线策略蒸馏中的前缀失败问题。通过检测教师模型与学生模型在错误推理方向上的延续不对称性，在关键点让教师模型短暂接管生成，再交还学生模型继续，从而构建更优的训练轨迹。在数学推理基准测试中，该方法显著优于标准 OPD 和 FastOPD，并将训练轨迹长度缩短超过 50%。",
       "tags": [
-        "可解释性",
-        "医学影像",
-        "KAN网络",
-        "视觉语言模型"
+        "知识蒸馏",
+        "在线策略",
+        "推理增强",
+        "模型压缩",
+        "数学推理"
       ],
-      "title": "KANEx: Translating Kolmogorov-Arnold Networks' Interpretability to Medical Explainability",
-      "tracking_signal": "关注 KANEx 框架的代码开源情况，以及其在更多医学影像模态和疾病类型上的验证，特别是与现有临床金标准的对比研究。",
-      "why_it_matters": "医学 AI 的“黑箱”问题是临床信任的主要障碍。该研究创新性地利用 KAN 的架构特性，从根源上提升了模型的可解释性，而非依赖事后解释方法。将数学上可解释的单元与 VLM 的语言能力结合，为构建透明、可信的医学 AI 系统开辟了新路径，对推动 AI 在临床高风险决策中的应用至关重要。"
+      "title": "Pass the Baton: Trajectory-Relayed On-Policy Distillation",
+      "tracking_signal": "关注该方法在更大规模模型和更多类型推理任务上的泛化能力，以及是否会被集成到主流训练框架中。",
+      "why_it_matters": "该研究针对大模型推理能力蒸馏中的核心难题——错误累积，提出了创新的接力机制，有效提升了小模型的推理性能并降低了训练成本。这对于在资源受限环境下部署高性能推理模型具有重要价值，推动了模型压缩和知识蒸馏技术的发展。"
     },
     {
-      "canonical_url": "https://arxiv.org/abs/2607.24720v1",
-      "category": "Agent",
-      "id": "f9e4ac9cae08e59c",
+      "canonical_url": "https://arxiv.org/abs/2607.26034v1",
+      "category": "论文研究",
+      "id": "46c5dc7436d51cee",
       "importance": 8,
       "is_official": true,
       "marketing_risk": "low",
-      "original_title": "The Physics of Multi-Turn Long-Horizon Planning: From Pre-training to Post-training via Single- and Multi-Teacher On-Policy Agentic Distillation",
-      "published_at": "2026-07-27T17:55:03Z",
+      "original_title": "Falling Behind Drives Unsafe Development in an Idealised AI Race Experiment",
+      "published_at": "2026-07-28T17:44:03Z",
       "source": "arXiv AI",
-      "summary": "该研究通过构建统一可控的多轮交互环境，系统性地研究了基础模型智能体在多轮长程规划能力上的获取、塑造与整合过程。研究发现，在预训练阶段通过思维链状态转移建模构建显式世界模型能提升长程泛化能力，次优轨迹会严重损害性能；在后训练阶段，通过互信息区分通用规划模式与任务特定知识，并比较了GRPO与在线策略蒸馏（OPD）的有效区域，发现OPD在低质量和长程场景下更优；最后提出多教师在线策略蒸馏（MOPD）方法，通过收敛到共享规划模式来整合能力。",
+      "summary": "本文通过一个理想化的AI竞赛行为实验，研究了竞争压力如何影响开发安全性。实验中，成对参与者反复在安全和不安全开发之间选择，不安全开发带来更快进展但积累私人风险。研究发现，不安全行为更多由竞赛中的战略状态（如对手行为、领先或落后）驱动，而非个人的风险偏好。具体而言，参与者更可能在对手选择不安全后跟随，领先时减少不安全行为，落后时增加。研究还引入了一个简化的演化模型，再现了这种条件性不安全行为如何被竞争动态所青睐。结论建议政策应侧重于减少竞争压力和促进合作，而非仅关注个体风险。",
       "tags": [
-        "AI Agent",
-        "长程规划",
-        "世界模型",
-        "知识蒸馏",
-        "强化学习"
+        "AI安全",
+        "竞赛动态",
+        "行为实验",
+        "AI治理",
+        "风险偏好"
       ],
-      "title": "The Physics of Multi-Turn Long-Horizon Planning: From Pre-training to Post-training via Single- and Multi-Teacher On-Policy Agentic Distillation",
-      "tracking_signal": "跟踪该研究提出的MOPD方法是否会被应用于主流开源Agent框架（如AutoGPT、CrewAI）的后训练流程，以及GRPO与OPD的对比结论是否会影响RLHF相关工具的设计。",
-      "why_it_matters": "多轮长程规划是构建可靠AI智能体的核心挑战。该研究首次在受控环境下解构了规划能力从预训练到后训练的完整形成过程，为训练更强大的智能体提供了明确的指导原则，特别是关于数据质量、世界模型构建以及多教师蒸馏的发现，对工业界训练下一代智能体模型具有直接的参考价值。"
+      "title": "Falling Behind Drives Unsafe Development in an Idealised AI Race Experiment",
+      "tracking_signal": "该研究为AI安全政策讨论提供了行为经济学视角的论据。后续可关注其结论是否被政策制定者引用，以及是否有后续研究在更复杂的模拟环境或真实开发者群体中验证这些发现。",
+      "why_it_matters": "这项研究为AI安全领域关于“竞赛动态导致安全标准降低”的普遍担忧提供了实证证据。它揭示了在竞争环境中，对落后的恐惧和对手的行为是驱动不安全开发的关键因素，其影响甚至超过了个体的风险偏好。这一发现对AI治理和政策制定具有重要启示，表明仅仅关注开发者个体的风险意识可能不够，更需要从系统层面设计机制来缓解竞争压力，鼓励合作，以避免“逐底竞争”导致灾难性后果。"
+    },
+    {
+      "canonical_url": "https://arxiv.org/abs/2607.26005v1",
+      "category": "Agent",
+      "id": "cb02da3b52c34e82",
+      "importance": 8,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Pictura: Perspective-View Self-Play at Scale for Driving",
+      "published_at": "2026-07-28T17:20:39Z",
+      "source": "arXiv AI",
+      "summary": "本文提出了Pictura，一个GPU加速的多智能体驾驶模拟器，以及基于此训练的驾驶策略Alberti。现有自博弈驾驶策略通常使用特权向量化观测（如精确位姿和速度），与部署时智能体从自我中心相机获得的局部观测存在表征鸿沟。Pictura通过在每个步骤渲染每个智能体的自我中心视图，从源头消除了这一鸿沟，在单个H100 GPU上可维持高达50万智能体步/秒（200万图像/秒）的模拟速度。利用Pictura，作者使用纯PPO算法从透视图像直接训练了首个大规模自博弈驾驶策略Alberti，训练量达500亿智能体步（约3500万公里驾驶）。该策略性能接近其特权向量化版本，并能零样本迁移到Waymo Open Motion Dataset的重渲染场景中，且性能优于特权智能体。",
+      "tags": [
+        "自动驾驶",
+        "自博弈",
+        "模拟器",
+        "强化学习",
+        "端到端学习"
+      ],
+      "title": "Pictura: Perspective-View Self-Play at Scale for Driving",
+      "tracking_signal": "重点关注项目页面（https://valeoai.github.io/Pictura/）是否开源模拟器和模型权重。同时，关注该策略在更真实的闭环模拟器（如CARLA）或真实世界数据上的迁移和微调表现。",
+      "why_it_matters": "这项研究解决了自动驾驶自博弈训练中的一个核心问题：模拟训练与真实部署之间的感知输入差异。通过直接在像素级进行大规模自博弈训练，Pictura和Alberti证明了无需依赖特权信息或知识蒸馏，即可从原始视觉输入学习到鲁棒的驾驶策略。这为开发更通用、更易部署的自动驾驶智能体铺平了道路，其零样本迁移能力也展示了强大的泛化潜力，对推动端到端自动驾驶的发展具有重要意义。"
+    },
+    {
+      "canonical_url": "https://github.com/cline/cline/releases/tag/cli-v3.0.47",
+      "category": "Coding Agent",
+      "id": "1ea45a82155afbed",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "CLI v3.0.47",
+      "published_at": "2026-07-28T22:44:40Z",
+      "source": "Cline",
+      "summary": "Cline 发布 CLI v3.0.47 版本，全面支持免费 Cline 模型并显示限制重置时间，设置中的计划/行动模式、工具自动批准和压缩模式现在可持久化，升级了 TUI 栈，修复了对话框关闭后残留面板、重复键警告、任务中止可能杀死共享守护进程等问题，代理压缩成为默认策略并修复了其静默回退和无法找到切割点的问题，编辑器编辑保留文件现有行尾符，扩展了内置提供商覆盖范围。",
+      "tags": [
+        "Cline",
+        "CLI",
+        "Coding Agent",
+        "代理压缩",
+        "版本发布"
+      ],
+      "title": "CLI v3.0.47",
+      "tracking_signal": "跟踪代理压缩策略在实际使用中的效果，以及持久化设置是否引发新的配置冲突。",
+      "why_it_matters": "该版本对 CLI 的核心功能进行了重要改进，持久化设置和代理压缩默认化提升了长期运行任务的稳定性和用户体验。修复多个关键错误，包括守护进程安全和文件编辑兼容性，增强了 CLI 作为 Coding Agent 的可靠性。"
     },
     {
       "canonical_url": "https://github.com/google-gemini/gemini-cli/releases/tag/v0.53.0",
@@ -79,17 +146,125 @@
       "original_title": "Release v0.53.0",
       "published_at": "2026-07-28T21:45:42Z",
       "source": "Gemini CLI",
-      "summary": "Gemini CLI 发布 v0.53.0 版本，包含多项修复与功能增强。修复了工具响应分组与角色合并问题以防止 400 错误，实现了 LLM 分类协调器与容器构建，重构了 macOS 安全配置文件以遵循默认拒绝模型，缓解了无限 ReAct 循环与提示注入循环，强化了工作区信任与任务隔离以防止远程代码执行，修复了缓存凭据验证与凭据回退机制，并新增了评估覆盖率报告命令。",
+      "summary": "Gemini CLI 发布 v0.53.0 版本，包含多项修复与功能增强。修复了工具响应分组和角色合并问题以防止 400 错误，实现了 LLM 分类协调器和容器构建，重构了 macOS 安全配置文件以遵循默认拒绝模型，缓解了无限 ReAct 循环和提示注入循环，强化了 A2A 服务器的工作区信任和任务隔离以防止远程代码执行，修复了缓存凭据验证和凭据回退机制，并新增了评估覆盖率报告命令。",
       "tags": [
         "Gemini CLI",
         "安全修复",
-        "ReAct循环",
-        "提示注入",
-        "远程代码执行"
+        "Coding Agent",
+        "版本发布"
       ],
       "title": "Release v0.53.0",
-      "tracking_signal": "关注该版本在生产环境中的安全漏洞修复效果，以及后续是否出现新的安全绕过报告。",
-      "why_it_matters": "该版本针对 Coding Agent 的安全性与稳定性进行了关键修复，包括防止远程代码执行、缓解提示注入与无限循环等严重漏洞，直接提升开发者在 CLI 环境中使用 AI 编码代理的可靠性与安全性。"
+      "tracking_signal": "关注后续版本是否持续强化安全机制，以及 LLM 分类协调器在实际场景中的表现。",
+      "why_it_matters": "该版本集中修复了多个安全关键问题，包括远程代码执行（RCE）防护、提示注入循环缓解和无限循环控制，直接提升 Coding Agent 在生产环境中的可靠性与安全性。同时引入 LLM 分类协调器和评估覆盖率报告，增强了自动化运维和可观测性，对使用 Gemini CLI 的开发者具有重要影响。"
+    },
+    {
+      "canonical_url": "https://arxiv.org/abs/2607.26052v1",
+      "category": "论文研究",
+      "id": "61f1b35126e6e387",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Spend Experts Where You Are Unsure: Confidence-Adaptive Routing for Mixture-of-Experts LoRA",
+      "published_at": "2026-07-28T17:59:16Z",
+      "source": "arXiv AI",
+      "summary": "论文提出 CARE 方法，一种用于 MoE-LoRA 的置信度自适应路由机制。它利用路由器输出的分布作为不确定性信号，以类似核采样的方式动态激活专家，而非固定 Top-k 数量。通过预算恒温器校准阈值，CARE 在匹配计算量的同时提升性能，或在保持性能的同时激活更少专家，并改善了分布外检测能力。",
+      "tags": [
+        "MoE",
+        "LoRA",
+        "自适应路由",
+        "不确定性估计",
+        "模型效率"
+      ],
+      "title": "Spend Experts Where You Are Unsure: Confidence-Adaptive Routing for Mixture-of-Experts LoRA",
+      "tracking_signal": "关注该方法的代码开源情况，以及在不同模型架构和更大规模 MoE 模型上的应用效果。",
+      "why_it_matters": "该方法为参数高效微调中的 MoE 结构提供了一种更智能、更高效的路由策略，实现了计算资源的动态分配。这不仅能提升模型性能，还能在不增加参数的情况下增强模型的不确定性估计能力，对构建更可靠、更高效的轻量化大模型具有重要意义。"
+    },
+    {
+      "canonical_url": "https://arxiv.org/abs/2607.26041v1",
+      "category": "Agent",
+      "id": "242f45f50140a5b6",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Desktop-Delta Bench: Do Computer-Use Models Understand Desktop GUI Transitions?",
+      "published_at": "2026-07-28T17:49:51Z",
+      "source": "arXiv AI",
+      "summary": "本文提出了Desktop-Delta Bench（DDB），一个用于评估计算机使用智能体（CUA）是否理解桌面GUI状态转换的离线基准测试。该基准包含2013个人工验证的实例，源自多应用Linux操作轨迹，覆盖约15个应用和50个任务领域。DDB通过两个互补任务（463个三帧时序排序实例和1550个动作前后对比实例）来诊断模型在状态验证、源跟踪和上下文感知控制三个维度的失败模式。对8个闭源和开源模型家族的评估显示，模型在时序排序任务上表现不佳，最佳非诱饵和诱饵精确匹配率仅为65.1%和65.7%，且存在系统性复制给定顺序的倾向。单动作结果显示，推断动作类型比定位动作更难。该基准旨在填补GUI基础能力与最终任务成功之间的诊断空白，以提升桌面CUA的验证、可靠性和恢复能力。",
+      "tags": [
+        "计算机使用智能体",
+        "GUI基准测试",
+        "状态转换",
+        "时序推理",
+        "模型评估"
+      ],
+      "title": "Desktop-Delta Bench: Do Computer-Use Models Understand Desktop GUI Transitions?",
+      "tracking_signal": "该基准测试揭示了当前CUA模型在理解桌面GUI动态变化方面的核心短板，特别是时序排序和动作类型推断。后续可关注是否有模型在该基准上取得显著突破，以及该基准是否被社区采纳为标准评估工具。",
+      "why_it_matters": "随着计算机使用智能体（CUA）在自动化长周期任务中的应用日益增多，其理解和验证GUI状态转换的能力变得至关重要。当前基准主要关注最终任务成功或单帧定位，忽略了模型是否能够重建由动作产生的因果性、任务相关的状态转换。这种能力对于拒绝过时观察、验证进度和从失败中恢复至关重要。DDB基准通过聚焦于状态转换的诊断，揭示了当前模型在时序推理和动作理解方面的系统性缺陷，为提升CUA在实际异步、不可靠桌面环境中的鲁棒性和可靠性提供了明确的改进方向。"
+    },
+    {
+      "canonical_url": "https://arxiv.org/abs/2607.26017v1",
+      "category": "Agent",
+      "id": "c67530b8e6ed913e",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "UniMem: Complementary Episodic-to-Parametric Memory for Boundary-Agnostic Task Streams",
+      "published_at": "2026-07-28T17:28:21Z",
+      "source": "arXiv AI",
+      "summary": "本文针对LLM智能体在无边界、持续演化的任务流中面临的可塑性-稳定性困境，提出了UniMem框架。该框架受大脑互补记忆系统启发，通过可学习的路由令牌作为记忆控制器，自适应协调两种记忆通路：新颖或稀疏的任务保留在情景缓冲区用于检索增强执行，而重复、可靠的模式则整合到可扩展的参数记忆中。UniMem将任务识别与任务执行解耦，能在部署时无任务标签的情况下按需扩展记忆，避免参数失控增长。在长周期流式任务序列上的实验表明，UniMem在三个骨干模型上平均提升了4.0个精确匹配点，同时保持了执行保真度。",
+      "tags": [
+        "LLM智能体",
+        "持续学习",
+        "记忆管理",
+        "检索增强生成",
+        "稳定性-可塑性困境"
+      ],
+      "title": "UniMem: Complementary Episodic-to-Parametric Memory for Boundary-Agnostic Task Streams",
+      "tracking_signal": "该框架的核心是记忆路由和巩固机制。后续可关注其代码是否开源，以及在更复杂的交互式环境（如WebArena、OSWorld）中，相比传统RAG或微调方法的长期性能表现。",
+      "why_it_matters": "LLM智能体在真实世界部署时，需要持续学习新任务并复用旧经验，但现有记忆机制难以平衡快速学习新知识（可塑性）和稳定保留旧知识（稳定性）。UniMem通过模拟人脑的记忆巩固过程，提供了一种优雅的解决方案，使智能体能够自主管理记忆，无需人工划分任务边界。这对于构建能够终身学习、在动态环境中自主进化的通用智能体至关重要，直接提升了智能体在客户服务、自动化流程等长周期应用中的效率和可靠性。"
+    },
+    {
+      "canonical_url": "https://arxiv.org/abs/2607.26004v1",
+      "category": "AI 工具",
+      "id": "eaa4cc97f8278cae",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Parallel Decoding Distillation for Fast Image and Video Generation",
+      "published_at": "2026-07-28T17:20:00Z",
+      "source": "arXiv AI",
+      "summary": "本文提出并行解码蒸馏（PDD），一种用于加速扩散和流匹配模型推理的简化、可扩展的轨迹蒸馏方法。现有加速方法依赖变分分数蒸馏和对抗损失，虽能实现高质量生成，但训练不稳定且易出现模式坍塌，导致视频多样性丧失和运动缺失。PDD通过让网络在一次评估中预测多个去噪步骤来加速生成，其核心是学习平均速度的表示，而无需通过JVP或有限差分近似回归其导数。该方法兼容任何预训练模型，并支持可变数量的函数评估。在LTX-2.3、Wan 14B和Qwen-Image等模型上，PDD以4-8步函数评估就达到了最先进性能，并显著提升了生成视频的多样性。",
+      "tags": [
+        "扩散模型",
+        "模型蒸馏",
+        "视频生成",
+        "图像生成",
+        "推理加速"
+      ],
+      "title": "Parallel Decoding Distillation for Fast Image and Video Generation",
+      "tracking_signal": "关注该方法是否开源，以及其是否被集成到流行的生成模型库（如Diffusers）中。同时，留意其在更大规模模型（如Sora类架构）和更长视频生成任务上的应用潜力。",
+      "why_it_matters": "扩散模型和流模型在图像/视频生成领域占据主导，但其缓慢的迭代采样过程严重限制了实际应用。PDD提供了一种更稳定、更简洁的蒸馏加速方案，有效解决了现有对抗训练方法中模式坍塌和多样性丧失的关键问题。这对于推动高质量生成模型在实时应用、内容创作工具中的落地至关重要，尤其是在视频生成领域，其提升多样性的能力直接关系到用户体验和内容生态的丰富性。"
+    },
+    {
+      "canonical_url": "https://blog.google/innovation-and-ai/technology/developers-tools/expanding-managed-agents-gemini-api-3-6-flash-hooks",
+      "category": "Agent",
+      "id": "9c57623ef609667d",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "Gemini API Managed Agents: 3.6 Flash, hooks, and more",
+      "published_at": "2026-07-28T16:00:00Z",
+      "source": "Google AI",
+      "summary": "Google AI 宣布 Gemini API 托管代理的更新，包括支持 Gemini 3.6 Flash 模型、引入钩子（Hooks）和触发器（Triggers）功能。",
+      "tags": [
+        "Gemini API",
+        "托管代理",
+        "钩子",
+        "触发器"
+      ],
+      "title": "Gemini API Managed Agents: 3.6 Flash, hooks, and more",
+      "tracking_signal": "观察开发者社区对钩子和触发器功能的反馈，以及 Gemini 3.6 Flash 在实际代理任务中的性能表现。",
+      "why_it_matters": "托管代理的更新降低了构建和部署 AI 代理的门槛，Gemini 3.6 Flash 的加入可能提升代理的响应速度和效率，而钩子和触发器功能增强了代理的自动化和定制能力。这对希望快速集成 AI 代理的企业和开发者具有直接价值。"
     },
     {
       "canonical_url": "https://huggingface.co/blog/LiquidAI/lfm2-5-encoders",
@@ -101,124 +276,125 @@
       "original_title": "LFM2.5-Encoders for Fast Long-Context Inference on CPU",
       "published_at": "2026-07-28T15:01:45Z",
       "source": "Hugging Face",
-      "summary": "LFM2.5-Encoders 是一个旨在实现 CPU 上快速长上下文推理的开源项目，由 Hugging Face 发布。该项目专注于优化编码器模型，使其能在 CPU 环境下高效处理长文本序列。",
+      "summary": "LFM2.5-Encoders 是一个开源项目，旨在实现 CPU 上的快速长上下文推理。该项目专注于优化编码器模型，使其能够在没有 GPU 的 CPU 环境下高效处理长文本序列。",
       "tags": [
         "长上下文",
-        "CPU推理",
+        "CPU 推理",
         "编码器",
-        "Hugging Face"
+        "效率优化",
+        "开源模型"
       ],
       "title": "LFM2.5-Encoders for Fast Long-Context Inference on CPU",
-      "tracking_signal": "关注该项目发布的具体模型、性能基准测试（如推理速度、内存占用）以及与 GPU 推理方案的对比，评估其在实际应用中的可行性。",
-      "why_it_matters": "在 CPU 上实现高效的长上下文推理，能显著降低大模型部署的硬件成本和能耗，使更多个人开发者和中小企业能够在普通设备上使用先进的长文本处理能力，推动 AI 技术的民主化。"
+      "tracking_signal": "关注该项目的具体技术实现、在标准长上下文基准测试上的性能表现，以及与 GPU 推理的对比。",
+      "why_it_matters": "在 CPU 上实现高效的长上下文推理能够大幅降低 AI 应用的部署成本和硬件门槛，使更多资源受限的场景（如边缘设备、个人电脑）能够运行复杂的语言理解任务，对 AI 的普及和民主化具有重要意义。"
     },
     {
-      "canonical_url": "https://arxiv.org/abs/2607.24741v1",
-      "category": "论文研究",
-      "id": "fad62d2b716e243d",
-      "importance": 7,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Certified Parallel-in-Time Sinkhorn for Dynamic Entropic Optimal Transport",
-      "published_at": "2026-07-27T17:59:36Z",
-      "source": "arXiv AI",
-      "summary": "论文提出了 TemporalSinkhorn，一种用于动态熵最优传输问题的并行时间执行器。它通过批量处理未来候选解并进行修复，利用中心化、行分片的证书机制确保输出准确性。实验表明，在 A100 GPU 上，该方法相比顺序执行实现了 1.42 倍至 3.55 倍的加速，在 Flow Matching 任务中加速达 3.054 倍至 3.632 倍，且无容差违规。",
-      "tags": [
-        "最优传输",
-        "并行计算",
-        "Sinkhorn算法",
-        "Flow Matching"
-      ],
-      "title": "Certified Parallel-in-Time Sinkhorn for Dynamic Entropic Optimal Transport",
-      "tracking_signal": "关注该算法在更大规模、多节点环境下的验证结果，以及其是否会被集成到主流的生成模型框架（如扩散模型、流匹配库）中。",
-      "why_it_matters": "最优传输是生成模型（如 Flow Matching）等领域的核心计算组件。该研究提出的并行时间算法显著加速了动态场景下的计算，同时保证了输出精度，这对于需要快速迭代和实时响应的生成式 AI 应用具有重要意义，可能提升相关模型的训练和推理效率。"
-    },
-    {
-      "canonical_url": "https://arxiv.org/abs/2607.24731v1",
-      "category": "论文研究",
-      "id": "503a193f933c594b",
-      "importance": 7,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Rethinking Classifier-Free Guidance in On-Policy Diffusion Distillation",
-      "published_at": "2026-07-27T17:57:02Z",
-      "source": "arXiv AI",
-      "summary": "论文重新思考了在策略蒸馏中分类器自由引导的作用。研究发现，现有的速度匹配目标在分支层面存在欠定性，可能导致负分支误差增加，即“负分支不对称性”问题。为此，论文提出了分支感知的蒸馏目标“正方向匹配”，通过分别约束正预测和 CFG 条件方向来解决此问题，并在视频控制任务中验证了其鲁棒性和有效性。",
-      "tags": [
-        "扩散模型",
-        "知识蒸馏",
-        "分类器自由引导",
-        "视频生成"
-      ],
-      "title": "Rethinking Classifier-Free Guidance in On-Policy Diffusion Distillation",
-      "tracking_signal": "关注该“正方向匹配”方法是否被其他扩散模型蒸馏工作（如 LCM、SDXL-Turbo 的改进版）所采纳，以及其在图像生成等其他任务上的泛化效果。",
-      "why_it_matters": "扩散模型蒸馏是提高生成效率的关键技术，而 CFG 是其标配。该研究揭示了现有蒸馏方法在 CFG 下的一个根本性缺陷，并提出了解决方案。这对于提升蒸馏模型的质量和稳定性，尤其是在对引导尺度敏感的应用（如可控生成）中，具有重要价值。"
-    },
-    {
-      "canonical_url": "https://arxiv.org/abs/2607.24726v1",
-      "category": "论文研究",
-      "id": "3b541d04aad14f22",
-      "importance": 7,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Global Convergence of DGM and PINN Algorithms for Solving Nonlinear PDEs",
-      "published_at": "2026-07-27T17:56:37Z",
-      "source": "arXiv AI",
-      "summary": "该论文针对深度伽辽金方法（DGM）和物理信息神经网络（PINNs）在求解非线性偏微分方程时的数学基础问题，证明了一类半线性偏微分方程在使用梯度下降最小化残差目标函数时，训练后的神经网络能够收敛到偏微分方程的真实解，而非局部极小值。",
-      "tags": [
-        "PINNs",
-        "DGM",
-        "偏微分方程",
-        "收敛性证明",
-        "科学机器学习"
-      ],
-      "title": "Global Convergence of DGM and PINN Algorithms for Solving Nonlinear PDEs",
-      "tracking_signal": "关注该理论证明是否会被后续工作扩展至更广泛的非线性偏微分方程类别，以及是否会影响PINNs相关开源库（如DeepXDE）的默认优化器选择。",
-      "why_it_matters": "DGM和PINNs是科学机器学习中求解偏微分方程的核心方法，但其非凸优化目标函数可能导致收敛到局部极小值而非真实解，这一直是领域内的长期未解问题。该研究为这些算法的可靠性提供了严格的数学保证，有助于推动其在物理、工程等关键领域的可信应用。"
-    },
-    {
-      "canonical_url": "https://arxiv.org/abs/2607.24717v1",
-      "category": "大模型",
-      "id": "d467275faa31008d",
-      "importance": 7,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "DataOrchestra: Learning to Orchestrate Per-Example Curation of Pretraining Data",
-      "published_at": "2026-07-27T17:54:12Z",
-      "source": "arXiv AI",
-      "summary": "DataOrchestra是一个针对大语言模型预训练数据的逐样本编排框架。它统一了多种数据处理操作（丢弃、保留、清洗），并为每个数据样本动态决定处理流程。对于需要清洗的样本，编排器会选择一个或多个下游操作（如程序化编辑或基于大模型的改写），并生成具体指令交由工具模型执行。在0.5B到7B规模的模型预训练实验中，该方法在11个基准测试上稳定优于单一数据处理方法，并能通过跳过不必要的操作减少计算开销。",
-      "tags": [
-        "大语言模型",
-        "预训练数据",
-        "数据清洗",
-        "数据编排",
-        "LLM"
-      ],
-      "title": "DataOrchestra: Learning to Orchestrate Per-Example Curation of Pretraining Data",
-      "tracking_signal": "关注DataOrchestra的代码是否开源，以及其编排策略是否会被集成到Hugging Face的datasets库或NVIDIA NeMo等主流数据管线中。",
-      "why_it_matters": "预训练数据处理是决定大模型性能的关键环节，但现有方法多为语料库级别的固定策略。DataOrchestra提出的逐样本自适应编排思路，能够更精细地提升数据质量，同时优化处理算力。这对于追求高效、高质量预训练的大模型团队来说，提供了一种可落地的数据工程新范式。"
-    },
-    {
-      "canonical_url": "https://github.com/cline/cline/releases/tag/sdk/sdk/v0.0.66",
+      "canonical_url": "https://github.com/cline/cline/releases/tag/desktop-v0.0.7",
       "category": "Coding Agent",
-      "id": "5f442173ebc0ade6",
+      "id": "233277f5817fb142",
       "importance": 6,
       "is_official": true,
       "marketing_risk": "low",
-      "original_title": "SDK v0.0.66",
-      "published_at": "2026-07-28T22:35:13Z",
+      "original_title": "Desktop v0.0.7",
+      "published_at": "2026-07-29T01:43:59Z",
       "source": "Cline",
-      "summary": "Cline SDK 发布 v0.0.66 版本，支持免费模型，将代理压缩设为默认策略并修复了相关回退与切点问题，实现了连接器会话持久化与自动重连，持久化多项设置，扩展了内置提供商列表，修复了编辑器行尾符处理，并增强了遥测功能。",
+      "summary": "Cline 发布桌面应用 v0.0.7 版本，新增系统托盘图标显示应用状态和代理会话数量，会话历史支持分页和收藏，子代理和队友运行状态可见，聊天界面优化了工具图标、思考时间和推理样式，支持免费 Cline 模型并显示限制重置时间，修复了中国/国际端点切换、工具调用参数类型错误等问题，并刷新了内置模型目录。",
       "tags": [
-        "Cline SDK",
-        "免费模型",
-        "代理压缩",
-        "连接器持久化",
-        "遥测"
+        "Cline",
+        "桌面应用",
+        "Coding Agent",
+        "用户体验"
       ],
-      "title": "SDK v0.0.66",
-      "tracking_signal": "关注 SDK 更新后下游应用的集成情况与代理压缩策略的实际表现。",
-      "why_it_matters": "SDK 更新为基于 Cline 构建的 Coding Agent 提供了更稳定的基础能力，特别是代理压缩默认化与连接器持久化，直接提升代理的自主性与可靠性。"
+      "title": "Desktop v0.0.7",
+      "tracking_signal": "关注免费模型的使用限制和用户反馈，以及桌面应用在复杂代理任务中的稳定性表现。",
+      "why_it_matters": "该版本显著提升了 Cline 桌面应用的用户体验和功能完整性，特别是免费模型支持和会话管理优化，降低了使用门槛。修复端点切换和参数类型错误等关键问题，增强了跨区域用户的可用性和代理执行的稳定性。"
+    },
+    {
+      "canonical_url": "https://arxiv.org/abs/2607.26043v1",
+      "category": "论文研究",
+      "id": "870a2a65b424bd50",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Re-thinking Mammography Transfer Learning: The Dataset-Informed Transfer Learning (DITL) Framework for Breast Cancer Screening and Lesion Diagnosis",
+      "published_at": "2026-07-28T17:52:36Z",
+      "source": "arXiv AI",
+      "summary": "论文提出 DITL 框架，用于乳腺 X 光影像的迁移学习。该框架整合了数据集驱动的难度信号和基于邻域的三元组监督，包含自适应难度加权交叉熵和自适应邻域表示三元组两个组件。在大规模数据集和小型 ROI 数据集上，DITL 在乳腺癌筛查和病变诊断任务中均取得了最先进的性能，且无需超参数调优。",
+      "tags": [
+        "医学影像",
+        "迁移学习",
+        "乳腺癌筛查",
+        "AI 诊断",
+        "数据集自适应"
+      ],
+      "title": "Re-thinking Mammography Transfer Learning: The Dataset-Informed Transfer Learning (DITL) Framework for Breast Cancer Screening and Lesion Diagnosis",
+      "tracking_signal": "关注该框架在其他医学影像任务和模态上的泛化能力，以及是否有临床部署的试点研究。",
+      "why_it_matters": "该研究为医学影像分析中的迁移学习提供了新的范式，通过自适应地利用数据集内在特性，显著提升了乳腺癌筛查和诊断的准确性。其无需调参和计算开销小的特点，使其具有很强的临床落地潜力，有助于推动 AI 辅助诊断的普及。"
+    },
+    {
+      "canonical_url": "https://arxiv.org/abs/2607.26023v1",
+      "category": "大模型",
+      "id": "8c4207d306394e55",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "CHARM: A Multimodal Graph Foundation Model with Hierarchical Context Modeling for Zero-Shot Transfer",
+      "published_at": "2026-07-28T17:35:26Z",
+      "source": "arXiv AI",
+      "summary": "本文提出了CHARM，一个用于多模态图零样本迁移的基础模型。针对现有图基础模型需要下游适配或仅处理单模态图的问题，CHARM通过分层上下文建模来解决两大挑战：跨模态关系泛化和目标域无监督下的节点表征纠缠。CHARM用分层图上下文替代孤立的原始节点，捕获多模态语义和跨模态关系，将特定领域的节点模式映射到共享的高级概念，减少对目标域监督的依赖。其模态感知的图上下文编码器将多模态信息与图结构融合，并转换为图令牌供大语言模型处理。实验表明，CHARM在零样本多模态图任务上取得了持续改进。",
+      "tags": [
+        "图基础模型",
+        "多模态学习",
+        "零样本迁移",
+        "大语言模型",
+        "图神经网络"
+      ],
+      "title": "CHARM: A Multimodal Graph Foundation Model with Hierarchical Context Modeling for Zero-Shot Transfer",
+      "tracking_signal": "关注该模型是否开源，以及其在更广泛的多模态图基准测试（如多模态知识图谱补全、视觉关系检测）上的表现，特别是与需要微调的方法相比的竞争力。",
+      "why_it_matters": "现实世界的图数据（如社交网络、知识图谱）常包含文本、图像等多种模态，且为新领域标注数据成本高昂。CHARM模型通过结合图神经网络和大语言模型，实现了对多模态图的零样本迁移学习，无需目标域微调。这大大降低了将图学习应用于新领域的门槛，对于构建能够理解复杂、多模态关系网络的通用人工智能系统具有重要意义，可广泛应用于推荐系统、药物发现、社交网络分析等场景。"
+    },
+    {
+      "canonical_url": "https://arxiv.org/abs/2607.26016v1",
+      "category": "论文研究",
+      "id": "21b5f489b6355364",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "MDTransformer: A Hardware-Software Co-Design of Mode-Division Photonic Transformer Accelerator with Inverse-Designed Coherent Crossbar",
+      "published_at": "2026-07-28T17:27:49Z",
+      "source": "arXiv AI",
+      "summary": "本文提出MDTransformer，一种基于模分复用的光子Transformer加速器的软硬件协同设计方案。该设计利用空间模式干涉执行复杂矩阵运算，通过逆向设计的多模耦合器、交叉器和IQ调制器构成紧凑的模分光子张量核心（MPTC）。每个导模（TE0-TE3）作为独立计算通道，实现单波导四倍并行度，无需光谱滤波。其相干检测和IQ调制联合编码幅度和相位，实现复数运算。MDTransformer提供亚4位有效精度的模拟乘法和低于-30dB的模间串扰。实验结果显示，与最先进的光子Transformer加速器相比，MDTransformer在多种工作负载（DeiT、BERT）上实现了40.4%的面积减少、63.6%的功耗节省和40.6%的能耗节省，同时保持可比延迟。",
+      "tags": [
+        "光子计算",
+        "Transformer加速器",
+        "模分复用",
+        "软硬件协同设计",
+        "AI硬件"
+      ],
+      "title": "MDTransformer: A Hardware-Software Co-Design of Mode-Division Photonic Transformer Accelerator with Inverse-Designed Coherent Crossbar",
+      "tracking_signal": "关注该设计是否进行了流片验证，以及其在实际系统级集成中的性能表现。同时，留意其逆向设计方法是否被其他光子计算项目采用。",
+      "why_it_matters": "随着Transformer模型规模不断增长，传统电子加速器面临功耗和速度瓶颈。光子计算是突破这些瓶颈的潜在颠覆性技术。MDTransformer通过创新的模分复用方案，解决了现有光子加速器依赖昂贵多波长光源和大型点积单元的问题，显著提升了集成度、能效和实用性。这项工作为构建高性能、低能耗的下一代AI推理硬件提供了切实可行的技术路径，对推动光子AI芯片的产业化具有重要意义。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/scientific-computing-agentic-ai",
+      "category": "论文研究",
+      "id": "824b5ba22f1e74f5",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Scientific computing in the age of agentic AI",
+      "published_at": "2026-07-28T17:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 发布了一份现场报告，展示科学家如何利用 AI 编码代理来现代化科学计算，加速基因组学等领域的软件开发和科学发现。",
+      "tags": [
+        "AI 编码代理",
+        "科学计算",
+        "基因组学",
+        "OpenAI"
+      ],
+      "title": "Scientific computing in the age of agentic AI",
+      "tracking_signal": "追踪该报告是否引发学术界对 AI 编码代理在科研中应用的进一步讨论或实证研究。",
+      "why_it_matters": "该报告揭示了 AI 编码代理在科学研究中的实际应用案例，特别是在基因组学等计算密集型领域，可能推动科研方法的变革。作为官方发布的现场报告，它为 AI 在科学计算中的落地提供了实证参考，对学术界和产业界均有启发意义。"
     },
     {
       "canonical_url": "https://huggingface.co/blog/allenai/olmoearth-infrastructure",
@@ -230,217 +406,44 @@
       "original_title": "The OlmoEarth Platform: Geospatial inference at planetary scale",
       "published_at": "2026-07-28T16:27:42Z",
       "source": "Hugging Face",
-      "summary": "OlmoEarth 是一个用于行星尺度地理空间推理的平台，由 Hugging Face 发布。该平台旨在提供大规模地理空间数据的推理能力。",
+      "summary": "OlmoEarth 平台是一个用于行星尺度地理空间推理的开源项目，由 Hugging Face 发布。该平台旨在提供大规模地理空间数据的推理能力。",
       "tags": [
         "地理空间",
-        "推理平台",
-        "Hugging Face"
+        "开源平台",
+        "Hugging Face",
+        "行星尺度"
       ],
       "title": "The OlmoEarth Platform: Geospatial inference at planetary scale",
-      "tracking_signal": "关注该平台后续发布的具体模型、数据集、API 接口以及社区采用情况，评估其在实际地理空间任务中的性能表现。",
-      "why_it_matters": "行星尺度的地理空间推理对于气候监测、城市规划、灾害响应等全球性挑战至关重要。该平台的开源性质可能降低相关领域的技术门槛，促进研究和应用的发展。"
+      "tracking_signal": "关注该平台的实际应用案例、模型性能基准测试以及社区采用情况。",
+      "why_it_matters": "行星尺度的地理空间推理是一个具有挑战性的技术领域，涉及大规模数据处理和模型部署。该开源项目可能为环境监测、城市规划、灾害响应等领域提供新的技术基础，体现了 AI 在地理科学中的应用潜力。"
     },
     {
-      "canonical_url": "https://blog.google/innovation-and-ai/technology/developers-tools/expanding-managed-agents-gemini-api-3-6-flash-hooks",
-      "category": "Agent",
-      "id": "9c57623ef609667d",
-      "importance": 6,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Gemini API Managed Agents: 3.6 Flash, hooks, and more",
-      "published_at": "2026-07-28T16:00:00Z",
-      "source": "Google AI",
-      "summary": "Google AI 宣布 Gemini API 托管代理功能更新，引入 3.6 Flash 模型、钩子与触发器机制。",
-      "tags": [
-        "Gemini API",
-        "托管代理",
-        "3.6 Flash",
-        "钩子",
-        "触发器"
-      ],
-      "title": "Gemini API Managed Agents: 3.6 Flash, hooks, and more",
-      "tracking_signal": "关注开发者社区对钩子与触发器功能的实际使用反馈，以及 3.6 Flash 模型在代理任务中的性能表现。",
-      "why_it_matters": "托管代理功能结合新模型与钩子机制，可能简化开发者构建自主代理的流程，增强代理的定制化与事件驱动能力，对 Agent 开发生态有直接推动作用。"
-    },
-    {
-      "canonical_url": "https://arxiv.org/abs/2607.24732v1",
-      "category": "论文研究",
-      "id": "47f047502cd744ee",
-      "importance": 6,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Learning Distributions from Multiple Data Providers",
-      "published_at": "2026-07-27T17:57:16Z",
-      "source": "arXiv AI",
-      "summary": "论文研究从多个异构数据提供者处学习分布的理论模型。学习者通过查询一组固定的条件集合来获取样本。研究发现，学习的可行性由查询集合的共现图决定：点态一致性要求图在目标支撑集上连通，而 PAC 学习要求图是完全图。论文给出了 PAC 学习的样本复杂度界限，并识别了可实现近乎线性复杂度的结构条件。",
-      "tags": [
-        "分布学习",
-        "PAC学习",
-        "理论计算机科学",
-        "数据提供者"
-      ],
-      "title": "Learning Distributions from Multiple Data Providers",
-      "tracking_signal": "关注该理论成果是否会被后续研究应用于实际的联邦学习或数据分析算法设计中，以改进其查询策略和样本效率。",
-      "why_it_matters": "该研究为联邦学习、隐私保护数据分析等场景提供了理论基础，这些场景中数据常以受限的条件样本形式提供。它揭示了数据提供者的结构（共现图）如何根本性地决定学习任务的难度和效率，为设计更优的数据协作和查询策略提供了理论指导。"
-    },
-    {
-      "canonical_url": "https://arxiv.org/abs/2607.24714v1",
-      "category": "AI 工具",
-      "id": "8d6ed760ab7fcb3a",
-      "importance": 6,
-      "is_official": true,
-      "marketing_risk": "medium",
-      "original_title": "Efficient LLM-Generated Shuttling Compilers for Complex Trapped-Ion Architectures",
-      "published_at": "2026-07-27T17:51:18Z",
-      "source": "arXiv AI",
-      "summary": "该研究首次展示使用前沿大语言模型（Claude Opus 4.7和Claude Fable 5）从书面规范自动生成并迭代优化离子阱量子计算机的穿梭编译器完整Python代码。从线性分段阱到带连接点的阱，再到通用连接阱图，LLM生成的编译器在穿梭时间步数上相比人工设计的编译器最高减少了76%和39%，将新架构的开发时间从数月缩短至数天。",
-      "tags": [
-        "代码生成",
-        "量子计算",
-        "编译器",
-        "Claude",
-        "AI辅助编程"
-      ],
-      "title": "Efficient LLM-Generated Shuttling Compilers for Complex Trapped-Ion Architectures",
-      "tracking_signal": "关注该编译器生成方法是否会被推广到其他量子计算架构（如超导量子比特），以及Anthropic是否会将其作为Claude在科学计算领域的标杆案例进行宣传。",
-      "why_it_matters": "该工作证明了未经修改的通用大模型能够直接生成专业领域内具有竞争力的编译器代码，显著降低了量子计算硬件编译器的开发门槛和周期。这不仅是AI辅助编程在高度专业化领域的成功应用，也为其他科学计算领域的代码生成提供了参考范式。"
-    },
-    {
-      "canonical_url": "https://arxiv.org/abs/2607.24692v1",
-      "category": "论文研究",
-      "id": "b2cb816e9499c37c",
-      "importance": 6,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Denial of Deadline: Network-Driven Accuracy Collapse in Distributed Inference Pipelines",
-      "published_at": "2026-07-27T17:34:09Z",
-      "source": "arXiv AI",
-      "summary": "该研究揭示了分布式推理管道中一种新的攻击面：攻击者通过构造突发性工作负载（如Yo-Yo bursts），利用慢路径上的共享资源竞争，导致良性用户的慢路径预测结果超过延迟截止时间而被丢弃，从而引发“精度坍塌”。在自动驾驶多目标跟踪的边云协同推理模拟中，约4000个突发请求使良性用户P99延迟从92ms增至2s，目标跟踪质量平均下降7.0 HOTA点，且对特定稀有类别（如停车标志）的预测精度损失近半。",
-      "tags": [
-        "分布式推理",
-        "安全攻击",
-        "边云协同",
-        "自动驾驶",
-        "精度坍塌"
-      ],
-      "title": "Denial of Deadline: Network-Driven Accuracy Collapse in Distributed Inference Pipelines",
-      "tracking_signal": "关注该攻击面是否会在工业界分布式推理框架（如NVIDIA Triton、Ray Serve）中引发安全补丁或防御机制的研究，以及是否会有针对此类攻击的CVE编号被分配。",
-      "why_it_matters": "随着边云协同推理在自动驾驶等安全关键领域的应用增多，该研究揭示了一种无需访问模型权重或数据即可降低推理精度的新型攻击方式。这为分布式推理系统的路由、合并、调度和资源隔离机制设计敲响了安全警钟，具有重要的现实安全意义。"
-    },
-    {
-      "canonical_url": "https://github.com/cline/cline/releases/tag/cli-v3.0.47",
+      "canonical_url": "https://github.com/cline/cline/releases/tag/v4.0.12",
       "category": "Coding Agent",
-      "id": "1ea45a82155afbed",
+      "id": "2fc7f1556b6fa913",
       "importance": 5,
       "is_official": true,
       "marketing_risk": "low",
-      "original_title": "CLI v3.0.47",
-      "published_at": "2026-07-28T22:44:40Z",
+      "original_title": "v4.0.12",
+      "published_at": "2026-07-28T23:01:47Z",
       "source": "Cline",
-      "summary": "Cline CLI 发布 v3.0.47 版本，全面支持免费 Cline 模型，设置项持久化，升级 TUI 堆栈，修复了多个界面与稳定性问题，并将代理压缩设为默认上下文压缩策略，同时改进了编辑器对行尾符的处理。",
+      "summary": "Cline 发布 v4.0.12 版本，新增对免费 Cline 模型的支持，在模型选择器中显示为“(free)”，并在达到免费限制时显示包含重置时间的专用错误卡片。修复了 Claude Code 在因最大轮次错误退出时丢弃已流式传输响应的问题。",
       "tags": [
-        "Cline CLI",
+        "Cline",
         "免费模型",
-        "代理压缩",
-        "TUI升级",
-        "持久化设置"
+        "Claude Code",
+        "版本发布"
       ],
-      "title": "CLI v3.0.47",
-      "tracking_signal": "跟踪代理压缩策略在实际编码任务中的效果与用户反馈，以及 TUI 升级后的稳定性。",
-      "why_it_matters": "该版本通过免费模型、设置持久化与默认代理压缩等改进，显著提升了 CLI 工具的易用性与智能压缩能力，对开发者日常使用有实际价值。"
-    },
-    {
-      "canonical_url": "https://openai.com/index/scientific-computing-agentic-ai",
-      "category": "论文研究",
-      "id": "824b5ba22f1e74f5",
-      "importance": 5,
-      "is_official": true,
-      "marketing_risk": "medium",
-      "original_title": "Scientific computing in the age of agentic AI",
-      "published_at": "2026-07-28T17:00:00Z",
-      "source": "OpenAI",
-      "summary": "OpenAI 发布了一份关于科学家如何利用 AI 编码代理现代化科学计算的现场报告，展示了在基因组学等领域加速软件开发与发现的应用。",
-      "tags": [
-        "科学计算",
-        "AI编码代理",
-        "基因组学",
-        "OpenAI"
-      ],
-      "title": "Scientific computing in the age of agentic AI",
-      "tracking_signal": "跟踪该报告是否引发学术界对 AI 编码代理的广泛讨论或后续实证研究。",
-      "why_it_matters": "该报告揭示了 AI 编码代理在科学研究中的实际应用价值，可能推动更多科研领域采用 AI 工具加速创新，但作为报告而非技术突破，其影响力相对有限。"
-    },
-    {
-      "canonical_url": "https://github.com/crewAIInc/crewAI/releases/tag/1.15.8",
-      "category": "Agent",
-      "id": "6019772f1b4c66c8",
-      "importance": 5,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "1.15.8",
-      "published_at": "2026-07-28T15:06:04Z",
-      "source": "CrewAI",
-      "summary": "CrewAI 发布 1.15.8 版本，新增了用于长时间运行任务暂停的 WaitTool 功能，修复了 FileWriterTool 的文件写入问题，并将 E2B_API_KEY 标记为 E2B 工具的必要环境变量，同时更新了模型可用性文档。",
-      "tags": [
-        "CrewAI",
-        "版本更新",
-        "多智能体",
-        "工具"
-      ],
-      "title": "1.15.8",
-      "tracking_signal": "关注 WaitTool 在实际多 Agent 协作场景中的使用案例，以及 E2B 工具集成后的用户反馈。",
-      "why_it_matters": "CrewAI 是构建多智能体系统的流行框架。新增的 WaitTool 增强了其对长时间运行任务的控制能力，文件工具的修复提升了稳定性，这些改进有助于开发者构建更健壮、更复杂的 Agent 工作流。"
-    },
-    {
-      "canonical_url": "https://arxiv.org/abs/2607.24707v1",
-      "category": "论文研究",
-      "id": "7cbc4d2c27eee27f",
-      "importance": 5,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "ERUnderstand: Evaluating Vision-Language Models on Structured ER Diagrams",
-      "published_at": "2026-07-27T17:46:43Z",
-      "source": "arXiv AI",
-      "summary": "ERUnderstand是首个大规模评估视觉语言模型（VLMs）理解实体关系图（ER图）结构化信息的基准测试，包含2960张来自教育、真实世界和合成生成的ER图。评估发现，当前最先进的VLMs在恢复常见ER元素上表现可靠（F1>0.74），但在弱实体（F1低至0.28）、多值属性（0.14）和N元关系（0.07）上性能急剧下降。推理增强模型可提升15-25%的整体性能，但仍受语言先验和图表复杂度影响。",
-      "tags": [
-        "视觉语言模型",
-        "基准测试",
-        "ER图",
-        "多模态理解",
-        "数据库设计"
-      ],
-      "title": "ERUnderstand: Evaluating Vision-Language Models on Structured ER Diagrams",
-      "tracking_signal": "关注该基准是否会被纳入主流多模态模型（如GPT-4o、Gemini）的官方评测榜单，以及其揭示的弱实体识别问题是否会催生新的训练数据或模型架构。",
-      "why_it_matters": "ER图是数据库设计的核心，但其通常以图像形式存在，限制了AI辅助数据库工程的发展。该基准测试揭示了当前多模态大模型在理解结构化图表方面的具体短板，为改进VLMs的图表理解能力提供了明确的评估标准和改进方向，对数据库工程自动化有推动作用。"
-    },
-    {
-      "canonical_url": "https://arxiv.org/abs/2607.24688v1",
-      "category": "论文研究",
-      "id": "3ae84c86ff070fda",
-      "importance": 5,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Beyond Scale and Generation: Understanding Language Model-based Entity Matching",
-      "published_at": "2026-07-27T17:29:18Z",
-      "source": "arXiv AI",
-      "summary": "该研究通过控制变量实验（涵盖3种匹配器架构、3种模型变体、3种模型规模和9个数据集，共1215次微调运行），系统解耦了影响语言模型实体匹配性能的因素。发现模型变体对双编码器至关重要，嵌入导向变体提供更优的表示几何；交叉编码器因联合编码记录对而保持优势，但大模型可缩小差距；生成式匹配器并非普遍优于交叉编码器，其优势集中在分布偏移和跨数据集迁移场景；此外，更大模型更依赖捷径学习，未必性能更好。",
-      "tags": [
-        "实体匹配",
-        "语言模型",
-        "双编码器",
-        "交叉编码器",
-        "分布偏移"
-      ],
-      "title": "Beyond Scale and Generation: Understanding Language Model-based Entity Matching",
-      "tracking_signal": "关注该研究的结论是否会影响实体匹配领域基准测试（如WDC、Magellan）的评估协议设计，以及其代码库是否会被集成到数据集成工具（如OpenRefine）中。",
-      "why_it_matters": "实体匹配是数据集成和清洗的基础任务。该研究澄清了长期以来关于不同匹配架构优劣的混淆，指出模型变体和分布偏移才是关键因素，而非单纯的模型规模或生成能力。这为后续实体匹配研究和基准设计提供了更严谨的方法论指导，避免盲目追求大模型。"
+      "title": "v4.0.12",
+      "tracking_signal": "观察免费模型的使用量和限制策略对用户留存的影响。",
+      "why_it_matters": "免费模型支持降低了新用户的试用成本，有助于扩大用户基础。修复 Claude Code 响应丢失问题提升了代理交互的可靠性，避免有效结果被浪费。"
     }
   ],
   "model": "deepseek-v4-pro",
   "schema_version": "1.0",
   "source_runs": [
     {
-      "elapsed_ms": 536,
+      "elapsed_ms": 743,
       "error_type": null,
       "item_count": 1052,
       "source_id": "openai",
@@ -448,7 +451,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 970,
+      "elapsed_ms": 849,
       "error_type": null,
       "item_count": 20,
       "source_id": "google-ai",
@@ -456,7 +459,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1036,
+      "elapsed_ms": 781,
       "error_type": null,
       "item_count": 100,
       "source_id": "deepmind",
@@ -464,7 +467,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 728,
+      "elapsed_ms": 296,
       "error_type": null,
       "item_count": 833,
       "source_id": "hugging-face",
@@ -472,7 +475,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 783,
+      "elapsed_ms": 341,
       "error_type": null,
       "item_count": 40,
       "source_id": "arxiv-ai",
@@ -480,7 +483,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1836,
+      "elapsed_ms": 1077,
       "error_type": "HttpFetchError",
       "item_count": 0,
       "source_id": "github-codex",
@@ -488,7 +491,7 @@
       "success": false
     },
     {
-      "elapsed_ms": 828,
+      "elapsed_ms": 778,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-claude-code",
@@ -496,7 +499,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 529,
+      "elapsed_ms": 703,
       "error_type": null,
       "item_count": 2,
       "source_id": "github-gemini-cli",
@@ -504,7 +507,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 436,
+      "elapsed_ms": 348,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-langchain",
@@ -512,7 +515,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 460,
+      "elapsed_ms": 301,
       "error_type": null,
       "item_count": 7,
       "source_id": "github-crewai",
@@ -520,7 +523,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 625,
+      "elapsed_ms": 438,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-llama-index",
@@ -528,7 +531,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 388,
+      "elapsed_ms": 296,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-transformers",
@@ -536,7 +539,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 547,
+      "elapsed_ms": 323,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-vllm",
@@ -544,7 +547,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 453,
+      "elapsed_ms": 392,
       "error_type": null,
       "item_count": 8,
       "source_id": "github-ollama",
@@ -552,7 +555,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 316,
+      "elapsed_ms": 294,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-cline",
