@@ -9,6 +9,7 @@ import httpx
 
 _ALLOWED_SUFFIXES = frozenset({"chat/completions", "v1/messages"})
 _ARK_HOST = "ark.cn-beijing.volces.com"
+_ARK_CODING_OPENAI_BASE_PATH = "/api/coding/v3"
 _DNS_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", re.ASCII)
 _ENCODED_SEPARATOR = re.compile(r"%(?:2f|5c)", re.IGNORECASE)
 _INVALID_PERCENT_ESCAPE = re.compile(r"%(?![0-9a-fA-F]{2})")
@@ -118,10 +119,12 @@ def validate_llm_base_url(value: str) -> str:
     )
     comparable_path = normalized_path.casefold()
 
-    if canonical_host == _ARK_HOST and (
-        comparable_path == "/api/coding" or comparable_path.startswith("/api/coding/")
+    if (
+        canonical_host == _ARK_HOST
+        and (comparable_path == "/api/coding" or comparable_path.startswith("/api/coding/"))
+        and normalized_path != _ARK_CODING_OPENAI_BASE_PATH
     ):
-        raise _invalid("Ark Coding Plan endpoints are not allowed.")
+        raise _invalid("Unsupported Ark Coding Plan endpoint.")
     if any(comparable_path.endswith(f"/{suffix}") for suffix in _ALLOWED_SUFFIXES):
         raise _invalid()
 

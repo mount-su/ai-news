@@ -19,6 +19,11 @@ from ai_news.llm.endpoint import (
             "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
         ),
         (
+            "https://ark.cn-beijing.volces.com/api/coding/v3",
+            "chat/completions",
+            "https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions",
+        ),
+        (
             "https://api.anthropic.com",
             "v1/messages",
             "https://api.anthropic.com/v1/messages",
@@ -46,19 +51,36 @@ def test_build_llm_endpoint_preserves_safe_base_path(
 @pytest.mark.parametrize(
     "base_url",
     [
-        "https://ark.cn-beijing.volces.com/api/coding",
-        "https://ark.cn-beijing.volces.com/api/coding/",
         "https://ark.cn-beijing.volces.com/api/coding/v3",
-        "https://ark.cn-beijing.volces.com/API/CODING",
-        "https://ark.cn-beijing.volces.com/Api/Coding/v3",
-        "https://ARK.CN-BEIJING.VOLCES.COM/api/v3/../coding",
-        "https://ark.cn-beijing.volces.com/api%2fcoding",
-        "https://ark.cn-beijing.volces.com/api%252fcoding",
-        "https://ark.cn-beijing.volces.com/api%5ccoding",
+        "https://ark.cn-beijing.volces.com/api/coding/v3/",
+        "https://ARK.CN-BEIJING.VOLCES.COM/api/coding/v3",
     ],
 )
-def test_validate_llm_base_url_rejects_ark_coding_plan(base_url: str) -> None:
-    with pytest.raises(InvalidLLMEndpoint, match="not allowed"):
+def test_validate_llm_base_url_allows_exact_ark_coding_plan_openai_base(
+    base_url: str,
+) -> None:
+    assert validate_llm_base_url(base_url) == ("https://ark.cn-beijing.volces.com/api/coding/v3")
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "https://ark.cn-beijing.volces.com/api/coding",
+        "https://ark.cn-beijing.volces.com/api/coding/",
+        "https://ark.cn-beijing.volces.com/api/coding/v2",
+        "https://ark.cn-beijing.volces.com/api/coding/v3/tenant",
+        "https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions",
+        "https://ark.cn-beijing.volces.com/API/CODING/V3",
+        "https://ark.cn-beijing.volces.com/api/v3/../coding/v3",
+        "https://ark.cn-beijing.volces.com/api%2fcoding%2fv3",
+        "https://ark.cn-beijing.volces.com/api%252fcoding%252fv3",
+        "https://ark.cn-beijing.volces.com/api%5ccoding%5cv3",
+    ],
+)
+def test_validate_llm_base_url_rejects_non_exact_ark_coding_plan_paths(
+    base_url: str,
+) -> None:
+    with pytest.raises(InvalidLLMEndpoint):
         validate_llm_base_url(base_url)
 
 
