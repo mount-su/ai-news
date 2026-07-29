@@ -206,9 +206,7 @@ def test_request_uses_exact_ark_coding_plan_contract() -> None:
 
     assert list(result) == [candidate.id]
     request = captured[0]
-    assert str(request.url) == (
-        "https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions"
-    )
+    assert str(request.url) == ("https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions")
     assert request.headers["authorization"] == "Bearer top-secret-token"
     body = json.loads(request.content)
     assert body["model"] == "deepseek-v4-pro"

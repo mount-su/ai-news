@@ -165,10 +165,7 @@ def test_env_example_uses_safe_non_secret_placeholders() -> None:
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
 
     assert "LLM_PROTOCOL=openai-chat" in env_example
-    assert (
-        "LLM_BASE_URL=https://ark.cn-beijing.volces.com/api/coding/v3"
-        in env_example
-    )
+    assert "LLM_BASE_URL=https://ark.cn-beijing.volces.com/api/coding/v3" in env_example
     assert "LLM_API_" + "KEY=replace-with-a-repository-secret" in env_example
     assert "LLM_MODEL=deepseek-v4-pro" in env_example
     assert "LLM_AUTH_SCHEME=bearer" in env_example
