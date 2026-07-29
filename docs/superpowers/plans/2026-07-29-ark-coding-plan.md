@@ -74,6 +74,7 @@ Keep rejection coverage for all non-exact paths:
         "https://ark.cn-beijing.volces.com/api/coding/v2",
         "https://ark.cn-beijing.volces.com/api/coding/v3/tenant",
         "https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions",
+        "https://ark.cn-beijing.volces.com/API/CODING/V3",
         "https://ark.cn-beijing.volces.com/api/v3/../coding/v3",
         "https://ark.cn-beijing.volces.com/api%2fcoding%2fv3",
         "https://ark.cn-beijing.volces.com/api%252fcoding%252fv3",
@@ -112,12 +113,10 @@ Replace the blanket Ark Coding Plan branch with:
 ```python
 if canonical_host == _ARK_HOST and (
     comparable_path == "/api/coding"
-    or (
-        comparable_path.startswith("/api/coding/")
-        and comparable_path != _ARK_CODING_OPENAI_BASE_PATH
-    )
+    or comparable_path.startswith("/api/coding/")
 ):
-    raise _invalid("Unsupported Ark Coding Plan endpoint.")
+    if normalized_path != _ARK_CODING_OPENAI_BASE_PATH:
+        raise _invalid("Unsupported Ark Coding Plan endpoint.")
 ```
 
 Do not weaken the later encoded-separator, dot-segment, full-endpoint, userinfo, query, fragment,
