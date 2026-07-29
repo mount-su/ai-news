@@ -181,6 +181,46 @@ def test_request_uses_exact_ark_endpoint_headers_body_and_isolates_client_defaul
     assert "header-secret" not in rendered
 
 
+def test_request_uses_exact_ark_coding_plan_contract() -> None:
+    candidate = _candidate("coding-plan")
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(200, content=_openai_response([_analysis_row(candidate)]))
+
+    async def exercise() -> dict[str, Any]:
+        settings = Settings(
+            llm_protocol="openai-chat",
+            llm_base_url="https://ark.cn-beijing.volces.com/api/coding/v3",
+            llm_token=SecretStr("top-secret-token"),
+            llm_model="deepseek-v4-pro",
+            llm_auth_scheme="bearer",
+            site_base_path="/ai-news/",
+        )
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            analyzer = OpenAIChatAnalyzer(settings, client=client)
+            return await analyzer.analyze([candidate])
+
+    result = asyncio.run(exercise())
+
+    assert list(result) == [candidate.id]
+    request = captured[0]
+    assert str(request.url) == (
+        "https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions"
+    )
+    assert request.headers["authorization"] == "Bearer top-secret-token"
+    body = json.loads(request.content)
+    assert body["model"] == "deepseek-v4-pro"
+    assert body["thinking"] == {"type": "disabled"}
+    assert request.extensions["timeout"] == {
+        "connect": 120,
+        "read": 120,
+        "write": 120,
+        "pool": 120,
+    }
+
+
 @pytest.mark.parametrize("leak_stage", ["initial", "repair"])
 def test_openai_rejects_current_token_in_successful_analysis(
     leak_stage: str,

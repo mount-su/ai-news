@@ -53,6 +53,26 @@ def test_load_settings_reads_expected_environment_variables(
     assert settings.site_base_path == "/ai-news/"
 
 
+def test_load_settings_accepts_approved_ark_coding_plan_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LLM_PROTOCOL", "openai-chat")
+    monkeypatch.setenv(
+        "LLM_BASE_URL",
+        "https://ark.cn-beijing.volces.com/api/coding/v3",
+    )
+    monkeypatch.setenv("LLM_API_KEY", "test-secret")
+    monkeypatch.setenv("LLM_MODEL", "deepseek-v4-pro")
+    monkeypatch.setenv("LLM_AUTH_SCHEME", "bearer")
+
+    settings = load_settings()
+
+    assert settings.llm_base_url == "https://ark.cn-beijing.volces.com/api/coding/v3"
+    assert settings.llm_model == "deepseek-v4-pro"
+    assert settings.llm_token.get_secret_value() == "test-secret"
+    assert "test-secret" not in repr(settings)
+
+
 @pytest.mark.parametrize(
     ("field_name", "invalid_value", "sensitive_value"),
     [
@@ -335,7 +355,7 @@ def test_load_settings_rejects_coding_plan_url_without_echoing_key(
         load_settings()
 
     error = str(exc_info.value)
-    assert "Ark Coding Plan endpoints are not allowed" in error
+    assert "Unsupported Ark Coding Plan endpoint" in error
     assert "standard-api-secret" not in error
 
 
