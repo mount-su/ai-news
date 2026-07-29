@@ -7,8 +7,10 @@ JSON、Markdown 日报写入仓库，再用 Jinja 构建 GitHub Pages。
 预期 Pages 地址（完成部署后）：<https://mount-su.github.io/ai-news/>
 
 实现约束与决策见[设计规格](docs/superpowers/specs/2026-07-26-ai-news-github-pages-design.md)，
+当前模型接入边界见
+[Coding Plan 补充设计](docs/superpowers/specs/2026-07-29-ark-coding-plan-design.md)，
 模型接入与部署的当前步骤见
-[当前实施计划](docs/superpowers/plans/2026-07-27-standard-ark-api.md)。
+[当前实施计划](docs/superpowers/plans/2026-07-29-ark-coding-plan.md)。
 
 ## 它如何工作
 
@@ -88,17 +90,17 @@ python -m http.server 8000 --directory .preview
 ## 使用真实模型生成
 
 本项目支持 OpenAI Chat 和 Anthropic 两种协议适配器，运行时统一使用 `LLM_*`
-环境变量。标准 Ark API 使用 `/api/v3`；先在 provider 控制台确认当前标准账号可用的
-标准 API 模型 ID，不要根据 Coding Plan 中显示的模型名推测该值。
+环境变量。当前生产配置使用火山方舟 Coding Plan 的 OpenAI 兼容入口
+`https://ark.cn-beijing.volces.com/api/coding/v3` 和模型 `deepseek-v4-pro`。
+`deepseek-v4-pro` 是模型名，不是 `LLM_API_KEY`；后者必须是真实 API Key。
 
 真实密钥不能发送到聊天，也不能写入文件、命令历史、README、日志或仓库；应直接写入 GitHub Secret，
 或通过隐藏终端输入注入本地进程。下面的命令不会回显密钥：
 
 ```bash
 export LLM_PROTOCOL="openai-chat"
-export LLM_BASE_URL="https://ark.cn-beijing.volces.com/api/v3"
-read -r LLM_MODEL
-export LLM_MODEL
+export LLM_BASE_URL="https://ark.cn-beijing.volces.com/api/coding/v3"
+export LLM_MODEL="deepseek-v4-pro"
 export LLM_AUTH_SCHEME="bearer"
 read -r -s LLM_API_KEY
 export LLM_API_KEY
@@ -115,10 +117,10 @@ python -m ai_news build --root . --output .preview/ai-news
 python scripts/validate_site.py .preview/ai-news --base-path /ai-news/
 ```
 
-`/api/coding` 端点和 Coding Plan 密钥不能用于本项目；它们不适用于无人值守的非编码资讯摘要。
-配置检查会在发出网络请求前拒绝该端点。必须使用标准模型 API 凭证和在
-provider 控制台确认过的标准 API 模型 ID，不得通过更改请求标识、伪装客户端或其他
-方式绕过 provider 限制。
+配置检查只允许方舟官方主机的精确 Coding Plan OpenAI Base URL
+`/api/coding/v3`，并继续拒绝其他 Coding Plan 路径、完整请求端点、编码绕过、
+userinfo、query 和 fragment。真实 API Key 只通过 GitHub Secret 或隐藏终端输入
+提供，不能发送到聊天，也不能写入文件、README、日志或仓库。
 
 ## GitHub Secrets 与 Variables
 
@@ -126,24 +128,23 @@ provider 控制台确认过的标准 API 模型 ID，不得通过更改请求标
 
 | 类型 | 名称 | 用途 |
 | --- | --- | --- |
-| Variable | `LLM_PROTOCOL` | 协议；标准 Ark 使用 `openai-chat` |
-| Variable | `LLM_BASE_URL` | 标准 Ark 使用 `https://ark.cn-beijing.volces.com/api/v3` |
-| Variable | `LLM_MODEL` | provider 控制台确认的标准 API 模型 ID |
-| Variable | `LLM_AUTH_SCHEME` | 鉴权方案；标准 Ark 使用 `bearer` |
-| Secret | `LLM_API_KEY` | 标准模型 API 凭证 |
+| Variable | `LLM_PROTOCOL` | Coding Plan 使用 `openai-chat` |
+| Variable | `LLM_BASE_URL` | `https://ark.cn-beijing.volces.com/api/coding/v3` |
+| Variable | `LLM_MODEL` | `deepseek-v4-pro` |
+| Variable | `LLM_AUTH_SCHEME` | Coding Plan 使用 `bearer` |
+| Secret | `LLM_API_KEY` | 真实 API Key，不是模型名 |
 
 `SITE_BASE_PATH=/ai-news/` 已固定在 `.github/workflows/daily-news.yml`，不是第四个
 Repository Variable。GitHub Actions 只把 token 注入生成步骤；Secret 扫描在提交
 生成数据前执行。
 
-可以使用 GitHub CLI 配置非敏感 Variables。先把 provider 控制台中确认的标准 API
-模型 ID 填入 `LLM_MODEL`；Secret 必须直接通过 `gh secret set LLM_API_KEY` 的隐藏
-交互式输入设置，不能先保存到文件或发送到聊天：
+可以使用 GitHub CLI 配置非敏感 Variables。Secret 必须直接通过
+`gh secret set LLM_API_KEY` 的隐藏交互式输入设置，不能先保存到文件或发送到聊天：
 
 ```bash
 gh variable set LLM_PROTOCOL --body openai-chat --repo mount-su/ai-news
-gh variable set LLM_BASE_URL --body https://ark.cn-beijing.volces.com/api/v3 --repo mount-su/ai-news
-gh variable set LLM_MODEL --body "<provider-console-model-id>" --repo mount-su/ai-news
+gh variable set LLM_BASE_URL --body https://ark.cn-beijing.volces.com/api/coding/v3 --repo mount-su/ai-news
+gh variable set LLM_MODEL --body deepseek-v4-pro --repo mount-su/ai-news
 gh variable set LLM_AUTH_SCHEME --body bearer --repo mount-su/ai-news
 gh secret set LLM_API_KEY --repo mount-su/ai-news
 ```

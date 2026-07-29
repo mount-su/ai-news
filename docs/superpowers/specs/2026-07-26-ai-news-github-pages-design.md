@@ -1,10 +1,16 @@
 # AI 情报雷达：GitHub Pages + GitHub Actions 设计
 
-## 2026-07-27 模型协议补充
+## 2026-07-29 Coding Plan 补充
+
+当前生产模型配置、Coding Plan 精确端点安全边界和验收要求已由
+`docs/superpowers/specs/2026-07-29-ark-coding-plan-design.md` 更新。发生冲突时，
+以该补充设计为准；采集、排序、存储、站点和发布阈值继续以本文为准。
+
+## 2026-07-27 模型协议历史补充
 
 模型配置、协议选择和 Coding Plan 安全边界已由
 `docs/superpowers/specs/2026-07-27-standard-ark-api-design.md` 更新。发生冲突时，
-以该补充设计为准；采集、排序、存储、站点和发布阈值继续以本文为准。
+该文档仅作为标准 Ark 接入的历史记录。
 
 ## 1. 目标
 

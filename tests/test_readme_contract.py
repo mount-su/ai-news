@@ -65,10 +65,9 @@ def test_readme_documents_exact_repository_configuration() -> None:
         "LLM_AUTH_SCHEME",
     ]:
         assert variable in readme
-    assert "https://ark.cn-beijing.volces.com/api/v3" in readme
+    assert "https://ark.cn-beijing.volces.com/api/coding/v3" in readme
+    assert "deepseek-v4-pro" in readme
     assert "gh secret set LLM_API_KEY" in readme
-    assert "/api/coding" in readme
-    assert "不能用于" in readme
     assert "SITE_BASE_PATH=/ai-news/" in readme
     assert "08:17" in readme
     assert "Asia/Shanghai" in readme
@@ -90,8 +89,7 @@ def test_readme_documents_automation_recovery_and_safety_boundaries() -> None:
         "降级",
         "最后一次成功部署",
         "Coding Plan",
-        "无人值守的非编码资讯摘要",
-        "标准模型 API 凭证",
+        "真实 API Key",
         "不保存文章全文",
         "聊天、截图、日志或本地环境中的凭证",
     ]
@@ -104,14 +102,14 @@ def test_readme_links_the_design_and_implementation_plan() -> None:
     readme = _readme()
 
     assert "docs/superpowers/specs/2026-07-26-ai-news-github-pages-design.md" in readme
-    assert "docs/superpowers/plans/2026-07-27-standard-ark-api.md" in readme
+    assert "docs/superpowers/plans/2026-07-29-ark-coding-plan.md" in readme
     assert "当前实施计划" in readme
     assert "docs/superpowers/plans/2026-07-26-ai-news-github-pages.md" not in readme
 
 
 def test_superseded_plan_warns_before_any_executable_content() -> None:
     old_plan = OLD_IMPLEMENTATION_PLAN.read_text(encoding="utf-8")
-    canonical_plan = "docs/superpowers/plans/2026-07-27-standard-ark-api.md"
+    canonical_plan = "docs/superpowers/plans/2026-07-29-ark-coding-plan.md"
 
     assert old_plan.startswith("> [!WARNING]\n")
     warning_end = old_plan.index("# AI 情报雷达 Implementation Plan")
@@ -167,21 +165,23 @@ def test_env_example_uses_safe_non_secret_placeholders() -> None:
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
 
     assert "LLM_PROTOCOL=openai-chat" in env_example
-    assert "LLM_BASE_URL=https://ark.cn-beijing.volces.com/api/v3" in env_example
+    assert (
+        "LLM_BASE_URL=https://ark.cn-beijing.volces.com/api/coding/v3"
+        in env_example
+    )
     assert "LLM_API_" + "KEY=replace-with-a-repository-secret" in env_example
-    assert "LLM_MODEL=replace-with-a-standard-api-model-id" in env_example
+    assert "LLM_MODEL=deepseek-v4-pro" in env_example
     assert "LLM_AUTH_SCHEME=bearer" in env_example
     assert "SITE_BASE_PATH=/ai-news/" in env_example
 
 
-def test_readme_documents_standard_ark_operator_boundaries() -> None:
+def test_readme_documents_ark_coding_plan_operator_boundaries() -> None:
     readme = _readme()
 
     required_fragments = [
-        "`/api/coding` 端点和 Coding Plan 密钥不能用于本项目",
-        "标准 Ark API 使用 `/api/v3`",
-        "provider 控制台",
-        "标准 API 模型 ID",
+        "https://ark.cn-beijing.volces.com/api/coding/v3",
+        "`deepseek-v4-pro` 是模型名",
+        "不是 `LLM_API_KEY`",
         "直接写入 GitHub Secret",
         "隐藏终端输入",
         "不能发送到聊天",
@@ -194,9 +194,9 @@ def test_readme_documents_standard_ark_operator_boundaries() -> None:
         assert fragment in readme
 
 
-def test_original_design_points_to_the_canonical_protocol_supplement() -> None:
+def test_original_design_points_to_the_canonical_coding_plan_supplement() -> None:
     design = DESIGN.read_text(encoding="utf-8")
 
-    assert "## 2026-07-27 模型协议补充" in design
-    assert "docs/superpowers/specs/2026-07-27-standard-ark-api-design.md" in design
+    assert "## 2026-07-29 Coding Plan 补充" in design
+    assert "docs/superpowers/specs/2026-07-29-ark-coding-plan-design.md" in design
     assert "以该补充设计为准" in design
