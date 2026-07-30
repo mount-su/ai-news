@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from ai_news.models import Candidate, Category, RawItem
+from ai_news.pipeline import rank as rank_module
 from ai_news.pipeline.normalize import to_candidate
 from ai_news.pipeline.rank import candidate_score, select_candidates
 
@@ -18,10 +20,11 @@ def _candidate(
     weight: int = 5,
     age_hours: float = 1,
     official: bool = False,
+    source_id: str | None = None,
 ) -> Candidate:
     return to_candidate(
         RawItem(
-            source_id=f"source-{slug}",
+            source_id=source_id or f"source-{slug}",
             source_name=f"Source {slug}",
             source_weight=weight,
             title=title,
@@ -133,3 +136,47 @@ def test_select_candidates_enforces_limit_without_mutating_input() -> None:
     assert len(items) == 4
     with pytest.raises(ValueError, match="limit"):
         select_candidates(items, NOW, limit=-1)
+
+
+def test_select_balanced_candidates_caps_each_source_and_total_deterministically() -> None:
+    dominant = [
+        _candidate(f"a-{index}", "Launch", source_id="source-a") for index in range(20)
+    ]
+    diverse = [
+        _candidate(
+            f"{source}-{index}",
+            "Release",
+            source_id=f"source-{source}",
+        )
+        for source in ("b", "c", "d", "e", "f")
+        for index in range(8)
+    ]
+
+    selected = rank_module.select_balanced_candidates(
+        dominant + diverse,
+        NOW,
+        limit=36,
+        per_source=6,
+    )
+
+    counts = Counter(item.raw.source_id for item in selected)
+    assert len(selected) == 36
+    assert max(counts.values()) == 6
+    assert selected == rank_module.select_balanced_candidates(
+        list(reversed(dominant + diverse)),
+        NOW,
+        limit=36,
+        per_source=6,
+    )
+
+
+def test_select_balanced_candidates_validates_limits_without_mutating_input() -> None:
+    items = [_candidate(f"item-{index}", "Routine update") for index in range(4)]
+    snapshot = [item.model_dump() for item in items]
+
+    assert rank_module.select_balanced_candidates(items, NOW, limit=0, per_source=1) == []
+    with pytest.raises(ValueError, match="limit"):
+        rank_module.select_balanced_candidates(items, NOW, limit=-1, per_source=1)
+    with pytest.raises(ValueError, match="source"):
+        rank_module.select_balanced_candidates(items, NOW, limit=1, per_source=0)
+    assert [item.model_dump() for item in items] == snapshot

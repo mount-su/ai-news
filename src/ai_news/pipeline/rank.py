@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from datetime import datetime
 
 from ai_news.models import Candidate
@@ -42,6 +43,18 @@ def candidate_score(item: Candidate, now: datetime) -> int:
     )
 
 
+def _ranked_candidates(items: list[Candidate], now: datetime) -> list[Candidate]:
+    normalized_now = ensure_utc(now)
+    return sorted(
+        items,
+        key=lambda item: (
+            -candidate_score(item, normalized_now),
+            -ensure_utc(item.raw.published_at).timestamp(),
+            item.id,
+        ),
+    )
+
+
 def select_candidates(
     items: list[Candidate],
     now: datetime,
@@ -52,13 +65,31 @@ def select_candidates(
     if limit == 0:
         return []
 
-    normalized_now = ensure_utc(now)
-    ranked = sorted(
-        items,
-        key=lambda item: (
-            -candidate_score(item, normalized_now),
-            -ensure_utc(item.raw.published_at).timestamp(),
-            item.id,
-        ),
-    )
-    return ranked[:limit]
+    return _ranked_candidates(items, now)[:limit]
+
+
+def select_balanced_candidates(
+    items: list[Candidate],
+    now: datetime,
+    *,
+    limit: int = 36,
+    per_source: int = 6,
+) -> list[Candidate]:
+    if limit < 0:
+        raise ValueError("limit must not be negative")
+    if per_source <= 0:
+        raise ValueError("per-source limit must be positive")
+    if limit == 0:
+        return []
+
+    counts: Counter[str] = Counter()
+    selected: list[Candidate] = []
+    for item in _ranked_candidates(items, now):
+        source_id = item.raw.source_id
+        if counts[source_id] >= per_source:
+            continue
+        counts[source_id] += 1
+        selected.append(item)
+        if len(selected) == limit:
+            break
+    return selected

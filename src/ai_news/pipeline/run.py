@@ -35,12 +35,17 @@ from ai_news.models import (
 )
 from ai_news.pipeline.dedupe import deduplicate
 from ai_news.pipeline.normalize import ensure_utc, normalize_title, to_candidate
-from ai_news.pipeline.rank import candidate_score, select_candidates
+from ai_news.pipeline.rank import (
+    candidate_score,
+    select_balanced_candidates,
+    select_candidates,
+)
 from ai_news.storage import load_history_urls, save_report
 
 _COLLECTION_CONCURRENCY = 6
 _DEDUPLICATION_LIMIT = 500
-_ANALYSIS_LIMIT = 30
+_EDITORIAL_CANDIDATE_LIMIT = 36
+_EDITORIAL_SOURCE_LIMIT = 6
 _PUBLICATION_LIMIT = 20
 _PUBLICATION_THRESHOLD = 5
 _WINDOW = timedelta(hours=36)
@@ -351,7 +356,12 @@ def _prepare_candidates(
     now: datetime,
 ) -> list[Candidate]:
     deduplicated = deduplicate(candidates, historical_urls)
-    return select_candidates(deduplicated, now, limit=_ANALYSIS_LIMIT)
+    return select_balanced_candidates(
+        deduplicated,
+        now,
+        limit=_EDITORIAL_CANDIDATE_LIMIT,
+        per_source=_EDITORIAL_SOURCE_LIMIT,
+    )
 
 
 def _validated_analyses(

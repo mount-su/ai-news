@@ -331,12 +331,19 @@ def test_time_window_includes_both_boundaries_and_excludes_future() -> None:
     assert {item.raw.published_at for item in analyzer.calls[0]} == set(timestamps[:2])
 
 
-def test_history_deduplication_and_pretrim_bound_analysis_to_thirty() -> None:
-    source = _source(0)
-    raw_items = [
-        _raw(index, source=source, published_at=NOW - timedelta(minutes=index % 60))
-        for index in range(510)
-    ]
+def test_history_deduplication_and_pretrim_build_balanced_thirty_six_item_pool() -> None:
+    sources = [_source(source_index) for source_index in range(6)]
+    raw_items_by_source = {
+        source.id: [
+            _raw(
+                source_index * 1_000 + index,
+                source=source,
+                published_at=NOW - timedelta(minutes=index % 60),
+            )
+            for index in range(85)
+        ]
+        for source_index, source in enumerate(sources)
+    }
     analyzer = _Analyzer()
     history_calls: list[tuple[Path, date, int]] = []
     historical_url = "https://example.com/news/0"
@@ -347,15 +354,20 @@ def test_history_deduplication_and_pretrim_bound_analysis_to_thirty() -> None:
 
     report = _run(
         root=Path("/tmp/history-root"),
-        collector=_collector({source.id: raw_items}),
+        source_config=SourceConfig(sources=sources),
+        collector=_collector(raw_items_by_source),
         analyzer=analyzer,
         history_loader=history_loader,
     )
 
     assert history_calls == [(Path("/tmp/history-root"), RUN_DATE, 30)]
-    assert len(analyzer.calls[0]) == 30
+    source_counts: dict[str, int] = {}
+    for item in analyzer.calls[0]:
+        source_counts[item.raw.source_id] = source_counts.get(item.raw.source_id, 0) + 1
+    assert len(analyzer.calls[0]) == 36
+    assert max(source_counts.values()) == 6
     assert all(str(item.canonical_url) != historical_url for item in analyzer.calls[0])
-    assert report.candidate_count == 30
+    assert report.candidate_count == 36
 
 
 def test_fewer_than_five_valid_items_does_not_write_any_files(tmp_path: Path) -> None:
@@ -401,11 +413,18 @@ def test_five_valid_items_build_and_persist_report(tmp_path: Path) -> None:
 
 
 def test_final_items_are_stably_sorted_and_limited_to_twenty() -> None:
-    source = _source(0)
-    items = [
-        _raw(index, source=source, published_at=NOW - timedelta(minutes=index % 3))
-        for index in range(25)
-    ]
+    sources = [_source(source_index) for source_index in range(4)]
+    items_by_source = {
+        source.id: [
+            _raw(
+                source_index * 100 + index,
+                source=source,
+                published_at=NOW - timedelta(minutes=index % 3),
+            )
+            for index in range(7)
+        ]
+        for source_index, source in enumerate(sources)
+    }
 
     def analyses(candidates: list[Any]) -> dict[str, Analysis]:
         return {
@@ -417,7 +436,8 @@ def test_final_items_are_stably_sorted_and_limited_to_twenty() -> None:
         }
 
     report = _run(
-        collector=_collector({source.id: items}),
+        source_config=SourceConfig(sources=sources),
+        collector=_collector(items_by_source),
         analyzer=_Analyzer(analyses),
     )
     expected = sorted(
