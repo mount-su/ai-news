@@ -138,8 +138,7 @@ def _parse_analysis(
             return None, "source_distribution"
 
     return {
-        row.id: Analysis.model_validate(row.model_dump(exclude={"id"}))
-        for row in parsed_rows
+        row.id: Analysis.model_validate(row.model_dump(exclude={"id"})) for row in parsed_rows
     }, None
 
 

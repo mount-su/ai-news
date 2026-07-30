@@ -6,6 +6,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 README = ROOT / "README.md"
 DESIGN = ROOT / "docs" / "superpowers" / "specs" / "2026-07-26-ai-news-github-pages-design.md"
+EDITORIAL_DESIGN = (
+    ROOT / "docs" / "superpowers" / "specs" / "2026-07-31-concise-editorial-design.md"
+)
 OLD_IMPLEMENTATION_PLAN = (
     ROOT / "docs" / "superpowers" / "plans" / "2026-07-26-ai-news-github-pages.md"
 )
@@ -134,23 +137,23 @@ def test_readme_does_not_contain_screenshot_markup_or_token_assignment() -> None
 def test_readme_describes_the_implemented_degraded_rule() -> None:
     readme = _readme()
 
-    assert "来源失败且最终仍有至少 5 条" in readme
+    assert "来源失败但最终仍满足九条契约" in readme
     assert "`degraded=true`" in readme
     assert "该字段由来源运行是否失败决定" in readme
     assert "候选损失时可以降级发布" not in readme
 
 
-def test_docs_describe_strict_batch_analysis_failure() -> None:
+def test_docs_describe_strict_editorial_analysis_failure() -> None:
     readme = _readme()
-    design = DESIGN.read_text(encoding="utf-8")
+    design = EDITORIAL_DESIGN.read_text(encoding="utf-8")
 
-    for document in [readme, design]:
-        assert "整批严格校验" in document
-        assert "只执行一次结构修复" in document
-        assert "整次生成失败" in document
-        assert "不写入新日报" in document
-        assert "舍弃该批" not in document
-        assert "个别分析无效会被丢弃" not in document
+    assert "完整候选池" in readme
+    assert "只执行一次结构修复" in readme
+    assert "整次生成失败且不写入新日报" in readme
+    assert "所有候选在一次主编请求中统一比较" in design
+    assert "程序发起一次定向修复请求" in design
+    assert "修复后仍不合格则终止本期发布" in design
+    assert "不能静默退回 20 条旧逻辑" in design
 
 
 def test_runtime_docs_do_not_instruct_use_of_legacy_model_variables() -> None:

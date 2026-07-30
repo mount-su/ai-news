@@ -139,9 +139,7 @@ def test_select_candidates_enforces_limit_without_mutating_input() -> None:
 
 
 def test_select_balanced_candidates_caps_each_source_and_total_deterministically() -> None:
-    dominant = [
-        _candidate(f"a-{index}", "Launch", source_id="source-a") for index in range(20)
-    ]
+    dominant = [_candidate(f"a-{index}", "Launch", source_id="source-a") for index in range(20)]
     diverse = [
         _candidate(
             f"{source}-{index}",

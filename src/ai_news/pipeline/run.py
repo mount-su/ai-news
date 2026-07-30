@@ -449,10 +449,7 @@ def _validate_editorial_distribution(
 
     candidate_by_id = {candidate.id: candidate for candidate in selected}
     try:
-        source_counts = Counter(
-            candidate_by_id[item.id].raw.source_id
-            for item in items
-        )
+        source_counts = Counter(candidate_by_id[item.id].raw.source_id for item in items)
     except KeyError:
         raise ReportValidationError("editorial distribution invalid") from None
     if any(count > _MAX_FINAL_SOURCE_ITEMS for count in source_counts.values()):

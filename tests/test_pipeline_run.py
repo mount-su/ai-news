@@ -384,9 +384,7 @@ def test_time_window_includes_both_boundaries_and_excludes_future() -> None:
 
     assert len(analyzer.calls) == 1
     assert {
-        item.raw.published_at
-        for item in analyzer.calls[0]
-        if item.raw.source_id == source.id
+        item.raw.published_at for item in analyzer.calls[0] if item.raw.source_id == source.id
     } == set(timestamps[:2])
 
 
@@ -460,10 +458,7 @@ def test_fewer_than_nine_valid_candidates_does_not_call_analyzer_or_write(
 def test_nine_valid_items_build_and_persist_schema_1_1_report(tmp_path: Path) -> None:
     sources = [_source(index) for index in range(3)]
     items_by_source = {
-        source.id: [
-            _raw(source_index * 100 + index, source=source)
-            for index in range(3)
-        ]
+        source.id: [_raw(source_index * 100 + index, source=source) for index in range(3)]
         for source_index, source in enumerate(sources)
     }
     report = asyncio.run(
@@ -520,9 +515,7 @@ def test_final_nine_items_are_stably_sorted() -> None:
                 importance=(index % 4) + 7,
                 editorial_lane=lane,
             )
-            for index, (candidate, lane) in enumerate(
-                zip(candidates[:9], lanes, strict=True)
-            )
+            for index, (candidate, lane) in enumerate(zip(candidates[:9], lanes, strict=True))
         }
 
     report = _run(
@@ -546,18 +539,12 @@ def test_final_nine_items_are_stably_sorted() -> None:
 def test_pipeline_rejects_eight_analyzed_items() -> None:
     sources = [_source(index) for index in range(3)]
     items_by_source = {
-        source.id: [
-            _raw(source_index * 100 + index, source=source)
-            for index in range(3)
-        ]
+        source.id: [_raw(source_index * 100 + index, source=source) for index in range(3)]
         for source_index, source in enumerate(sources)
     }
 
     def eight_analyses(candidates: list[Any]) -> dict[str, Analysis]:
-        return {
-            candidate.id: _analysis(index)
-            for index, candidate in enumerate(candidates[:8])
-        }
+        return {candidate.id: _analysis(index) for index, candidate in enumerate(candidates[:8])}
 
     with pytest.raises(PublicationThresholdError, match="nine"):
         _run(
@@ -570,10 +557,7 @@ def test_pipeline_rejects_eight_analyzed_items() -> None:
 def test_pipeline_rejects_invalid_editorial_lane_distribution() -> None:
     sources = [_source(index) for index in range(3)]
     items_by_source = {
-        source.id: [
-            _raw(source_index * 100 + index, source=source)
-            for index in range(3)
-        ]
+        source.id: [_raw(source_index * 100 + index, source=source) for index in range(3)]
         for source_index, source in enumerate(sources)
     }
     lanes = [
@@ -591,9 +575,7 @@ def test_pipeline_rejects_invalid_editorial_lane_distribution() -> None:
     def invalid_lanes(candidates: list[Any]) -> dict[str, Analysis]:
         return {
             candidate.id: _analysis(index, editorial_lane=lane)
-            for index, (candidate, lane) in enumerate(
-                zip(candidates[:9], lanes, strict=True)
-            )
+            for index, (candidate, lane) in enumerate(zip(candidates[:9], lanes, strict=True))
         }
 
     with pytest.raises(ReportValidationError, match="distribution"):
@@ -846,9 +828,7 @@ def test_duplicate_canonical_urls_are_folded_before_bounded_pretrim() -> None:
 
     assert report.candidate_count == 15
     assert len(report.items) == 9
-    assert sum(
-        str(item.canonical_url) == duplicate_url for item in analyzer.calls[0]
-    ) == 1
+    assert sum(str(item.canonical_url) == duplicate_url for item in analyzer.calls[0]) == 1
 
 
 def test_same_host_exact_titles_are_folded_before_bounded_pretrim() -> None:
@@ -883,9 +863,7 @@ def test_same_host_exact_titles_are_folded_before_bounded_pretrim() -> None:
     assert report.candidate_count == 15
     assert len(report.items) == 9
     primary_titles = [
-        item.raw.title
-        for item in analyzer.calls[0]
-        if item.raw.source_id == source.id
+        item.raw.title for item in analyzer.calls[0] if item.raw.source_id == source.id
     ]
     assert len([title for title in primary_titles if "SAME" in title]) == 1
 
@@ -924,9 +902,7 @@ def test_exact_key_bridge_merges_both_existing_groups(
         candidates: list[Any],
         historical_urls: set[str],
     ) -> list[Any]:
-        dedupe_sizes.append(
-            sum(candidate.raw.source_id == source.id for candidate in candidates)
-        )
+        dedupe_sizes.append(sum(candidate.raw.source_id == source.id for candidate in candidates))
         return real_deduplicate(candidates, historical_urls)
 
     monkeypatch.setattr(run_module, "deduplicate", observed_deduplicate)
@@ -972,9 +948,7 @@ def test_large_exact_title_alias_state_is_bounded_and_order_independent(
     real_deduplicate = run_module.deduplicate
 
     def bounded_deduplicate(candidates: list[Any], historical_urls: set[str]) -> list[Any]:
-        dedupe_sizes.append(
-            sum(candidate.raw.source_id == source.id for candidate in candidates)
-        )
+        dedupe_sizes.append(sum(candidate.raw.source_id == source.id for candidate in candidates))
         return real_deduplicate(candidates, historical_urls)
 
     monkeypatch.setattr(run_module, "deduplicate", bounded_deduplicate)
@@ -1110,9 +1084,7 @@ def test_more_than_1500_unique_items_stay_bounded_and_order_independent(
     real_deduplicate = run_module.deduplicate
 
     def bounded_deduplicate(candidates: list[Any], historical_urls: set[str]) -> list[Any]:
-        dedupe_sizes.append(
-            sum(candidate.raw.source_id == source.id for candidate in candidates)
-        )
+        dedupe_sizes.append(sum(candidate.raw.source_id == source.id for candidate in candidates))
         return real_deduplicate(candidates, historical_urls)
 
     monkeypatch.setattr(run_module, "deduplicate", bounded_deduplicate)
