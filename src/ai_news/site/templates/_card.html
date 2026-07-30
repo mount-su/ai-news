@@ -1,50 +1,36 @@
-{% macro news_card(item) -%}
+{% macro news_card(item, rank, priority=false) -%}
   <article
     id="item-{{ item.id }}"
-    class="news-card"
+    class="news-card{% if priority %} news-card--priority{% endif %}"
     data-news-card
     data-item-id="{{ item.id }}"
-    data-category="{{ item.category.value }}"
-    data-search="{{ item.title }} {{ item.original_title }} {{ item.source }} {{ item.summary }} {{ item.why_it_matters }} {{ item.tags|join(' ') }}"
+    data-priority="{{ 'true' if priority else 'false' }}"
   >
-    <div class="news-card__signal">
-      <span class="importance">重要性 {{ item.importance }}/10</span>
-      <span class="risk risk--{{ item.marketing_risk }}">
-        营销风险
-        {% if item.marketing_risk == "high" %}高{% elif item.marketing_risk == "medium" %}中{% else %}低{% endif %}
-      </span>
-    </div>
-    <h3>{{ item.title }}</h3>
-    <p class="original-title"><span>原始标题</span>{{ item.original_title }}</p>
-    <dl class="news-card__meta">
-      <div><dt>来源</dt><dd>{{ item.source }}</dd></div>
-      <div>
-        <dt>时间</dt>
-        <dd><time datetime="{{ item.published_at.isoformat() }}">{{ item.published_at|beijing_datetime }}</time></dd>
+    <header class="news-card__header">
+      <span class="news-card__rank">{{ "%02d"|format(rank) }}</span>
+      <div class="news-card__labels">
+        <span class="lane">{{ item.editorial_lane.value }}</span>
+        <span class="category">{{ item.category.value }}</span>
       </div>
-      <div><dt>分类</dt><dd>{{ item.category.value }}</dd></div>
-      <div><dt>官方</dt><dd>{{ "是，官方信息" if item.is_official else "否，需交叉验证" }}</dd></div>
-    </dl>
-    <p class="summary"><span class="field-label">摘要</span>{{ item.summary }}</p>
-    <p class="why"><span class="field-label">价值</span>{{ item.why_it_matters }}</p>
-    <ul class="tags" aria-label="标签">
-      {% for tag in item.tags %}<li>{{ tag }}</li>{% endfor %}
-    </ul>
-    <details>
-      <summary>展开研判细节</summary>
-      <p><span class="field-label">跟踪信号</span>{{ item.tracking_signal }}</p>
-      <p>
-        <span class="field-label">营销风险说明</span>
-        当前评级为
-        {% if item.marketing_risk == "high" %}高{% elif item.marketing_risk == "medium" %}中{% else %}低{% endif %}，
-        请结合官方资料复核。
+    </header>
+    <div class="news-card__body">
+      <h3>{{ item.title }}</h3>
+      <p class="news-card__source">
+        {{ item.source }}
+        <span aria-hidden="true">·</span>
+        <time datetime="{{ item.published_at.isoformat() }}">{{ item.published_at|beijing_datetime }}</time>
       </p>
-    </details>
-    <div class="news-card__links">
-      <a href="{{ item.canonical_url }}" target="_blank" rel="noopener noreferrer">阅读原文</a>
-      {% if item|github_url %}
-        <a href="{{ item.canonical_url }}" target="_blank" rel="noopener noreferrer">GitHub 仓库</a>
-      {% endif %}
+      <dl class="brief-fields">
+        <div><dt>变化</dt><dd>{{ item.summary }}</dd></div>
+        <div><dt>影响</dt><dd>{{ item.why_it_matters }}</dd></div>
+        <div><dt>行动</dt><dd>{{ item.tracking_signal }}</dd></div>
+      </dl>
+      <a
+        class="source-link"
+        href="{{ item.canonical_url }}"
+        target="_blank"
+        rel="noopener noreferrer"
+      >查看原始来源 <span aria-hidden="true">↗</span></a>
     </div>
   </article>
 {%- endmacro %}

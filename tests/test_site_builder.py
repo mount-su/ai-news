@@ -46,6 +46,7 @@ PUBLIC_SEARCH_FIELDS = {
     "tracking_signal",
     "date",
     "page_url",
+    "editorial_lane",
 }
 
 
@@ -322,7 +323,8 @@ def test_home_uses_latest_report_and_feed_category_order_is_stable(
         items["model"].id,
         items["agent"].id,
     ]
-    assert homepage.article_ids[-3:] == latest_expected
+    assert homepage.article_ids == latest_expected
+    assert len(homepage.article_ids) == len(set(homepage.article_ids))
     assert items["old-coding"].id not in homepage.article_ids
     coding_page = _parse(output / "categories/coding-agent/index.html")
     assert coding_page.article_ids == [items["coding"].id, items["old-coding"].id]
@@ -331,6 +333,39 @@ def test_home_uses_latest_report_and_feed_category_order_is_stable(
     assert archive_text.index("2026-07-26") < archive_text.index("2026-07-25")
     assert "最后成功" in (output / "index.html").read_text(encoding="utf-8")
     assert "北京时间" in (output / "index.html").read_text(encoding="utf-8")
+
+
+def test_brief_pages_render_each_item_once_without_verbose_controls(
+    report_root: tuple[Path, dict[str, NewsItem]],
+    tmp_path: Path,
+) -> None:
+    root, items = report_root
+    output = tmp_path / "dist"
+
+    build_site(root, output)
+
+    for page, expected_ids in (
+        (
+            output / "index.html",
+            [items["coding"].id, items["model"].id, items["agent"].id],
+        ),
+        (
+            output / "days/2026-07-26/index.html",
+            [items["coding"].id, items["model"].id, items["agent"].id],
+        ),
+    ):
+        parser = _parse(page)
+        text = page.read_text(encoding="utf-8")
+        assert parser.article_ids == expected_ids
+        assert 'data-priority="true"' in text
+        assert 'type="search"' not in text
+        assert "今日最重要" not in text
+        assert "后续观察" not in text
+        assert "营销风险" not in text
+        assert "原始标题" not in text
+        assert "展开研判细节" not in text
+        assert "重要性 " not in text
+        assert all(label in text for label in ("变化", "影响", "行动"))
 
 
 def test_external_links_are_hardened_and_untrusted_titles_are_escaped(

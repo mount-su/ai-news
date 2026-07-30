@@ -172,6 +172,7 @@ def _report_context(report: DailyReport) -> dict[str, object]:
         "date": report.date.isoformat(),
         "generated_at": report.generated_at,
         "source_count": len(report.source_runs),
+        "healthy_source_count": sum(run.success for run in report.source_runs),
         "candidate_count": report.candidate_count,
         "included_count": len(report.items),
     }
@@ -236,8 +237,6 @@ def _build_staging(
             "page_title": "今日情报",
             "report": _report_context(latest),
             "items": latest_items,
-            "top_items": latest_items[:3],
-            "signals": latest_items[:3],
         },
     )
 
@@ -253,7 +252,6 @@ def _build_staging(
                 "page_title": f"{report.date.isoformat()} 情报",
                 "report": _report_context(report),
                 "items": report_items,
-                "signals": report_items[:3],
             },
         )
 
@@ -284,7 +282,6 @@ def _build_staging(
                 "page_title": f"{category.value} 情报",
                 "category_name": category.value,
                 "items": ordered_items,
-                "signals": ordered_items[:3],
             },
         )
 

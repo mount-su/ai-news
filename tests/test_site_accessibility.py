@@ -94,7 +94,7 @@ def test_all_pages_have_single_main_skip_link_landmarks_and_ordered_headings(
         )
 
 
-def test_feed_controls_cards_and_long_analysis_are_accessible_without_javascript(
+def test_concise_brief_cards_are_accessible_without_javascript(
     accessibility_report_root: tuple[Path, object],
     tmp_path: Path,
 ) -> None:
@@ -109,20 +109,14 @@ def test_feed_controls_cards_and_long_analysis_are_accessible_without_javascript
     ]:
         parser = _parse(page)
         visible_text = " ".join(parser.text_parts)
-        search = next(field for field in parser.inputs if field.get("type") == "search")
-        assert search.get("id")
-        assert any(label.get("for") == search["id"] for label in parser.labels)
-        filter_buttons = [button for button in parser.buttons if "data-category" in button]
-        assert filter_buttons
-        assert all(button.get("type") == "button" for button in filter_buttons)
-        assert filter_buttons[0].get("aria-pressed") == "true"
-        assert all(button.get("aria-pressed") == "false" for button in filter_buttons[1:])
-        assert parser.details_count >= 1
-        assert parser.details_count == parser.summary_count
-        assert "重要性 10/10" in visible_text
-        assert "价值" in visible_text
-        assert "条结果" in visible_text
-        assert 'aria-live="polite"' in page.read_text(encoding="utf-8")
+        assert not parser.inputs
+        assert not parser.buttons
+        assert parser.details_count == 0
+        assert parser.summary_count == 0
+        assert "变化" in visible_text
+        assert "影响" in visible_text
+        assert "行动" in visible_text
+        assert "查看原始来源" in visible_text
 
 
 def test_styles_define_visual_system_responsive_layout_and_accessibility_contract(
@@ -158,7 +152,7 @@ def test_styles_define_visual_system_responsive_layout_and_accessibility_contrac
     assert "scroll-behavior: auto" in css
 
 
-def test_javascript_is_safe_progressive_enhancement_for_search_and_category_filters(
+def test_javascript_is_safe_progressive_enhancement_without_content_mutation(
     accessibility_report_root: tuple[Path, object],
     tmp_path: Path,
 ) -> None:
@@ -167,16 +161,10 @@ def test_javascript_is_safe_progressive_enhancement_for_search_and_category_filt
     build_site(root, output)
     javascript = (output / "assets/app.js").read_text(encoding="utf-8")
 
-    for token in (
-        "data-search",
-        "data-category",
-        "aria-pressed",
-        "aria-live",
-        "toLowerCase",
-        "textContent",
-    ):
-        assert token in javascript
+    assert "classList.add" in javascript
+    assert "js" in javascript
     assert "innerHTML" not in javascript
+    assert "textContent" not in javascript
     assert "eval(" not in javascript
     assert "new Function" not in javascript
     assert f"{BASE_PATH}search.json" not in javascript

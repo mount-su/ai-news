@@ -6,41 +6,19 @@
     <section class="edition-heading" aria-labelledby="day-title">
       <p class="eyebrow">DAILY RECORD / {{ report.date }}</p>
       <h1 id="day-title">{{ report.date }} 情报档案</h1>
-      <p>按重要性与发布时间整理的当日完整收录。</p>
+      <p>这一天经编辑筛选后的精炼情报。</p>
+      <p class="edition-health">{{ report.included_count }} 条入选</p>
     </section>
-    <section class="feed-shell" aria-labelledby="feed-title" data-feed>
-      <div class="feed-column">
-        <div class="section-heading">
-          <p>DAILY FEED</p>
-          <h2 id="feed-title">当日情报</h2>
-        </div>
-        <div class="filter-console">
-          <div class="search-control">
-            <label for="feed-search">搜索标题、来源、摘要或标签</label>
-            <input id="feed-search" type="search" data-filter-search autocomplete="off" placeholder="输入关键词">
-          </div>
-          <div class="category-controls" aria-label="按分类筛选">
-            <button type="button" data-category="all" aria-pressed="true">全部</button>
-            {% for category in categories %}
-              <button type="button" data-category="{{ category.name }}" aria-pressed="false">{{ category.name }}</button>
-            {% endfor %}
-          </div>
-          <p class="result-count" data-result-count aria-live="polite">{{ items|length }} 条结果</p>
-        </div>
-        <p class="empty-state" data-empty-state hidden>没有符合当前条件的情报，请调整关键词或分类。</p>
-        <div class="news-list">
-          {% for item in items %}{{ news_card(item) }}{% endfor %}
-        </div>
+    <section class="brief-shell" aria-labelledby="feed-title">
+      <div class="section-heading section-heading--brief">
+        <p>DAILY SELECTION</p>
+        <h2 id="feed-title">当日简报</h2>
       </div>
-      <section class="signal-rail" aria-labelledby="signal-title">
-        <p class="eyebrow">TRACKING SIGNAL</p>
-        <h2 id="signal-title">后续观察</h2>
-        <ol>
-          {% for item in signals %}
-            <li><span>0{{ loop.index }}</span><strong>{{ item.title }}</strong><p>{{ item.tracking_signal }}</p></li>
-          {% endfor %}
-        </ol>
-      </section>
+      <ol class="news-list">
+        {% for item in items %}
+          <li>{{ news_card(item, loop.index, loop.index <= 3) }}</li>
+        {% endfor %}
+      </ol>
     </section>
   </main>
 {% endblock %}

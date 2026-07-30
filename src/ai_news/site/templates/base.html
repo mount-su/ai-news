@@ -33,17 +33,12 @@
           <a href="{{ page_url('archive') }}">归档</a>
         </div>
       </nav>
-      <section class="status-strip" aria-label="本期采集状态">
-        <div class="status-strip__inner">
-          <p><span>来源数</span><strong>{{ latest_report.source_count }}</strong></p>
-          <p><span>候选数</span><strong>{{ latest_report.candidate_count }}</strong></p>
-          <p><span>收录数</span><strong>{{ latest_report.included_count }}</strong></p>
-          <p>
-            <span>最后成功</span>
-            <strong>{{ latest_report.generated_at|beijing_datetime }}</strong>
-          </p>
-        </div>
-      </section>
+      <p class="status-line">
+        <span class="status-dot" aria-hidden="true"></span>
+        {{ latest_report.healthy_source_count }}/{{ latest_report.source_count }} 个来源正常
+        <span aria-hidden="true">·</span>
+        {{ latest_report.included_count }} 条入选
+      </p>
     </header>
 
     {% block main %}{% endblock %}

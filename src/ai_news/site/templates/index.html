@@ -3,68 +3,27 @@
 
 {% block main %}
   <main id="main-content" class="page-shell">
-    <section class="edition-heading" aria-labelledby="edition-title">
-      <p class="eyebrow">DAILY INTELLIGENCE / {{ report.date }}</p>
-      <h1 id="edition-title">今天需要知道的 AI 变化</h1>
-      <p>把发布、能力变化与可执行信号压缩成一张决策桌面。</p>
+    <section class="edition-heading edition-heading--brief" aria-labelledby="edition-title">
+      <p class="eyebrow">DAILY BRIEF / {{ report.date }}</p>
+      <h1 id="edition-title">今日九条 AI 情报</h1>
+      <p>只留变化、影响与下一步。预计 3 分钟读完。</p>
+      <p class="edition-health">
+        {{ report.healthy_source_count }}/{{ report.source_count }} 个来源正常
+        <span aria-hidden="true">·</span>
+        {{ report.included_count }} 条入选
+      </p>
     </section>
 
-    <section class="editorial" aria-labelledby="editorial-title">
-      <div class="section-heading">
-        <p>EDITOR'S PRIORITY</p>
-        <h2 id="editorial-title">今日最重要</h2>
+    <section class="brief-shell" aria-labelledby="brief-title">
+      <div class="section-heading section-heading--brief">
+        <p>EDITORIAL SELECTION</p>
+        <h2 id="brief-title">本期简报</h2>
       </div>
-      <div class="editorial-grid">
-        {% for item in top_items %}
-          <article class="editorial-brief">
-            <p class="editorial-brief__rank">0{{ loop.index }}</p>
-            <h3>{{ item.title }}</h3>
-            <p><span>结论</span>{{ item.summary }}</p>
-            <p class="importance">重要性 {{ item.importance }}/10</p>
-            <p><span>价值</span>{{ item.why_it_matters }}</p>
-            <a href="#item-{{ item.id }}">进入情报卡</a>
-          </article>
+      <ol class="news-list">
+        {% for item in items %}
+          <li>{{ news_card(item, loop.index, loop.index <= 3) }}</li>
         {% endfor %}
-      </div>
-    </section>
-
-    <section class="feed-shell" aria-labelledby="feed-title" data-feed>
-      <div class="feed-column">
-        <div class="section-heading">
-          <p>VERIFIED FEED</p>
-          <h2 id="feed-title">本期情报流</h2>
-        </div>
-        <div class="filter-console">
-          <div class="search-control">
-            <label for="feed-search">搜索标题、来源、摘要或标签</label>
-            <input id="feed-search" type="search" data-filter-search autocomplete="off" placeholder="输入关键词">
-          </div>
-          <div class="category-controls" aria-label="按分类筛选">
-            <button type="button" data-category="all" aria-pressed="true">全部</button>
-            {% for category in categories %}
-              <button type="button" data-category="{{ category.name }}" aria-pressed="false">{{ category.name }}</button>
-            {% endfor %}
-          </div>
-          <p class="result-count" data-result-count aria-live="polite">{{ items|length }} 条结果</p>
-        </div>
-        <p class="empty-state" data-empty-state hidden>没有符合当前条件的情报，请调整关键词或分类。</p>
-        <div class="news-list">
-          {% for item in items %}{{ news_card(item) }}{% endfor %}
-        </div>
-      </div>
-      <section class="signal-rail" aria-labelledby="signal-title">
-        <p class="eyebrow">TRACKING SIGNAL</p>
-        <h2 id="signal-title">后续观察</h2>
-        <ol>
-          {% for item in signals %}
-            <li>
-              <span>0{{ loop.index }}</span>
-              <strong>{{ item.title }}</strong>
-              <p>{{ item.tracking_signal }}</p>
-            </li>
-          {% endfor %}
-        </ol>
-      </section>
+      </ol>
     </section>
   </main>
 {% endblock %}
