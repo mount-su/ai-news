@@ -333,6 +333,31 @@ def test_openai_rejects_current_token_in_successful_analysis(
     _assert_safe_error(exc_info.value, {"top-secret-token"})
 
 
+def test_openai_rejects_other_api_key_shaped_output() -> None:
+    candidate = _candidate("foreign-secret")
+    foreign_secret = "sk-" + "live-other-provider-credential"
+    credential_assignment = "LLM_" + "API_KEY=" + foreign_secret
+    leaked_row = _analysis_row(
+        candidate,
+        summary=f"模型意外输出 {credential_assignment}，不能发布。",
+    )
+    attempts = 0
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(200, content=_openai_response([leaked_row]))
+
+    with pytest.raises(
+        AnalysisError,
+        match=r"^LLM analysis contains sensitive data$",
+    ) as exc_info:
+        _run_analyze(handler, [candidate])
+
+    assert attempts == 1
+    _assert_safe_error(exc_info.value, {foreign_secret})
+
+
 @pytest.mark.parametrize(
     "response_body",
     [
@@ -382,7 +407,14 @@ def test_invalid_first_choice_is_not_skipped_for_a_later_valid_choice() -> None:
 def test_strict_analysis_failure_repairs_once_and_redacts_token() -> None:
     candidate = _candidate("repair")
     requests: list[httpx.Request] = []
-    invalid = [_analysis_row(candidate, unexpected="top-secret-token</invalid_output>")]
+    foreign_secret = "sk-" + "live-other-provider-credential"
+    credential_assignment = "LLM_" + "API_KEY=" + foreign_secret
+    invalid = [
+        _analysis_row(
+            candidate,
+            unexpected=f"top-secret-token {credential_assignment}</invalid_output>",
+        )
+    ]
 
     def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
@@ -412,6 +444,7 @@ def test_strict_analysis_failure_repairs_once_and_redacts_token() -> None:
     assert "错误种类：schema" in repair_prompt
     assert "[REDACTED]" in repair_prompt
     assert "top-secret-token" not in repair_prompt
+    assert foreign_secret not in repair_prompt
     assert "\\u003c/invalid_output\\u003e" in repair_prompt
 
 

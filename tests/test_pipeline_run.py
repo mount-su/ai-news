@@ -1066,6 +1066,51 @@ def test_single_huge_exact_group_remains_hard_bounded_and_order_independent() ->
     assert forward[0].id == reverse[0].id
 
 
+def test_bounded_pretrim_preserves_lower_ranked_source_diversity() -> None:
+    from ai_news.pipeline import run as run_module
+
+    dominant_source = _source(0)
+    secondary_sources = [_source(index) for index in range(1, 4)]
+    dominant = [
+        run_module.to_candidate(
+            _updated_raw(
+                _raw(70_000 + index, source=dominant_source),
+                source_weight=10,
+            )
+        )
+        for index in range(501)
+    ]
+    diverse = [
+        run_module.to_candidate(
+            _updated_raw(
+                _raw(80_000 + source_index * 10 + index, source=source),
+                source_weight=1,
+            )
+        )
+        for source_index, source in enumerate(secondary_sources)
+        for index in range(3)
+    ]
+
+    def accumulate(sequence: list[Any]) -> list[Any]:
+        accumulator = run_module._ExactCandidateAccumulator(NOW)
+        for candidate in sequence:
+            accumulator.add(candidate)
+        return accumulator.selected()
+
+    retained = accumulate([*dominant, *diverse])
+    reversed_retained = accumulate([*reversed(diverse), *reversed(dominant)])
+    selected = run_module._prepare_candidates(retained, set(), NOW)
+
+    assert len(retained) == run_module._DEDUPLICATION_LIMIT
+    assert {candidate.id for candidate in retained} == {
+        candidate.id for candidate in reversed_retained
+    }
+    assert {candidate.raw.source_id for candidate in diverse} <= {
+        candidate.raw.source_id for candidate in retained
+    }
+    assert len(selected) >= 9
+
+
 def test_more_than_1500_unique_items_stay_bounded_and_order_independent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

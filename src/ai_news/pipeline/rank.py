@@ -93,3 +93,35 @@ def select_balanced_candidates(
         if len(selected) == limit:
             break
     return selected
+
+
+def select_diversity_preserving_candidates(
+    items: list[Candidate],
+    now: datetime,
+    *,
+    limit: int,
+    source_floor: int,
+) -> list[Candidate]:
+    """Keep each source's best rows before filling the remaining global budget."""
+    if limit < 0:
+        raise ValueError("limit must not be negative")
+    if source_floor <= 0:
+        raise ValueError("source floor must be positive")
+    if limit == 0:
+        return []
+
+    ranked = _ranked_candidates(items, now)
+    retained_ids = {
+        item.id
+        for item in select_balanced_candidates(
+            ranked,
+            now,
+            limit=limit,
+            per_source=source_floor,
+        )
+    }
+    for item in ranked:
+        if len(retained_ids) == limit:
+            break
+        retained_ids.add(item.id)
+    return [item for item in ranked if item.id in retained_ids][:limit]

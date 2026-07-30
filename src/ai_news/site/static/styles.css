@@ -162,7 +162,7 @@ button:focus-visible {
 }
 
 .page-shell {
-  padding-block: 3.2rem 5rem;
+  padding-block: 2rem 5rem;
 }
 
 .edition-heading,
@@ -174,7 +174,7 @@ button:focus-visible {
 
 .edition-heading {
   position: relative;
-  padding: 0.5rem 0 2.5rem;
+  padding: 0.35rem 0 1.5rem;
   border-bottom: 1px solid var(--line);
 }
 
@@ -227,7 +227,7 @@ button:focus-visible {
 }
 
 .brief-shell {
-  padding-top: 2.35rem;
+  padding-top: 1.5rem;
 }
 
 .section-heading--brief {
@@ -235,7 +235,7 @@ button:focus-visible {
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 0.8rem;
+  margin-bottom: 0.5rem;
 }
 
 .section-heading h2 {

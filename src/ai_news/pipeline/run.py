@@ -39,12 +39,13 @@ from ai_news.pipeline.normalize import ensure_utc, normalize_title, to_candidate
 from ai_news.pipeline.rank import (
     candidate_score,
     select_balanced_candidates,
-    select_candidates,
+    select_diversity_preserving_candidates,
 )
 from ai_news.storage import load_history_urls, save_report
 
 _COLLECTION_CONCURRENCY = 6
 _DEDUPLICATION_LIMIT = 500
+_DEDUPLICATION_SOURCE_FLOOR = 6
 _EDITORIAL_CANDIDATE_LIMIT = 36
 _EDITORIAL_SOURCE_LIMIT = 6
 _PUBLICATION_COUNT = 9
@@ -226,10 +227,11 @@ class _ExactCandidateAccumulator:
         self._title_groups[_exact_title_key(candidate)] = group_id
 
     def _compact(self) -> None:
-        retained_candidates = select_candidates(
+        retained_candidates = select_diversity_preserving_candidates(
             list(self._winners.values()),
             self._now,
             limit=_DEDUPLICATION_LIMIT,
+            source_floor=_DEDUPLICATION_SOURCE_FLOOR,
         )
         retained_ids = {candidate.id for candidate in retained_candidates}
         retained_winners = {
@@ -320,10 +322,11 @@ class _ExactCandidateAccumulator:
     def selected(self) -> list[Candidate]:
         if len(self._winners) > _DEDUPLICATION_LIMIT or self._state_size() > _EXACT_STATE_TARGET:
             self._compact()
-        return select_candidates(
+        return select_diversity_preserving_candidates(
             list(self._winners.values()),
             self._now,
             limit=_DEDUPLICATION_LIMIT,
+            source_floor=_DEDUPLICATION_SOURCE_FLOOR,
         )
 
 

@@ -291,6 +291,14 @@ def test_schema_1_0_report_without_editorial_lanes_remains_loadable() -> None:
     assert all(item.editorial_lane.value == "产品工程" for item in loaded.items)
 
 
+def test_schema_1_1_report_requires_explicit_editorial_lanes() -> None:
+    payload = _report().model_dump(mode="json")
+    payload["items"][0].pop("editorial_lane")
+
+    with pytest.raises(ValidationError, match="editorial_lane"):
+        DailyReport.model_validate(payload)
+
+
 def test_public_models_reject_extra_fields_insecure_urls_and_naive_datetimes() -> None:
     item_payload = _item("validation").model_dump(mode="json")
     report_payload = _report(slugs=("validation",)).model_dump(mode="json")

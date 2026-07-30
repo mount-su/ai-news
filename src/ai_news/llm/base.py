@@ -36,6 +36,16 @@ _LLM_REQUEST_TIMEOUT_SECONDS = 120
 _MAX_RESPONSE_BYTES = 2_000_000
 _MAX_REPAIR_TEXT_CHARS = 20_000
 _OUTER_FENCE = re.compile(r"\A```(?:json)?[ \t]*\r?\n(.*?)\r?\n?```[ \t]*\Z", re.I | re.S)
+_SENSITIVE_TEXT = re.compile(
+    r"""(?ix)
+    (?:
+        \b(?:llm[_-]?)?api[_ -]?key\b
+        \s*[:=]\s*["']?[A-Za-z0-9_./+=-]{8,}
+      | \bauthorization\b\s*[:=]\s*bearer\s+[A-Za-z0-9_./+=-]{8,}
+      | \bsk-[A-Za-z0-9][A-Za-z0-9_-]{15,}
+    )
+    """
+)
 
 
 class AnalysisError(RuntimeError):
@@ -142,21 +152,24 @@ def _parse_analysis(
     }, None
 
 
-def _contains_secret(value: object, token: str) -> bool:
-    if not token:
-        return False
+def _contains_sensitive_data(value: object, token: str) -> bool:
     if isinstance(value, str):
-        return token in value
+        return bool(token and token in value) or _SENSITIVE_TEXT.search(value) is not None
     if isinstance(value, BaseModel):
-        return _contains_secret(value.model_dump(mode="python"), token)
+        return _contains_sensitive_data(value.model_dump(mode="python"), token)
     if isinstance(value, Mapping):
         return any(
-            _contains_secret(key, token) or _contains_secret(item, token)
+            _contains_sensitive_data(key, token) or _contains_sensitive_data(item, token)
             for key, item in value.items()
         )
     if isinstance(value, list | tuple | set | frozenset):
-        return any(_contains_secret(item, token) for item in value)
+        return any(_contains_sensitive_data(item, token) for item in value)
     return False
+
+
+def _redact_sensitive_text(value: str, token: str) -> str:
+    redacted = value.replace(token, "[REDACTED]") if token else value
+    return _SENSITIVE_TEXT.sub("[REDACTED]", redacted)
 
 
 def _escape_delimiters(value: str) -> str:
@@ -169,7 +182,7 @@ def _repair_prompt(
     error_kind: str,
     token: str,
 ) -> str:
-    safe_invalid_text = invalid_text.replace(token, "[REDACTED]") if token else invalid_text
+    safe_invalid_text = _redact_sensitive_text(invalid_text, token)
     safe_invalid_text = _escape_delimiters(safe_invalid_text)[:_MAX_REPAIR_TEXT_CHARS]
     return f"""{build_analysis_prompt(items)}
 上一次输出无效，错误种类：{error_kind}。
@@ -283,7 +296,7 @@ class BaseAnalyzer(ABC):
         first_text = await self._request(client, build_analysis_prompt(items))
         parsed, error_kind = _parse_analysis(first_text, items)
         if parsed is not None:
-            if _contains_secret(parsed, self._token):
+            if _contains_sensitive_data(parsed, self._token):
                 raise AnalysisError(
                     "LLM analysis contains sensitive data",
                     safe_code="sensitive_output",
@@ -298,7 +311,7 @@ class BaseAnalyzer(ABC):
                 "invalid LLM analysis after repair",
                 safe_code="invalid_after_repair",
             )
-        if _contains_secret(repaired, self._token):
+        if _contains_sensitive_data(repaired, self._token):
             raise AnalysisError(
                 "LLM analysis contains sensitive data",
                 safe_code="sensitive_output",

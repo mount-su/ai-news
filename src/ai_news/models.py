@@ -438,6 +438,18 @@ class DailyReport(BaseModel):
     items: list[NewsItem]
     source_runs: list[SourceRun]
 
+    @model_validator(mode="before")
+    @classmethod
+    def require_schema_1_1_editorial_lanes(cls, values: object) -> object:
+        if not isinstance(values, Mapping) or values.get("schema_version", "1.1") != "1.1":
+            return values
+        items = values.get("items")
+        if isinstance(items, list) and any(
+            isinstance(item, Mapping) and "editorial_lane" not in item for item in items
+        ):
+            raise ValueError("schema 1.1 items require editorial_lane")
+        return values
+
     @field_validator("generated_at")
     @classmethod
     def require_aware_generated_at(cls, value: datetime) -> datetime:
