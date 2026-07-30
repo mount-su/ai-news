@@ -248,6 +248,7 @@ def test_news_item_factory_is_flat_json_safe_and_preserves_public_fields() -> No
         "published_at": "2026-07-26T08:30:00Z",
         "title": analysis.title,
         "category": Category.MODEL.value,
+        "editorial_lane": "产品工程",
         "summary": analysis.summary,
         "importance": 8,
         "why_it_matters": analysis.why_it_matters,
@@ -259,6 +260,35 @@ def test_news_item_factory_is_flat_json_safe_and_preserves_public_fields() -> No
     assert "raw" not in payload
     assert "analysis" not in payload
     json.dumps(payload, ensure_ascii=False)
+
+
+def test_news_item_infers_legacy_editorial_lane_from_category() -> None:
+    payload = _item("legacy-lane").model_dump(mode="json")
+    payload.pop("editorial_lane", None)
+    payload["category"] = Category.RESEARCH.value
+
+    item = NewsItem.model_validate(payload)
+
+    assert item.editorial_lane.value == "前沿研究"
+
+
+def test_new_daily_report_serializes_schema_1_1() -> None:
+    payload = _report().model_dump(mode="json")
+
+    assert payload["schema_version"] == "1.1"
+    assert all(item["editorial_lane"] == "产品工程" for item in payload["items"])
+
+
+def test_schema_1_0_report_without_editorial_lanes_remains_loadable() -> None:
+    payload = _report().model_dump(mode="json")
+    payload["schema_version"] = "1.0"
+    for item in payload["items"]:
+        item.pop("editorial_lane", None)
+
+    loaded = DailyReport.model_validate(payload)
+
+    assert loaded.schema_version == "1.0"
+    assert all(item.editorial_lane.value == "产品工程" for item in loaded.items)
 
 
 def test_public_models_reject_extra_fields_insecure_urls_and_naive_datetimes() -> None:

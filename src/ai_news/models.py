@@ -32,6 +32,19 @@ class Category(StrEnum):
     RESEARCH = "论文研究"
 
 
+class EditorialLane(StrEnum):
+    PRODUCT_ENGINEERING = "产品工程"
+    BUSINESS = "商业趋势"
+    RESEARCH = "前沿研究"
+
+
+def editorial_lane_for_category(category: Category | str) -> EditorialLane:
+    normalized = Category(category)
+    if normalized is Category.RESEARCH:
+        return EditorialLane.RESEARCH
+    return EditorialLane.PRODUCT_ENGINEERING
+
+
 class SourceSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -211,6 +224,7 @@ class Candidate(BaseModel):
 class Analysis(BaseModel):
     title: str
     category: Category
+    editorial_lane: EditorialLane
     summary: str = Field(min_length=20, max_length=1200)
     importance: int = Field(ge=1, le=10)
     why_it_matters: str = Field(min_length=10, max_length=800)
@@ -218,6 +232,18 @@ class Analysis(BaseModel):
     is_official: bool
     marketing_risk: Literal["low", "medium", "high"]
     tracking_signal: str = Field(min_length=5, max_length=500)
+
+    @model_validator(mode="before")
+    @classmethod
+    def infer_legacy_editorial_lane(cls, values: object) -> object:
+        if not isinstance(values, Mapping) or "editorial_lane" in values:
+            return values
+        category = values.get("category")
+        if category is None:
+            return values
+        normalized = dict(values)
+        normalized["editorial_lane"] = editorial_lane_for_category(category)
+        return normalized
 
 
 def _require_aware_datetime(value: datetime) -> datetime:
@@ -236,6 +262,7 @@ class NewsItem(BaseModel):
     published_at: datetime
     title: str = Field(min_length=1, max_length=1000)
     category: Category
+    editorial_lane: EditorialLane
     summary: str = Field(min_length=20, max_length=1200)
     importance: int = Field(ge=1, le=10)
     why_it_matters: str = Field(min_length=10, max_length=800)
@@ -243,6 +270,18 @@ class NewsItem(BaseModel):
     is_official: bool
     marketing_risk: Literal["low", "medium", "high"]
     tracking_signal: str = Field(min_length=5, max_length=500)
+
+    @model_validator(mode="before")
+    @classmethod
+    def infer_legacy_editorial_lane(cls, values: object) -> object:
+        if not isinstance(values, Mapping) or "editorial_lane" in values:
+            return values
+        category = values.get("category")
+        if category is None:
+            return values
+        normalized = dict(values)
+        normalized["editorial_lane"] = editorial_lane_for_category(category)
+        return normalized
 
     @field_validator("canonical_url", mode="before")
     @classmethod
@@ -307,6 +346,7 @@ class NewsItem(BaseModel):
             published_at=candidate.raw.published_at,
             title=analysis.title,
             category=analysis.category,
+            editorial_lane=analysis.editorial_lane,
             summary=analysis.summary,
             importance=analysis.importance,
             why_it_matters=analysis.why_it_matters,
@@ -389,7 +429,7 @@ class SourceRun(BaseModel):
 class DailyReport(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.0", "1.1"] = "1.1"
     date: date
     generated_at: datetime
     model: str = Field(min_length=1, max_length=300)
