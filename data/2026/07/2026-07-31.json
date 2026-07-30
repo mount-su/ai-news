@@ -1,0 +1,321 @@
+{
+  "candidate_count": 13,
+  "date": "2026-07-31",
+  "degraded": true,
+  "generated_at": "2026-07-30T18:06:08.883070Z",
+  "items": [
+    {
+      "canonical_url": "https://deepmind.google/blog/gemini-robotics-er-2-powering-robotics-with-video-understanding-task-orchestration-and-multi-robot-collaboration",
+      "category": "论文研究",
+      "editorial_lane": "前沿研究",
+      "id": "c8c2521853f8de9e",
+      "importance": 9,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "Gemini Robotics ER 2: powering robotics with video understanding, task orchestration, and multi-robot collaboration",
+      "published_at": "2026-07-30T15:00:59Z",
+      "source": "DeepMind",
+      "summary": "Gemini Robotics ER 2 在视频理解、任务编排和多机器人协作方面取得显著进步，使机器人能推理并协作解决现实任务。",
+      "tags": [
+        "机器人",
+        "多智能体协作",
+        "视频理解"
+      ],
+      "title": "DeepMind 发布 Gemini Robotics ER 2，提升机器人视频理解与多机协作",
+      "tracking_signal": "在 DeepMind 博客或 arXiv 检索 Gemini Robotics ER 2 的技术报告，确认具体基准测试和任务成功率。",
+      "why_it_matters": "为工业自动化和服务机器人提供了更强的感知与协同能力，可能推动仓储、制造等场景的机器人应用从单机走向群体协作。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/advancing-the-price-performance-frontier-with-gpt-5-6",
+      "category": "大模型",
+      "editorial_lane": "商业趋势",
+      "id": "dca7adc62d79fe1c",
+      "importance": 8,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Advancing the price-performance frontier with GPT-5.6",
+      "published_at": "2026-07-30T10:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 推出 GPT-5.6，针对 Luna 和 Terra 两个版本降低价格，旨在提升企业大规模部署 AI 工作流的性价比。",
+      "tags": [
+        "GPT-5.6",
+        "定价",
+        "企业AI"
+      ],
+      "title": "OpenAI 发布 GPT-5.6，下调 Luna 与 Terra 定价",
+      "tracking_signal": "关注 OpenAI 官方定价页面，对比 GPT-5.6 与 GPT-5 在 Luna/Terra 上的具体 token 单价变化。",
+      "why_it_matters": "直接影响企业 AI 应用的成本结构，可能加速大模型在商业场景的落地，并对其他模型厂商形成定价压力。"
+    },
+    {
+      "canonical_url": "https://arxiv.org/abs/2607.27183v1",
+      "category": "论文研究",
+      "editorial_lane": "前沿研究",
+      "id": "64cec094b4d6c924",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "Pangram 4 Technical Report",
+      "published_at": "2026-07-29T17:53:01Z",
+      "source": "arXiv AI",
+      "summary": "Pangram Labs 发布 Pangram 4 AI 文本分类模型，AUROC 0.9916，误报率 0.0041%，并能更好地区分人机协作文本和对抗攻击。",
+      "tags": [
+        "AI文本检测",
+        "Pangram",
+        "学术诚信"
+      ],
+      "title": "Pangram 4 文本检测模型发布，AUROC 达 0.9916",
+      "tracking_signal": "在 arXiv 上阅读 Pangram 4 技术报告，关注其公布的误报率和对抗鲁棒性测试的具体方法。",
+      "why_it_matters": "为教育、出版和内容平台提供了更可靠的 AI 生成文本检测工具，其细粒度编辑检测能力对维护学术诚信和内容原创性有直接价值。"
+    },
+    {
+      "canonical_url": "https://deepmind.google/blog/were-launching-lyria-35-in-google-flow-music-with-advances-across-musicality-lyrics-vocals-and-creative-control",
+      "category": "AI 工具",
+      "editorial_lane": "产品工程",
+      "id": "c469407231ee7907",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "We’re launching Lyria 3.5 in Google Flow Music, with advances across musicality, lyrics, vocals, and creative control",
+      "published_at": "2026-07-29T16:02:10Z",
+      "source": "DeepMind",
+      "summary": "Lyria 3.5 在音乐性、歌词、人声和创作控制方面全面提升，并集成到 Google Flow Music 产品中。",
+      "tags": [
+        "AI音乐",
+        "Lyria",
+        "Google"
+      ],
+      "title": "DeepMind 在 Google Flow Music 中推出 Lyria 3.5 音乐生成模型",
+      "tracking_signal": "在 Google Flow Music 中试用 Lyria 3.5，对比前代模型在歌词准确度和人声自然度上的表现。",
+      "why_it_matters": "直接提升 AI 音乐生成的质量和可控性，对音乐创作者和内容生产者是实用的工具升级，可能影响 AI 音乐赛道的竞争格局。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/chatgpt-for-academic-researchers",
+      "category": "大模型",
+      "editorial_lane": "商业趋势",
+      "id": "47da73cdc4f72b4c",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Accelerating scientific discovery with ChatGPT for Academic Researchers",
+      "published_at": "2026-07-29T10:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 宣布为 10 万名学术研究人员提供 ChatGPT 最先进模型的免费访问权限，以加速科研合作与发现。",
+      "tags": [
+        "学术研究",
+        "免费访问",
+        "ChatGPT"
+      ],
+      "title": "OpenAI 向 10 万名学术研究者免费开放 ChatGPT 高级模型",
+      "tracking_signal": "查看 OpenAI 官网的申请条件和覆盖机构名单，跟踪首批受益研究项目的公开成果。",
+      "why_it_matters": "降低学术界的 AI 使用门槛，可能催生大量 AI 驱动的科学研究，同时巩固 OpenAI 在学术生态中的影响力。"
+    },
+    {
+      "canonical_url": "https://huggingface.co/blog/Dharma-AI/gpu-management",
+      "category": "开源项目",
+      "editorial_lane": "产品工程",
+      "id": "859cdcef3df01ae8",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "GPU Management: Why Idle GPUs Are the New Grounded Aircraft",
+      "published_at": "2026-07-30T15:09:09Z",
+      "source": "Hugging Face",
+      "summary": "Hugging Face 发文将闲置 GPU 比作停飞的飞机，强调 GPU 资源管理的重要性，可能涉及新的调度或共享方案。",
+      "tags": [
+        "GPU管理",
+        "基础设施",
+        "开源"
+      ],
+      "title": "Hugging Face 探讨 GPU 闲置问题，类比停飞飞机",
+      "tracking_signal": "阅读 Hugging Face 博客原文，确认是否发布了新的 GPU 管理工具或开源项目。",
+      "why_it_matters": "直指 AI 基础设施利用效率痛点，若能推动更高效的 GPU 共享或调度工具，将降低开源社区和中小企业的算力成本。"
+    },
+    {
+      "canonical_url": "https://github.com/crewAIInc/crewAI/releases/tag/1.15.9",
+      "category": "Agent",
+      "editorial_lane": "产品工程",
+      "id": "2f374aa57665d4d2",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "1.15.9",
+      "published_at": "2026-07-30T05:45:26Z",
+      "source": "CrewAI",
+      "summary": "CrewAI 发布 1.15.9 版本，新增工具失败上报、Flow 执行失败事件，以及技能的渐进式披露功能。",
+      "tags": [
+        "CrewAI",
+        "多Agent",
+        "错误处理"
+      ],
+      "title": "CrewAI 1.15.9 新增工具失败上报与渐进式技能展示",
+      "tracking_signal": "查阅 CrewAI 更新日志，测试工具失败上报功能是否提供了足够的调试信息。",
+      "why_it_matters": "增强了多 Agent 系统的错误处理和用户体验，使开发者能更精细地控制 Agent 行为，提升复杂工作流的可靠性。"
+    },
+    {
+      "canonical_url": "https://github.com/langchain-ai/langchain/releases/tag/langchain-core%3D%3D1.5.3",
+      "category": "Agent",
+      "editorial_lane": "产品工程",
+      "id": "a075f17fe4bf36ef",
+      "importance": 5,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "langchain-core==1.5.3",
+      "published_at": "2026-07-30T14:56:10Z",
+      "source": "LangChain",
+      "summary": "LangChain Core 发布 1.5.3 版本，修复了在网关场景下回退使用 LANGSMITH_API_KEY 的问题。",
+      "tags": [
+        "LangChain",
+        "版本更新",
+        "Agent框架"
+      ],
+      "title": "LangChain Core 1.5.3 修复 API 密钥回退逻辑",
+      "tracking_signal": "查看 GitHub 发布说明中的具体修复细节，并检查自己的 LangChain 项目是否需要升级。",
+      "why_it_matters": "对使用 LangChain 构建 Agent 应用的开发者有直接影响，确保在特定配置下 API 密钥能正确加载，避免运行中断。"
+    },
+    {
+      "canonical_url": "https://arxiv.org/abs/2607.27196v1",
+      "category": "论文研究",
+      "editorial_lane": "前沿研究",
+      "id": "e9f461c5b9552413",
+      "importance": 5,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "From Classification to Regression: Using a Fruitfly to Solve Equations",
+      "published_at": "2026-07-29T17:58:05Z",
+      "source": "arXiv AI",
+      "summary": "提出一种受果蝇环境感知机制启发的回归框架，用局部模式库替代全局代理模型，通过查询与存储模式的相似性进行预测。",
+      "tags": [
+        "生物启发",
+        "回归",
+        "科学计算"
+      ],
+      "title": "新研究受果蝇感知机制启发，用分类方法解决回归问题",
+      "tracking_signal": "在 arXiv 上检索该论文，查看其在具体科学数据集上的回归误差对比实验。",
+      "why_it_matters": "为科学数据建模提供了一种轻量、可解释的非线性回归新思路，尤其适用于输入空间有限且重复的科学计算场景。"
+    }
+  ],
+  "model": "deepseek-v4-pro",
+  "schema_version": "1.1",
+  "source_runs": [
+    {
+      "elapsed_ms": 643,
+      "error_type": null,
+      "item_count": 1056,
+      "source_id": "openai",
+      "source_name": "OpenAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1026,
+      "error_type": null,
+      "item_count": 20,
+      "source_id": "google-ai",
+      "source_name": "Google AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1143,
+      "error_type": null,
+      "item_count": 100,
+      "source_id": "deepmind",
+      "source_name": "DeepMind",
+      "success": true
+    },
+    {
+      "elapsed_ms": 890,
+      "error_type": null,
+      "item_count": 834,
+      "source_id": "hugging-face",
+      "source_name": "Hugging Face",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1457,
+      "error_type": null,
+      "item_count": 40,
+      "source_id": "arxiv-ai",
+      "source_name": "arXiv AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1028,
+      "error_type": "HttpFetchError",
+      "item_count": 0,
+      "source_id": "github-codex",
+      "source_name": "OpenAI Codex",
+      "success": false
+    },
+    {
+      "elapsed_ms": 615,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-claude-code",
+      "source_name": "Claude Code",
+      "success": true
+    },
+    {
+      "elapsed_ms": 370,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "github-gemini-cli",
+      "source_name": "Gemini CLI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 352,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-langchain",
+      "source_name": "LangChain",
+      "success": true
+    },
+    {
+      "elapsed_ms": 432,
+      "error_type": null,
+      "item_count": 7,
+      "source_id": "github-crewai",
+      "source_name": "CrewAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 484,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-llama-index",
+      "source_name": "LlamaIndex",
+      "success": true
+    },
+    {
+      "elapsed_ms": 389,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-transformers",
+      "source_name": "Transformers",
+      "success": true
+    },
+    {
+      "elapsed_ms": 330,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-vllm",
+      "source_name": "vLLM",
+      "success": true
+    },
+    {
+      "elapsed_ms": 294,
+      "error_type": null,
+      "item_count": 8,
+      "source_id": "github-ollama",
+      "source_name": "Ollama",
+      "success": true
+    },
+    {
+      "elapsed_ms": 353,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-cline",
+      "source_name": "Cline",
+      "success": true
+    }
+  ]
+}
