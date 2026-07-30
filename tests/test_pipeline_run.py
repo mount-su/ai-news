@@ -14,6 +14,7 @@ from ai_news.models import (
     Analysis,
     Category,
     DailyReport,
+    EditorialLane,
     RawItem,
     Settings,
     SourceConfig,
@@ -75,10 +76,16 @@ def _raw(
     )
 
 
-def _analysis(number: int, *, importance: int = 8) -> Analysis:
+def _analysis(
+    number: int,
+    *,
+    importance: int = 8,
+    editorial_lane: EditorialLane = EditorialLane.PRODUCT_ENGINEERING,
+) -> Analysis:
     return Analysis(
         title=f"分析标题 {number}",
         category=Category.MODEL,
+        editorial_lane=editorial_lane,
         summary=f"这是第 {number} 条满足长度要求并且完全基于候选事实的中文摘要内容。",
         importance=importance,
         why_it_matters=f"第 {number} 条进展可能影响产品能力和后续行业采用。",
@@ -107,7 +114,21 @@ class _Analyzer:
         self.calls.append(items)
         if self._result_factory is not None:
             return self._result_factory(items)
-        return {item.id: _analysis(index) for index, item in enumerate(items)}
+        lanes = [
+            EditorialLane.PRODUCT_ENGINEERING,
+            EditorialLane.PRODUCT_ENGINEERING,
+            EditorialLane.PRODUCT_ENGINEERING,
+            EditorialLane.PRODUCT_ENGINEERING,
+            EditorialLane.BUSINESS,
+            EditorialLane.BUSINESS,
+            EditorialLane.BUSINESS,
+            EditorialLane.RESEARCH,
+            EditorialLane.RESEARCH,
+        ]
+        return {
+            item.id: _analysis(index, editorial_lane=lane)
+            for index, (item, lane) in enumerate(zip(items[:9], lanes, strict=False))
+        }
 
 
 def _collector(items_by_source: dict[str, list[RawItem]]) -> Callable[..., Any]:
@@ -115,6 +136,29 @@ def _collector(items_by_source: dict[str, list[RawItem]]) -> Callable[..., Any]:
         return items_by_source[source.id]
 
     return collect
+
+
+def _with_filler_sources(
+    primary_source: SourceSpec,
+    primary_items: list[RawItem],
+    *,
+    filler_count: int = 3,
+) -> tuple[SourceConfig, Callable[..., Any]]:
+    filler_sources = [_source(900 + index) for index in range(filler_count)]
+    items_by_source = {
+        primary_source.id: primary_items,
+        **{
+            source.id: [
+                _raw(900_000 + source_index * 100 + item_index, source=source)
+                for item_index in range(3)
+            ]
+            for source_index, source in enumerate(filler_sources)
+        },
+    }
+    return (
+        SourceConfig(sources=[primary_source, *filler_sources]),
+        _collector(items_by_source),
+    )
 
 
 def _run(**kwargs: Any) -> DailyReport:
@@ -133,15 +177,16 @@ def _run(**kwargs: Any) -> DailyReport:
 
 def test_source_failure_does_not_block_healthy_source_and_marks_degraded() -> None:
     failed_source = _source(0)
-    healthy_source = _source(1)
+    healthy_sources = [_source(index) for index in range(1, 4)]
 
     async def collect(_client: Any, source: SourceSpec) -> list[RawItem]:
         if source.id == failed_source.id:
             raise RuntimeError("private-token-and-query-value")
-        return [_raw(index, source=source) for index in range(5)]
+        source_number = int(source.id.rsplit("-", 1)[1])
+        return [_raw(source_number * 100 + index, source=source) for index in range(3)]
 
     report = _run(
-        source_config=SourceConfig(sources=[failed_source, healthy_source]),
+        source_config=SourceConfig(sources=[failed_source, *healthy_sources]),
         collector=collect,
         analyzer=_Analyzer(),
     )
@@ -149,13 +194,13 @@ def test_source_failure_does_not_block_healthy_source_and_marks_degraded() -> No
     assert report.degraded is True
     assert [run.source_id for run in report.source_runs] == [
         failed_source.id,
-        healthy_source.id,
+        *(source.id for source in healthy_sources),
     ]
     assert report.source_runs[0].success is False
     assert report.source_runs[0].error_type == "RuntimeError"
     assert report.source_runs[0].item_count == 0
     assert report.source_runs[1].success is True
-    assert report.source_runs[1].item_count == 5
+    assert all(run.item_count == 3 for run in report.source_runs[1:])
     assert "private-token" not in report.model_dump_json()
 
 
@@ -214,11 +259,11 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
         return b"feed"
 
     def fake_parse_feed(_payload: bytes, source: SourceSpec) -> list[RawItem]:
-        return [_raw(0, source=source), _raw(1, source=source)]
+        return [_raw(index, source=source) for index in range(3)]
 
     async def fake_arxiv(received_client: object, source: SourceSpec) -> list[RawItem]:
         seen_clients.append(received_client)
-        return [_raw(2, source=source), _raw(3, source=source)]
+        return [_raw(100 + index, source=source) for index in range(3)]
 
     async def fake_github(
         received_client: object,
@@ -227,7 +272,7 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     ) -> list[RawItem]:
         seen_clients.append(received_client)
         assert token == "github-secret"
-        return [_raw(4, source=source), _raw(5, source=source)]
+        return [_raw(200 + index, source=source) for index in range(3)]
 
     def analyzer_factory(settings: Settings, *, client: object) -> _Analyzer:
         seen_settings.append(settings)
@@ -289,10 +334,15 @@ def test_analyzer_factory_failure_does_not_expose_or_retain_sensitive_state(
 
     monkeypatch.setattr(run_module, "create_analyzer", broken_factory)
     source = _source(0)
+    source_config, collector = _with_filler_sources(
+        source,
+        [_raw(index, source=source) for index in range(3)],
+    )
 
     with pytest.raises(AnalysisPipelineError) as exc_info:
         _run(
-            collector=_collector({source.id: [_raw(index, source=source) for index in range(5)]}),
+            source_config=source_config,
+            collector=collector,
             settings=Settings(
                 llm_protocol="openai-chat",
                 llm_base_url="https://ark.cn-beijing.volces.com/api/v3",
@@ -323,12 +373,21 @@ def test_time_window_includes_both_boundaries_and_excludes_future() -> None:
     ]
     analyzer = _Analyzer()
     items = [_raw(index, published_at=timestamp) for index, timestamp in enumerate(timestamps)]
+    source = _source(0)
+    source_config, collector = _with_filler_sources(source, items)
 
-    with pytest.raises(PublicationThresholdError):
-        _run(collector=_collector({_source(0).id: items}), analyzer=analyzer)
+    _run(
+        source_config=source_config,
+        collector=collector,
+        analyzer=analyzer,
+    )
 
     assert len(analyzer.calls) == 1
-    assert {item.raw.published_at for item in analyzer.calls[0]} == set(timestamps[:2])
+    assert {
+        item.raw.published_at
+        for item in analyzer.calls[0]
+        if item.raw.source_id == source.id
+    } == set(timestamps[:2])
 
 
 def test_history_deduplication_and_pretrim_build_balanced_thirty_six_item_pool() -> None:
@@ -370,34 +429,49 @@ def test_history_deduplication_and_pretrim_build_balanced_thirty_six_item_pool()
     assert report.candidate_count == 36
 
 
-def test_fewer_than_five_valid_items_does_not_write_any_files(tmp_path: Path) -> None:
-    source = _source(0)
-    items = [_raw(index, source=source) for index in range(4)]
+def test_fewer_than_nine_valid_candidates_does_not_call_analyzer_or_write(
+    tmp_path: Path,
+) -> None:
+    sources = [_source(index) for index in range(3)]
+    items_by_source = {
+        sources[0].id: [_raw(index, source=sources[0]) for index in range(3)],
+        sources[1].id: [_raw(100 + index, source=sources[1]) for index in range(3)],
+        sources[2].id: [_raw(200 + index, source=sources[2]) for index in range(2)],
+    }
+    analyzer = _Analyzer()
 
     with pytest.raises(PublicationThresholdError):
         asyncio.run(
             run_daily(
                 root=tmp_path,
                 run_date=RUN_DATE,
-                source_config=SourceConfig(sources=[source]),
-                collector=_collector({source.id: items}),
-                analyzer=_Analyzer(),
+                source_config=SourceConfig(sources=sources),
+                collector=_collector(items_by_source),
+                analyzer=analyzer,
                 now=NOW,
                 model="test-model",
             )
         )
 
+    assert analyzer.calls == []
     assert list(tmp_path.rglob("*")) == []
 
 
-def test_five_valid_items_build_and_persist_report(tmp_path: Path) -> None:
-    source = _source(0)
+def test_nine_valid_items_build_and_persist_schema_1_1_report(tmp_path: Path) -> None:
+    sources = [_source(index) for index in range(3)]
+    items_by_source = {
+        source.id: [
+            _raw(source_index * 100 + index, source=source)
+            for index in range(3)
+        ]
+        for source_index, source in enumerate(sources)
+    }
     report = asyncio.run(
         run_daily(
             root=tmp_path,
             run_date=RUN_DATE,
-            source_config=SourceConfig(sources=[source]),
-            collector=_collector({source.id: [_raw(index, source=source) for index in range(5)]}),
+            source_config=SourceConfig(sources=sources),
+            collector=_collector(items_by_source),
             analyzer=_Analyzer(),
             now=NOW,
             model="test-model",
@@ -408,12 +482,14 @@ def test_five_valid_items_build_and_persist_report(tmp_path: Path) -> None:
     markdown_path = tmp_path / "content/2026-07-26.md"
     index_path = tmp_path / "data/index.json"
     assert DailyReport.model_validate_json(report_path.read_bytes()) == report
+    assert report.schema_version == "1.1"
+    assert len(report.items) == 9
     assert markdown_path.is_file()
     assert index_path.is_file()
 
 
-def test_final_items_are_stably_sorted_and_limited_to_twenty() -> None:
-    sources = [_source(source_index) for source_index in range(4)]
+def test_final_nine_items_are_stably_sorted() -> None:
+    sources = [_source(source_index) for source_index in range(3)]
     items_by_source = {
         source.id: [
             _raw(
@@ -421,18 +497,32 @@ def test_final_items_are_stably_sorted_and_limited_to_twenty() -> None:
                 source=source,
                 published_at=NOW - timedelta(minutes=index % 3),
             )
-            for index in range(7)
+            for index in range(4)
         ]
         for source_index, source in enumerate(sources)
     }
 
     def analyses(candidates: list[Any]) -> dict[str, Analysis]:
+        lanes = [
+            EditorialLane.PRODUCT_ENGINEERING,
+            EditorialLane.PRODUCT_ENGINEERING,
+            EditorialLane.PRODUCT_ENGINEERING,
+            EditorialLane.PRODUCT_ENGINEERING,
+            EditorialLane.BUSINESS,
+            EditorialLane.BUSINESS,
+            EditorialLane.BUSINESS,
+            EditorialLane.RESEARCH,
+            EditorialLane.RESEARCH,
+        ]
         return {
             candidate.id: _analysis(
                 index,
                 importance=(index % 4) + 7,
+                editorial_lane=lane,
             )
-            for index, candidate in enumerate(candidates)
+            for index, (candidate, lane) in enumerate(
+                zip(candidates[:9], lanes, strict=True)
+            )
         }
 
     report = _run(
@@ -449,9 +539,88 @@ def test_final_items_are_stably_sorted_and_limited_to_twenty() -> None:
         ),
     )
 
-    assert len(report.items) == 20
+    assert len(report.items) == 9
     assert report.items == expected
-    assert report.items[:3] == expected[:3]
+
+
+def test_pipeline_rejects_eight_analyzed_items() -> None:
+    sources = [_source(index) for index in range(3)]
+    items_by_source = {
+        source.id: [
+            _raw(source_index * 100 + index, source=source)
+            for index in range(3)
+        ]
+        for source_index, source in enumerate(sources)
+    }
+
+    def eight_analyses(candidates: list[Any]) -> dict[str, Analysis]:
+        return {
+            candidate.id: _analysis(index)
+            for index, candidate in enumerate(candidates[:8])
+        }
+
+    with pytest.raises(PublicationThresholdError, match="nine"):
+        _run(
+            source_config=SourceConfig(sources=sources),
+            collector=_collector(items_by_source),
+            analyzer=_Analyzer(eight_analyses),
+        )
+
+
+def test_pipeline_rejects_invalid_editorial_lane_distribution() -> None:
+    sources = [_source(index) for index in range(3)]
+    items_by_source = {
+        source.id: [
+            _raw(source_index * 100 + index, source=source)
+            for index in range(3)
+        ]
+        for source_index, source in enumerate(sources)
+    }
+    lanes = [
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.BUSINESS,
+        EditorialLane.BUSINESS,
+        EditorialLane.RESEARCH,
+        EditorialLane.RESEARCH,
+    ]
+
+    def invalid_lanes(candidates: list[Any]) -> dict[str, Analysis]:
+        return {
+            candidate.id: _analysis(index, editorial_lane=lane)
+            for index, (candidate, lane) in enumerate(
+                zip(candidates[:9], lanes, strict=True)
+            )
+        }
+
+    with pytest.raises(ReportValidationError, match="distribution"):
+        _run(
+            source_config=SourceConfig(sources=sources),
+            collector=_collector(items_by_source),
+            analyzer=_Analyzer(invalid_lanes),
+        )
+
+
+def test_pipeline_rejects_more_than_three_final_items_from_one_source() -> None:
+    sources = [_source(index) for index in range(3)]
+    source_sizes = (4, 3, 2)
+    items_by_source = {
+        source.id: [
+            _raw(source_index * 100 + index, source=source)
+            for index in range(source_sizes[source_index])
+        ]
+        for source_index, source in enumerate(sources)
+    }
+
+    with pytest.raises(ReportValidationError, match="distribution"):
+        _run(
+            source_config=SourceConfig(sources=sources),
+            collector=_collector(items_by_source),
+            analyzer=_Analyzer(),
+        )
 
 
 @pytest.mark.parametrize("invalid_kind", ["missing", "invalid"])
@@ -491,7 +660,8 @@ def test_non_strict_analysis_payloads_are_discarded_without_saving(
     invalid_kind: str,
 ) -> None:
     source = _source(0)
-    items = [_raw(index, source=source) for index in range(5)]
+    items = [_raw(index, source=source) for index in range(3)]
+    source_config, collector = _with_filler_sources(source, items)
     saves: list[DailyReport] = []
 
     def result(candidates: list[Any]) -> dict[str, dict[str, Any]]:
@@ -515,7 +685,8 @@ def test_non_strict_analysis_payloads_are_discarded_without_saving(
 
     with pytest.raises(PublicationThresholdError):
         _run(
-            collector=_collector({source.id: items}),
+            source_config=source_config,
+            collector=collector,
             analyzer=_Analyzer(result),
             report_saver=lambda _root, report: saves.append(report),
         )
@@ -525,7 +696,8 @@ def test_non_strict_analysis_payloads_are_discarded_without_saving(
 
 def test_unknown_analysis_id_fails_the_whole_run_without_saving() -> None:
     source = _source(0)
-    items = [_raw(index, source=source) for index in range(5)]
+    items = [_raw(index, source=source) for index in range(3)]
+    source_config, collector = _with_filler_sources(source, items)
     saves: list[DailyReport] = []
 
     def result(candidates: list[Any]) -> dict[str, Analysis]:
@@ -535,7 +707,8 @@ def test_unknown_analysis_id_fails_the_whole_run_without_saving() -> None:
 
     with pytest.raises(AnalysisPipelineError):
         _run(
-            collector=_collector({source.id: items}),
+            source_config=source_config,
+            collector=collector,
             analyzer=_Analyzer(result),
             report_saver=lambda _root, report: saves.append(report),
         )
@@ -545,7 +718,8 @@ def test_unknown_analysis_id_fails_the_whole_run_without_saving() -> None:
 
 def test_duplicate_analysis_id_semantics_are_rejected() -> None:
     source = _source(0)
-    items = [_raw(index, source=source) for index in range(5)]
+    items = [_raw(index, source=source) for index in range(3)]
+    source_config, collector = _with_filler_sources(source, items)
 
     class _DuplicateResult:
         def items(self) -> list[tuple[str, Analysis]]:
@@ -562,19 +736,22 @@ def test_duplicate_analysis_id_semantics_are_rejected() -> None:
 
     with pytest.raises(AnalysisPipelineError):
         _run(
-            collector=_collector({source.id: items}),
+            source_config=source_config,
+            collector=collector,
             analyzer=_Analyzer(result),
         )
 
 
 def test_report_validation_failure_happens_before_save() -> None:
     source = _source(0)
-    items = [_raw(index, source=source) for index in range(5)]
+    items = [_raw(index, source=source) for index in range(3)]
+    source_config, collector = _with_filler_sources(source, items)
     saves: list[DailyReport] = []
 
     with pytest.raises(ReportValidationError):
         _run(
-            collector=_collector({source.id: items}),
+            source_config=source_config,
+            collector=collector,
             analyzer=_Analyzer(),
             model=" ",
             report_saver=lambda _root, report: saves.append(report),
@@ -597,9 +774,14 @@ def test_no_healthy_source_and_analyzer_failure_are_safe_pipeline_errors() -> No
         async def analyze(self, _items: list[Any]) -> dict[str, Analysis]:
             raise RuntimeError("secret analyzer details")
 
+    source_config, collector = _with_filler_sources(
+        source,
+        [_raw(index, source=source) for index in range(3)],
+    )
     with pytest.raises(AnalysisPipelineError) as analysis_error:
         _run(
-            collector=_collector({source.id: [_raw(index, source=source) for index in range(5)]}),
+            source_config=source_config,
+            collector=collector,
             analyzer=_BrokenAnalyzer(),
         )
     assert str(analysis_error.value) == "analysis failed"
@@ -617,9 +799,9 @@ def test_analysis_pipeline_error_accepts_only_safe_diagnostic_codes() -> None:
 
 
 def test_fixed_clocks_make_the_report_deterministic() -> None:
-    sources = [_source(0), _source(1)]
+    sources = [_source(0), _source(1), _source(2)]
     items = {
-        source.id: [_raw(index + source_index * 5, source=source) for index in range(5)]
+        source.id: [_raw(index + source_index * 100, source=source) for index in range(3)]
         for source_index, source in enumerate(sources)
     }
     arguments = {
@@ -651,14 +833,22 @@ def test_duplicate_canonical_urls_are_folded_before_bounded_pretrim() -> None:
         raw_data["source_weight"] = 1
         unique_items.append(RawItem.model_validate(raw_data))
 
+    analyzer = _Analyzer()
+    source_config, collector = _with_filler_sources(
+        source,
+        [*duplicate_items, *unique_items],
+    )
     report = _run(
-        collector=_collector({source.id: [*duplicate_items, *unique_items]}),
-        analyzer=_Analyzer(),
+        source_config=source_config,
+        collector=collector,
+        analyzer=analyzer,
     )
 
-    assert report.candidate_count == 6
-    assert len(report.items) == 6
-    assert sum(str(item.canonical_url) == duplicate_url for item in report.items) == 1
+    assert report.candidate_count == 15
+    assert len(report.items) == 9
+    assert sum(
+        str(item.canonical_url) == duplicate_url for item in analyzer.calls[0]
+    ) == 1
 
 
 def test_same_host_exact_titles_are_folded_before_bounded_pretrim() -> None:
@@ -679,13 +869,25 @@ def test_same_host_exact_titles_are_folded_before_bounded_pretrim() -> None:
         for index in range(5)
     ]
 
+    analyzer = _Analyzer()
+    source_config, collector = _with_filler_sources(
+        source,
+        [*noise_items, *healthy_items],
+    )
     report = _run(
-        collector=_collector({source.id: [*noise_items, *healthy_items]}),
-        analyzer=_Analyzer(),
+        source_config=source_config,
+        collector=collector,
+        analyzer=analyzer,
     )
 
-    assert report.candidate_count == 6
-    assert len(report.items) == 6
+    assert report.candidate_count == 15
+    assert len(report.items) == 9
+    primary_titles = [
+        item.raw.title
+        for item in analyzer.calls[0]
+        if item.raw.source_id == source.id
+    ]
+    assert len([title for title in primary_titles if "SAME" in title]) == 1
 
 
 def test_exact_key_bridge_merges_both_existing_groups(
@@ -722,19 +924,26 @@ def test_exact_key_bridge_merges_both_existing_groups(
         candidates: list[Any],
         historical_urls: set[str],
     ) -> list[Any]:
-        dedupe_sizes.append(len(candidates))
+        dedupe_sizes.append(
+            sum(candidate.raw.source_id == source.id for candidate in candidates)
+        )
         return real_deduplicate(candidates, historical_urls)
 
     monkeypatch.setattr(run_module, "deduplicate", observed_deduplicate)
 
+    source_config, collector = _with_filler_sources(
+        source,
+        [*bridge_items, *healthy_items],
+    )
     report = _run(
-        collector=_collector({source.id: [*bridge_items, *healthy_items]}),
+        source_config=source_config,
+        collector=collector,
         analyzer=_Analyzer(),
     )
 
     assert dedupe_sizes == [6]
-    assert report.candidate_count == 6
-    assert len(report.items) == 6
+    assert report.candidate_count == 15
+    assert len(report.items) == 9
 
 
 def test_large_exact_title_alias_state_is_bounded_and_order_independent(
@@ -763,26 +972,35 @@ def test_large_exact_title_alias_state_is_bounded_and_order_independent(
     real_deduplicate = run_module.deduplicate
 
     def bounded_deduplicate(candidates: list[Any], historical_urls: set[str]) -> list[Any]:
-        dedupe_sizes.append(len(candidates))
+        dedupe_sizes.append(
+            sum(candidate.raw.source_id == source.id for candidate in candidates)
+        )
         return real_deduplicate(candidates, historical_urls)
 
     monkeypatch.setattr(run_module, "deduplicate", bounded_deduplicate)
     first_analyzer = _Analyzer()
     second_analyzer = _Analyzer()
 
+    first_config, first_collector = _with_filler_sources(source, all_items)
+    second_config, second_collector = _with_filler_sources(
+        source,
+        list(reversed(all_items)),
+    )
     first_report = _run(
-        collector=_collector({source.id: all_items}),
+        source_config=first_config,
+        collector=first_collector,
         analyzer=first_analyzer,
         monotonic=lambda: 100.0,
     )
     second_report = _run(
-        collector=_collector({source.id: list(reversed(all_items))}),
+        source_config=second_config,
+        collector=second_collector,
         analyzer=second_analyzer,
         monotonic=lambda: 100.0,
     )
 
     assert dedupe_sizes == [6, 6]
-    assert first_report.candidate_count == second_report.candidate_count == 6
+    assert first_report.candidate_count == second_report.candidate_count == 15
     assert [item.id for item in first_analyzer.calls[0]] == [
         item.id for item in second_analyzer.calls[0]
     ]
@@ -892,25 +1110,35 @@ def test_more_than_1500_unique_items_stay_bounded_and_order_independent(
     real_deduplicate = run_module.deduplicate
 
     def bounded_deduplicate(candidates: list[Any], historical_urls: set[str]) -> list[Any]:
-        dedupe_sizes.append(len(candidates))
+        dedupe_sizes.append(
+            sum(candidate.raw.source_id == source.id for candidate in candidates)
+        )
         return real_deduplicate(candidates, historical_urls)
 
     monkeypatch.setattr(run_module, "deduplicate", bounded_deduplicate)
     first_analyzer = _Analyzer()
     second_analyzer = _Analyzer()
 
+    first_config, first_collector = _with_filler_sources(source, raw_items)
+    second_config, second_collector = _with_filler_sources(
+        source,
+        list(reversed(raw_items)),
+    )
     _run(
-        collector=_collector({source.id: raw_items}),
+        source_config=first_config,
+        collector=first_collector,
         analyzer=first_analyzer,
         monotonic=lambda: 100.0,
     )
     _run(
-        collector=_collector({source.id: list(reversed(raw_items))}),
+        source_config=second_config,
+        collector=second_collector,
         analyzer=second_analyzer,
         monotonic=lambda: 100.0,
     )
 
-    assert dedupe_sizes == [500, 500]
+    assert dedupe_sizes[0] == dedupe_sizes[1]
+    assert 0 < dedupe_sizes[0] <= 500
     assert [item.id for item in first_analyzer.calls[0]] == [
         item.id for item in second_analyzer.calls[0]
     ]
@@ -933,10 +1161,15 @@ def test_client_exit_failure_is_safe_and_prevents_all_persistence(
         saves.append(report)
         save_report(root, report)
 
+    source_config, collector = _with_filler_sources(
+        source,
+        [_raw(index, source=source) for index in range(3)],
+    )
     with pytest.raises(CollectionPipelineError) as exit_error:
         _run(
             root=tmp_path,
-            collector=_collector({source.id: [_raw(index, source=source) for index in range(5)]}),
+            source_config=source_config,
+            collector=collector,
             analyzer=_Analyzer(),
             client_factory=lambda *, timeout: _FailingExitContext(),
             report_saver=saver,
@@ -967,9 +1200,14 @@ def test_report_is_saved_once_only_after_normal_client_exit(tmp_path: Path) -> N
         events.append("save")
         saves.append(report)
 
+    source_config, collector = _with_filler_sources(
+        source,
+        [_raw(index, source=source) for index in range(3)],
+    )
     report = _run(
         root=tmp_path,
-        collector=_collector({source.id: [_raw(index, source=source) for index in range(5)]}),
+        source_config=source_config,
+        collector=collector,
         analyzer=_Analyzer(),
         client_factory=lambda *, timeout: _SuccessfulContext(),
         report_saver=saver,

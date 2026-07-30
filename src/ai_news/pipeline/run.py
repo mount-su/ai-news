@@ -6,6 +6,7 @@ import asyncio
 import os
 import re
 import time
+from collections import Counter
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, date, datetime, timedelta
@@ -46,8 +47,9 @@ _COLLECTION_CONCURRENCY = 6
 _DEDUPLICATION_LIMIT = 500
 _EDITORIAL_CANDIDATE_LIMIT = 36
 _EDITORIAL_SOURCE_LIMIT = 6
-_PUBLICATION_LIMIT = 20
-_PUBLICATION_THRESHOLD = 5
+_PUBLICATION_COUNT = 9
+_MAX_FINAL_SOURCE_ITEMS = 3
+_MAX_LANE_ITEMS = 4
 _WINDOW = timedelta(hours=36)
 _ANALYSIS_FIELDS = frozenset(Analysis.model_fields)
 _EXACT_STATE_LIMIT = _DEDUPLICATION_LIMIT * 6
@@ -427,7 +429,34 @@ def _build_items(
             -ensure_utc(item.published_at).timestamp(),
             item.id,
         ),
-    )[:_PUBLICATION_LIMIT]
+    )
+
+
+def _validate_editorial_distribution(
+    items: list[NewsItem],
+    selected: list[Candidate],
+) -> None:
+    if len(items) < _PUBLICATION_COUNT:
+        raise PublicationThresholdError("fewer than nine valid items")
+    if len(items) != _PUBLICATION_COUNT:
+        raise ReportValidationError("editorial distribution invalid")
+
+    lane_counts = Counter(item.editorial_lane for item in items)
+    if len(lane_counts) != 3 or any(
+        count < 1 or count > _MAX_LANE_ITEMS for count in lane_counts.values()
+    ):
+        raise ReportValidationError("editorial distribution invalid")
+
+    candidate_by_id = {candidate.id: candidate for candidate in selected}
+    try:
+        source_counts = Counter(
+            candidate_by_id[item.id].raw.source_id
+            for item in items
+        )
+    except KeyError:
+        raise ReportValidationError("editorial distribution invalid") from None
+    if any(count > _MAX_FINAL_SOURCE_ITEMS for count in source_counts.values()):
+        raise ReportValidationError("editorial distribution invalid")
 
 
 async def _run_with_client(
@@ -470,8 +499,8 @@ async def _run_with_client(
     except Exception:
         raise DataPipelineError("candidate preparation failed") from None
 
-    if not selected:
-        raise PublicationThresholdError("fewer than five valid items")
+    if len(selected) < _PUBLICATION_COUNT:
+        raise PublicationThresholdError("fewer than nine valid items")
 
     selected_analyzer = analyzer
     if selected_analyzer is None:
@@ -498,8 +527,7 @@ async def _run_with_client(
         raise AnalysisPipelineError("analysis failed") from None
     analyses = _validated_analyses(raw_analyses, selected)
     items = _build_items(selected, analyses)
-    if len(items) < _PUBLICATION_THRESHOLD:
-        raise PublicationThresholdError("fewer than five valid items")
+    _validate_editorial_distribution(items, selected)
 
     try:
         report = DailyReport(
