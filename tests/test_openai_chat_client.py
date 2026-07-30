@@ -388,6 +388,73 @@ def test_openai_rejects_other_credential_names_and_common_token_forms(
 
 
 @pytest.mark.parametrize(
+    "credential_key",
+    [
+        "ANTHROPIC_" + "AUTH_TOKEN",
+        "GITHUB_" + "TOKEN",
+        "access_" + "token",
+        "secret_" + "access_key",
+        "client_" + "secret",
+    ],
+)
+def test_openai_rejects_json_quoted_credential_assignments(
+    credential_key: str,
+) -> None:
+    candidate = _candidate("quoted-credential")
+    foreign_secret = "foreign-provider-credential-123456"
+    credential_json = json.dumps({credential_key: foreign_secret})
+    leaked_row = _analysis_row(
+        candidate,
+        summary=f"模型意外输出外部凭据 {credential_json}，该内容不能公开发布。",
+    )
+
+    with pytest.raises(
+        AnalysisError,
+        match=r"^LLM analysis contains sensitive data$",
+    ):
+        _run_analyze(
+            lambda _: httpx.Response(200, content=_openai_response([leaked_row])),
+            [candidate],
+        )
+
+
+@pytest.mark.parametrize(
+    "credential_key",
+    [
+        "ANTHROPIC_" + "AUTH_TOKEN",
+        "GITHUB_" + "TOKEN",
+        "access_" + "token",
+        "secret_" + "access_key",
+        "client_" + "secret",
+    ],
+)
+def test_openai_redacts_json_quoted_credentials_from_repair_prompt(
+    credential_key: str,
+) -> None:
+    candidate = _candidate("quoted-repair")
+    foreign_secret = "foreign-provider-credential-123456"
+    requests: list[httpx.Request] = []
+    invalid = [
+        _analysis_row(
+            candidate,
+            unexpected={credential_key: foreign_secret},
+        )
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        rows = invalid if len(requests) == 1 else [_analysis_row(candidate)]
+        return httpx.Response(200, content=_openai_response(rows))
+
+    result = _run_analyze(handler, [candidate])
+
+    assert list(result) == [candidate.id]
+    repair_prompt = json.loads(requests[1].content)["messages"][1]["content"]
+    assert foreign_secret not in repair_prompt
+    assert "[REDACTED]" in repair_prompt
+
+
+@pytest.mark.parametrize(
     "response_body",
     [
         b"{}",

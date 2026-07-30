@@ -39,15 +39,15 @@ _OUTER_FENCE = re.compile(r"\A```(?:json)?[ \t]*\r?\n(.*?)\r?\n?```[ \t]*\Z", re
 _SENSITIVE_TEXT = re.compile(
     r"""(?ix)
     (?:
-        \b(?:
+        (?<!\w)(?:\\?["'])?(?:
             (?:llm[_-]?)?api[_ -]?key
           | anthropic[_-]auth[_-]token
           | github[_-]token
           | access[_-]token
           | secret[_-](?:access[_-])?key
           | client[_-]secret
-        )\b
-        \s*[:=]\s*["']?[A-Za-z0-9_./+=-]{8,}
+        )(?:\\?["'])?
+        \s*[:=]\s*(?:\\?["'])?[A-Za-z0-9_./+=-]{8,}
       | \bauthorization\b\s*[:=]\s*bearer\s+[A-Za-z0-9_./+=-]{8,}
       | \bsk-[A-Za-z0-9][A-Za-z0-9_-]{15,}
       | \bgh[pousr]_[A-Za-z0-9]{20,}
