@@ -15,7 +15,7 @@ from pydantic import SecretStr
 from ai_news.llm.base import AnalysisError
 from ai_news.llm.openai_chat import OpenAIChatAnalyzer
 from ai_news.llm.prompt import SYSTEM_PROMPT
-from ai_news.models import Candidate, Category, RawItem, Settings
+from ai_news.models import Candidate, Category, EditorialLane, RawItem, Settings
 from ai_news.pipeline.normalize import to_candidate
 
 
@@ -32,10 +32,14 @@ class ClosingStream(httpx.AsyncByteStream):
         self.closed = True
 
 
-def _candidate(slug: str = "ark-standard") -> Candidate:
+def _candidate(
+    slug: str = "ark-standard",
+    *,
+    source_id: str | None = None,
+) -> Candidate:
     return to_candidate(
         RawItem(
-            source_id=f"source-{slug}",
+            source_id=source_id or f"source-{slug}",
             source_name="Volcengine AI News",
             source_weight=8,
             title=f"Ark standard API release {slug}",
@@ -63,6 +67,7 @@ def _analysis_row(candidate: Candidate, **overrides: Any) -> dict[str, Any]:
     row: dict[str, Any] = {
         "id": candidate.id,
         "title": candidate.raw.title,
+        "editorial_lane": EditorialLane.PRODUCT_ENGINEERING.value,
         "category": candidate.raw.category_hint.value,
         "summary": "这是严格基于候选事实生成的中文摘要，并且满足最小长度要求。",
         "importance": 8,
@@ -100,6 +105,24 @@ def _run_analyze(
             return await analyzer.analyze(items)
 
     return asyncio.run(exercise())
+
+
+def _editorial_rows(candidates: list[Candidate]) -> list[dict[str, Any]]:
+    lanes = [
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.BUSINESS,
+        EditorialLane.BUSINESS,
+        EditorialLane.BUSINESS,
+        EditorialLane.RESEARCH,
+        EditorialLane.RESEARCH,
+    ]
+    return [
+        _analysis_row(candidate, editorial_lane=lane.value)
+        for candidate, lane in zip(candidates[:9], lanes, strict=True)
+    ]
 
 
 def _assert_safe_error(error: BaseException, secrets: set[str]) -> None:
@@ -179,6 +202,69 @@ def test_request_uses_exact_ark_endpoint_headers_body_and_isolates_client_defaul
     assert "cookie-secret" not in rendered
     assert "client-default-key" not in rendered
     assert "header-secret" not in rendered
+
+
+def test_one_editorial_request_selects_nine_from_twelve_candidates() -> None:
+    candidates = [_candidate(f"editorial-{index}") for index in range(12)]
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, content=_openai_response(_editorial_rows(candidates)))
+
+    result = _run_analyze(handler, candidates)
+
+    assert len(requests) == 1
+    assert list(result) == [candidate.id for candidate in candidates[:9]]
+    prompt = json.loads(requests[0].content)["messages"][1]["content"]
+    assert "从全部候选中选择恰好 9 条" in prompt
+
+
+@pytest.mark.parametrize(
+    ("error_kind", "mutate"),
+    [
+        (
+            "lane_distribution",
+            lambda rows: [
+                {
+                    **row,
+                    "editorial_lane": (
+                        EditorialLane.PRODUCT_ENGINEERING.value
+                        if index < 5
+                        else row["editorial_lane"]
+                    ),
+                }
+                for index, row in enumerate(rows)
+            ],
+        ),
+        (
+            "source_distribution",
+            lambda rows: rows,
+        ),
+    ],
+)
+def test_editorial_distribution_violations_repair_once_then_fail(
+    error_kind: str,
+    mutate: Any,
+) -> None:
+    shared_sources = ["source-shared"] * 4 + [f"source-{index}" for index in range(5)]
+    candidates = [
+        _candidate(f"{error_kind}-{index}", source_id=source_id)
+        for index, source_id in enumerate(shared_sources)
+    ]
+    rows = mutate(_editorial_rows(candidates))
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, content=_openai_response(rows))
+
+    with pytest.raises(AnalysisError, match="invalid"):
+        _run_analyze(handler, candidates)
+
+    assert len(requests) == 2
+    repair_prompt = json.loads(requests[1].content)["messages"][1]["content"]
+    assert f"错误种类：{error_kind}" in repair_prompt
 
 
 def test_request_uses_exact_ark_coding_plan_contract() -> None:

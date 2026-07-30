@@ -13,7 +13,7 @@ from pydantic import SecretStr
 
 from ai_news.llm.anthropic import AnalysisError, AnthropicAnalyzer
 from ai_news.llm.prompt import SYSTEM_PROMPT
-from ai_news.models import Candidate, Category, RawItem, Settings
+from ai_news.models import Candidate, Category, EditorialLane, RawItem, Settings
 from ai_news.pipeline.normalize import to_candidate
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "llm-success.json"
@@ -76,6 +76,7 @@ def _analysis_row(candidate: Candidate, **overrides: Any) -> dict[str, Any]:
     row: dict[str, Any] = {
         "id": candidate.id,
         "title": candidate.raw.title,
+        "editorial_lane": EditorialLane.PRODUCT_ENGINEERING.value,
         "category": candidate.raw.category_hint.value,
         "summary": "这是一段满足最小长度要求且完全基于候选事实的中文摘要内容。",
         "importance": 7,
@@ -87,6 +88,24 @@ def _analysis_row(candidate: Candidate, **overrides: Any) -> dict[str, Any]:
     }
     row.update(overrides)
     return row
+
+
+def _editorial_rows(candidates: list[Candidate]) -> list[dict[str, Any]]:
+    lanes = [
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.BUSINESS,
+        EditorialLane.BUSINESS,
+        EditorialLane.BUSINESS,
+        EditorialLane.RESEARCH,
+        EditorialLane.RESEARCH,
+    ]
+    return [
+        _analysis_row(candidate, editorial_lane=lane.value)
+        for candidate, lane in zip(candidates[:9], lanes, strict=True)
+    ]
 
 
 def _anthropic_response(rows: list[dict[str, Any]] | str) -> bytes:
@@ -594,6 +613,11 @@ def test_unknown_duplicate_and_missing_response_ids_trigger_one_repair_then_fail
         {"is_official": "false"},
         {"tags": [""]},
         {"tags": ["   "]},
+        {"title": "题" * 81},
+        {"summary": "摘" * 161},
+        {"why_it_matters": "影" * 101},
+        {"tracking_signal": "行" * 81},
+        {"tags": ["一", "二", "三", "四"]},
         {"marketing_risk": "extreme"},
         {"unexpected": "forbidden"},
     ],
@@ -721,9 +745,9 @@ def test_duplicate_input_ids_are_rejected_before_any_request() -> None:
     assert attempts == 0
 
 
-def test_batches_ten_plus_one_and_preserves_input_order_in_aggregate() -> None:
+def test_one_request_selects_nine_and_preserves_selected_order() -> None:
     candidates = [_candidate(f"batch-{index}") for index in range(11)]
-    batch_ids: list[list[str]] = []
+    request_ids: list[list[str]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         prompt = json.loads(request.content)["messages"][0]["content"]
@@ -732,12 +756,11 @@ def test_batches_ten_plus_one_and_preserves_input_order_in_aggregate() -> None:
             1,
         )[0]
         ids = [row["id"] for row in json.loads(encoded)]
-        batch_ids.append(ids)
-        by_id = {candidate.id: candidate for candidate in candidates}
-        rows = [_analysis_row(by_id[candidate_id]) for candidate_id in ids]
+        request_ids.append(ids)
+        rows = _editorial_rows(candidates)
         return httpx.Response(200, content=_anthropic_response(rows), request=request)
 
     result = _run_analyze(handler, candidates)
 
-    assert [len(ids) for ids in batch_ids] == [10, 1]
-    assert list(result) == [candidate.id for candidate in candidates]
+    assert [len(ids) for ids in request_ids] == [11]
+    assert list(result) == [candidate.id for candidate in candidates[:9]]

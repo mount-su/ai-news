@@ -6,6 +6,7 @@ import asyncio
 import json
 import re
 from abc import ABC, abstractmethod
+from collections import Counter
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Annotated, Any, Literal
 
@@ -23,9 +24,14 @@ from pydantic import (
 
 from ai_news.llm.endpoint import InvalidLLMEndpoint, build_llm_endpoint
 from ai_news.llm.prompt import build_analysis_prompt
-from ai_news.models import Analysis, Candidate, Category, Settings
+from ai_news.models import (
+    Analysis,
+    Candidate,
+    Category,
+    EditorialLane,
+    Settings,
+)
 
-_BATCH_SIZE = 10
 _LLM_REQUEST_TIMEOUT_SECONDS = 120
 _MAX_RESPONSE_BYTES = 2_000_000
 _MAX_REPAIR_TEXT_CHARS = 20_000
@@ -44,18 +50,19 @@ class _AnalysisRow(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: Annotated[StrictStr, Field(pattern=r"^[0-9a-f]{16}$")]
-    title: StrictStr
+    title: Annotated[StrictStr, Field(min_length=1, max_length=80)]
+    editorial_lane: EditorialLane
     category: Category
-    summary: Annotated[StrictStr, Field(min_length=20, max_length=1200)]
+    summary: Annotated[StrictStr, Field(min_length=20, max_length=160)]
     importance: Annotated[StrictInt, Field(ge=1, le=10)]
-    why_it_matters: Annotated[StrictStr, Field(min_length=10, max_length=800)]
+    why_it_matters: Annotated[StrictStr, Field(min_length=10, max_length=100)]
     tags: list[Annotated[StrictStr, Field(min_length=1, max_length=50)]] = Field(
         min_length=1,
-        max_length=6,
+        max_length=3,
     )
     is_official: StrictBool
     marketing_risk: Literal["low", "medium", "high"]
-    tracking_signal: Annotated[StrictStr, Field(min_length=5, max_length=500)]
+    tracking_signal: Annotated[StrictStr, Field(min_length=5, max_length=80)]
 
     @field_validator("tags")
     @classmethod
@@ -93,7 +100,7 @@ def _remove_outer_fence(text: str) -> str:
 
 def _parse_analysis(
     text: str,
-    expected_ids: list[str],
+    candidates: list[Candidate],
 ) -> tuple[dict[str, Analysis] | None, str | None]:
     try:
         payload = json.loads(_remove_outer_fence(text))
@@ -109,17 +116,31 @@ def _parse_analysis(
     except (ValidationError, TypeError, ValueError):
         return None, "schema"
 
+    selection_count = min(9, len(candidates))
     row_ids = [row.id for row in parsed_rows]
     if len(row_ids) != len(set(row_ids)):
         return None, "duplicate"
-    expected_set = set(expected_ids)
-    if any(row_id not in expected_set for row_id in row_ids):
+    candidate_by_id = {candidate.id: candidate for candidate in candidates}
+    if any(row_id not in candidate_by_id for row_id in row_ids):
         return None, "unknown"
-    if any(expected_id not in set(row_ids) for expected_id in expected_ids):
+    if len(row_ids) < selection_count:
         return None, "missing"
+    if len(row_ids) > selection_count:
+        return None, "count"
+    if selection_count == 9:
+        lane_counts = Counter(row.editorial_lane for row in parsed_rows)
+        if set(lane_counts) != set(EditorialLane) or any(
+            count > 4 for count in lane_counts.values()
+        ):
+            return None, "lane_distribution"
+        source_counts = Counter(candidate_by_id[row.id].raw.source_id for row in parsed_rows)
+        if any(count > 3 for count in source_counts.values()):
+            return None, "source_distribution"
 
-    by_id = {row.id: Analysis.model_validate(row.model_dump(exclude={"id"})) for row in parsed_rows}
-    return {candidate_id: by_id[candidate_id] for candidate_id in expected_ids}, None
+    return {
+        row.id: Analysis.model_validate(row.model_dump(exclude={"id"}))
+        for row in parsed_rows
+    }, None
 
 
 def _contains_secret(value: object, token: str) -> bool:
@@ -255,14 +276,13 @@ class BaseAnalyzer(ABC):
             await self._sleep(2**retry_number)
         raise RuntimeError("unreachable")
 
-    async def _analyze_batch(
+    async def _analyze_editorial_selection(
         self,
         client: httpx.AsyncClient,
         items: list[Candidate],
     ) -> dict[str, Analysis]:
-        expected_ids = [item.id for item in items]
         first_text = await self._request(client, build_analysis_prompt(items))
-        parsed, error_kind = _parse_analysis(first_text, expected_ids)
+        parsed, error_kind = _parse_analysis(first_text, items)
         if parsed is not None:
             if _contains_secret(parsed, self._token):
                 raise AnalysisError(
@@ -273,7 +293,7 @@ class BaseAnalyzer(ABC):
 
         repair = _repair_prompt(items, first_text, error_kind or "schema", self._token)
         repaired_text = await self._request(client, repair)
-        repaired, _ = _parse_analysis(repaired_text, expected_ids)
+        repaired, _ = _parse_analysis(repaired_text, items)
         if repaired is None:
             raise AnalysisError(
                 "invalid LLM analysis after repair",
@@ -291,11 +311,7 @@ class BaseAnalyzer(ABC):
         client: httpx.AsyncClient,
         items: list[Candidate],
     ) -> dict[str, Analysis]:
-        aggregate: dict[str, Analysis] = {}
-        for offset in range(0, len(items), _BATCH_SIZE):
-            batch = items[offset : offset + _BATCH_SIZE]
-            aggregate.update(await self._analyze_batch(client, batch))
-        return aggregate
+        return await self._analyze_editorial_selection(client, items)
 
     async def analyze(self, items: list[Candidate]) -> dict[str, Analysis]:
         if not items:
