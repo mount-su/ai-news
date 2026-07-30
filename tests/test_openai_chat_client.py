@@ -359,6 +359,35 @@ def test_openai_rejects_other_api_key_shaped_output() -> None:
 
 
 @pytest.mark.parametrize(
+    "foreign_credential",
+    [
+        "ANTHROPIC_" + "AUTH_TOKEN=foreign-provider-credential-123456",
+        "GITHUB_" + "TOKEN=ghp_" + "A" * 24,
+        "AIza" + "A" * 32,
+    ],
+)
+def test_openai_rejects_other_credential_names_and_common_token_forms(
+    foreign_credential: str,
+) -> None:
+    candidate = _candidate("other-credential")
+    leaked_row = _analysis_row(
+        candidate,
+        summary=f"模型意外输出外部凭据 {foreign_credential}，该内容不能公开发布。",
+    )
+
+    with pytest.raises(
+        AnalysisError,
+        match=r"^LLM analysis contains sensitive data$",
+    ) as exc_info:
+        _run_analyze(
+            lambda _: httpx.Response(200, content=_openai_response([leaked_row])),
+            [candidate],
+        )
+
+    _assert_safe_error(exc_info.value, {foreign_credential})
+
+
+@pytest.mark.parametrize(
     "response_body",
     [
         b"{}",
