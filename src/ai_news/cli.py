@@ -14,6 +14,7 @@ from ai_news.models import (
     Analysis,
     Category,
     DailyReport,
+    EditorialLane,
     NewsItem,
     RawItem,
     SourceRun,
@@ -74,10 +75,26 @@ def _build_site(root: Path, output: Path) -> None:
 
 
 def _demo_report() -> DailyReport:
-    source_id = "demo-source"
-    source_name = "Offline Demo"
+    sources = [
+        ("demo-product", "Offline Product"),
+        ("demo-business", "Offline Business"),
+        ("demo-research", "Offline Research"),
+    ]
+    lanes = [
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.PRODUCT_ENGINEERING,
+        EditorialLane.BUSINESS,
+        EditorialLane.BUSINESS,
+        EditorialLane.BUSINESS,
+        EditorialLane.RESEARCH,
+        EditorialLane.RESEARCH,
+    ]
     items: list[NewsItem] = []
-    for index in range(6):
+    for index, lane in enumerate(lanes):
+        source_id, source_name = sources[index % len(sources)]
+        category = Category.RESEARCH if lane is EditorialLane.RESEARCH else Category.MODEL
         candidate = to_candidate(
             RawItem(
                 source_id=source_id,
@@ -87,13 +104,14 @@ def _demo_report() -> DailyReport:
                 url=f"https://example.com/ai-news/demo-{index + 1}",
                 published_at=_DEMO_GENERATED_AT - timedelta(hours=index),
                 excerpt=f"Deterministic offline source excerpt {index + 1}.",
-                category_hint=Category.MODEL,
+                category_hint=category,
                 is_official_source=True,
             )
         )
         analysis = Analysis(
             title=f"离线演示资讯 {index + 1}",
-            category=Category.MODEL,
+            category=category,
+            editorial_lane=lane,
             summary=f"这是第 {index + 1} 条完全离线且可重复生成的演示资讯摘要内容。",
             importance=10 - index,
             why_it_matters=f"该演示条目用于验证第 {index + 1} 条日报数据与站点构建流程。",
@@ -115,9 +133,10 @@ def _demo_report() -> DailyReport:
             SourceRun.succeeded(
                 source_id=source_id,
                 source_name=source_name,
-                item_count=len(items),
+                item_count=3,
                 elapsed_ms=0,
             )
+            for source_id, source_name in sources
         ],
     )
 

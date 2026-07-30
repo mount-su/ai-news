@@ -347,7 +347,8 @@ def test_demo_is_offline_deterministic_and_builds_from_a_real_saved_report(
     second_report = load_reports(tmp_path)[0]
 
     assert first_result == second_result == 0
-    assert len(first_report.items) >= 5
+    assert len(first_report.items) == 9
+    assert first_report.schema_version == "1.1"
     assert first_report == second_report
     assert first_report.model == "offline-demo"
     assert calls == [(tmp_path, output), (tmp_path, output)]
