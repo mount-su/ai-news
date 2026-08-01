@@ -357,7 +357,7 @@ def test_brief_pages_render_each_item_once_without_verbose_controls(
         parser = _parse(page)
         text = page.read_text(encoding="utf-8")
         assert parser.article_ids == expected_ids
-        assert 'data-priority="true"' in text
+        assert 'data-priority=' not in text
         assert 'type="search"' not in text
         assert "今日最重要" not in text
         assert "后续观察" not in text
@@ -365,7 +365,8 @@ def test_brief_pages_render_each_item_once_without_verbose_controls(
         assert "原始标题" not in text
         assert "展开研判细节" not in text
         assert "重要性 " not in text
-        assert all(label in text for label in ("变化", "影响", "行动"))
+        assert all(label in text for label in ("变化", "影响"))
+        assert "行动" not in text
 
 
 def test_external_links_are_hardened_and_untrusted_titles_are_escaped(

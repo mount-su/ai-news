@@ -115,7 +115,7 @@ def test_concise_brief_cards_are_accessible_without_javascript(
         assert parser.summary_count == 0
         assert "变化" in visible_text
         assert "影响" in visible_text
-        assert "行动" in visible_text
+        assert "行动" not in visible_text
         assert "查看原始来源" in visible_text
 
 
@@ -146,6 +146,8 @@ def test_styles_define_visual_system_responsive_layout_and_accessibility_contrac
     assert "min-height: 44px" in css
     assert "@media (min-width: 900px)" in css
     assert "@media (max-width: 719px)" in css
+    assert "@media (max-width: 600px)" in css
+    assert "grid-template-columns: repeat(2" in css
     assert "@media (prefers-reduced-motion: reduce)" in css
     assert "animation: none" in css
     assert "transition: none" in css
