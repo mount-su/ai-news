@@ -226,6 +226,28 @@ def test_source_collection_concurrency_never_exceeds_six() -> None:
     assert peak == 6
 
 
+def test_pipeline_publishes_available_quality_items_below_nine() -> None:
+    primary_source = _source(0)
+    source_config, collector = _with_filler_sources(
+        primary_source,
+        [_raw(index, source=primary_source) for index in range(4)],
+        filler_count=2,
+    )
+
+    class FourItemAnalyzer(_Analyzer):
+        async def analyze(self, items: list[Any]) -> Any:
+            self.calls.append(items)
+            return {item.id: _analysis(index) for index, item in enumerate(items[:4])}
+
+    report = _run(
+        source_config=source_config,
+        collector=collector,
+        analyzer=FourItemAnalyzer(),
+    )
+
+    assert len(report.items) == 4
+
+
 def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
