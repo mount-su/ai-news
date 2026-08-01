@@ -429,7 +429,7 @@ class SourceRun(BaseModel):
 class DailyReport(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["1.0", "1.1"] = "1.1"
+    schema_version: Literal["1.0", "1.1", "1.2"] = "1.1"
     date: date
     generated_at: datetime
     model: str = Field(min_length=1, max_length=300)

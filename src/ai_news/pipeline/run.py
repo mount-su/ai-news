@@ -35,6 +35,7 @@ from ai_news.models import (
     SourceSpec,
 )
 from ai_news.pipeline.dedupe import deduplicate
+from ai_news.pipeline.editorial import is_editorially_eligible
 from ai_news.pipeline.normalize import ensure_utc, normalize_title, to_candidate
 from ai_news.pipeline.rank import (
     candidate_score,
@@ -48,7 +49,7 @@ _DEDUPLICATION_LIMIT = 500
 _DEDUPLICATION_SOURCE_FLOOR = 6
 _EDITORIAL_CANDIDATE_LIMIT = 36
 _EDITORIAL_SOURCE_LIMIT = 6
-_PUBLICATION_COUNT = 9
+_MAX_PUBLICATION_COUNT = 9
 _MAX_FINAL_SOURCE_ITEMS = 3
 _MAX_LANE_ITEMS = 4
 _WINDOW = timedelta(hours=36)
@@ -360,7 +361,11 @@ def _prepare_candidates(
     historical_urls: set[str],
     now: datetime,
 ) -> list[Candidate]:
-    deduplicated = deduplicate(candidates, historical_urls)
+    deduplicated = [
+        candidate
+        for candidate in deduplicate(candidates, historical_urls)
+        if is_editorially_eligible(candidate)
+    ]
     return select_balanced_candidates(
         deduplicated,
         now,
@@ -439,15 +444,13 @@ def _validate_editorial_distribution(
     items: list[NewsItem],
     selected: list[Candidate],
 ) -> None:
-    if len(items) < _PUBLICATION_COUNT:
-        raise PublicationThresholdError("fewer than nine valid items")
-    if len(items) != _PUBLICATION_COUNT:
+    if not items:
+        raise PublicationThresholdError("no valid editorial items")
+    if len(items) > _MAX_PUBLICATION_COUNT:
         raise ReportValidationError("editorial distribution invalid")
 
     lane_counts = Counter(item.editorial_lane for item in items)
-    if len(lane_counts) != 3 or any(
-        count < 1 or count > _MAX_LANE_ITEMS for count in lane_counts.values()
-    ):
+    if any(count > _MAX_LANE_ITEMS for count in lane_counts.values()):
         raise ReportValidationError("editorial distribution invalid")
 
     candidate_by_id = {candidate.id: candidate for candidate in selected}
@@ -499,8 +502,8 @@ async def _run_with_client(
     except Exception:
         raise DataPipelineError("candidate preparation failed") from None
 
-    if len(selected) < _PUBLICATION_COUNT:
-        raise PublicationThresholdError("fewer than nine valid items")
+    if not selected:
+        raise PublicationThresholdError("no eligible candidates")
 
     selected_analyzer = analyzer
     if selected_analyzer is None:
@@ -531,6 +534,7 @@ async def _run_with_client(
 
     try:
         report = DailyReport(
+            schema_version="1.2",
             date=run_date,
             generated_at=now,
             model=model,

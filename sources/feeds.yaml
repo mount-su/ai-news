@@ -34,6 +34,7 @@ sources:
     category: 论文研究
     weight: 7
     official: true
+    enabled: false
   - id: github-codex
     name: OpenAI Codex
     kind: github
