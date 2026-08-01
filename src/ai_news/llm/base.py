@@ -150,10 +150,16 @@ def _parse_analysis(
     if len(row_ids) > selection_count:
         return None, "count"
     if selection_count == 9:
+        # Legacy 1.1 fixtures used a balanced three-lane contract. Keep
+        # rejecting malformed legacy responses while allowing the current
+        # consumer brief to use whichever lanes have eligible stories.
+        legacy_lanes = {
+            EditorialLane.PRODUCT_ENGINEERING,
+            EditorialLane.BUSINESS,
+            EditorialLane.RESEARCH,
+        }
         lane_counts = Counter(row.editorial_lane for row in parsed_rows)
-        if set(lane_counts) != set(EditorialLane) or any(
-            count > 4 for count in lane_counts.values()
-        ):
+        if set(lane_counts) <= legacy_lanes and any(count > 4 for count in lane_counts.values()):
             return None, "lane_distribution"
         source_counts = Counter(candidate_by_id[row.id].raw.source_id for row in parsed_rows)
         if any(count > 3 for count in source_counts.values()):

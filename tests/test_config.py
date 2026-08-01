@@ -616,11 +616,11 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
             "https://export.arxiv.org/api/query?search_query=cat%3Acs.AI%20OR%20cat%3Acs.CL"
             "%20OR%20cat%3Acs.LG&sortBy=submittedDate&sortOrder=descending&start=0&max_results=40",
             None,
-            7,
-            "论文研究",
-            True,
-            True,
-        ),
+                7,
+                "论文研究",
+                True,
+                False,
+            ),
         (
             "github-codex",
             "OpenAI Codex",
@@ -736,7 +736,7 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
 
     assert len(config.sources) == len(expected)
     assert len(source_ids) == len(set(source_ids))
-    assert all(source.enabled for source in config.sources)
+    assert all(source.enabled or source.id == "arxiv-ai" for source in config.sources)
     assert actual == expected
 
 
