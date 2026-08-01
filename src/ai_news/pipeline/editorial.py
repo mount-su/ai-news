@@ -36,9 +36,10 @@ def is_editorially_eligible(candidate: Candidate) -> bool:
     text = " ".join((raw.title, raw.source_name, raw.excerpt, raw.category_hint.value))
     if _TECHNICAL_MARKERS.search(text):
         return False
-    if _CORPORATE_ONLY_MARKERS.search(text) and not _CONCRETE_IMPACT_MARKERS.search(text):
-        return False
-    return True
+    return not (
+        _CORPORATE_ONLY_MARKERS.search(text)
+        and not _CONCRETE_IMPACT_MARKERS.search(text)
+    )
 
 
 __all__ = ["is_editorially_eligible"]

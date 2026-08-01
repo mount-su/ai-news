@@ -48,8 +48,14 @@ def test_editorial_filter_rejects_technical_academic_and_unimpactful_corporate_n
         ("ChatGPT launches a new consumer plan", "The plan is available to all users today."),
         ("AI assistant cuts subscription price", "The monthly price changes for customers."),
         ("Major retailer deploys AI shopping assistant", "Millions of shoppers can use it."),
-        ("Government publishes new AI platform rules", "The rules change what providers must disclose."),
-        ("Company raises funding to expand free access", "The investment will expand the product's free tier."),
+        (
+            "Government publishes new AI platform rules",
+            "The rules change what providers must disclose.",
+        ),
+        (
+            "Company raises funding to expand free access",
+            "The investment will expand the product's free tier.",
+        ),
     ],
 )
 def test_editorial_filter_accepts_concrete_user_or_market_changes(
