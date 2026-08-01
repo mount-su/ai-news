@@ -51,7 +51,6 @@ _EDITORIAL_CANDIDATE_LIMIT = 36
 _EDITORIAL_SOURCE_LIMIT = 6
 _MAX_PUBLICATION_COUNT = 9
 _MAX_FINAL_SOURCE_ITEMS = 3
-_MAX_LANE_ITEMS = 4
 _WINDOW = timedelta(hours=36)
 _ANALYSIS_FIELDS = frozenset(Analysis.model_fields)
 _EXACT_STATE_LIMIT = _DEDUPLICATION_LIMIT * 6
@@ -447,10 +446,6 @@ def _validate_editorial_distribution(
     if not items:
         raise PublicationThresholdError("no valid editorial items")
     if len(items) > _MAX_PUBLICATION_COUNT:
-        raise ReportValidationError("editorial distribution invalid")
-
-    lane_counts = Counter(item.editorial_lane for item in items)
-    if any(count > _MAX_LANE_ITEMS for count in lane_counts.values()):
         raise ReportValidationError("editorial distribution invalid")
 
     candidate_by_id = {candidate.id: candidate for candidate in selected}
