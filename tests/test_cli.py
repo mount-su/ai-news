@@ -119,7 +119,7 @@ def test_invalid_iso_date_is_rejected_by_argparse_without_echoing_value(
         ),
         (
             lambda: PublicationThresholdError("secret threshold details"),
-            3,
+            0,
             "publication_threshold",
         ),
         (
@@ -157,7 +157,12 @@ def test_generate_maps_safe_exit_categories(
     stderr = capsys.readouterr().err
 
     assert result == expected_code
-    assert stderr == f"{expected_category}: Error\n"
+    expected_stderr = (
+        "publication_threshold: no eligible items; keeping previous report\n"
+        if expected_category == "publication_threshold"
+        else f"{expected_category}: Error\n"
+    )
+    assert stderr == expected_stderr
     assert "secret" not in stderr
     assert "token=value" not in stderr
 
