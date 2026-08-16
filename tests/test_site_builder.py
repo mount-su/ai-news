@@ -357,7 +357,7 @@ def test_brief_pages_render_each_item_once_without_verbose_controls(
         parser = _parse(page)
         text = page.read_text(encoding="utf-8")
         assert parser.article_ids == expected_ids
-        assert 'data-priority=' not in text
+        assert "data-priority=" not in text
         assert 'type="search"' not in text
         assert "今日最重要" not in text
         assert "后续观察" not in text

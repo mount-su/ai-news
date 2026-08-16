@@ -7,9 +7,9 @@ import re
 from ai_news.models import Candidate
 
 _TECHNICAL_MARKERS = re.compile(
-    r"(?:\barxiv\b|论文|学术|研究论文|科研|benchmark|基准测试|评测集|" 
-    r"\bsdk\b|\bapi\b|接口协议|开发框架|framework|repository|仓库|" 
-    r"\b(?:v|version)\s*\d+\.\d+\.\d+|小版本|补丁|修复连接器|超时配置|模型训练|" 
+    r"(?:\barxiv\b|论文|学术|研究论文|科研|benchmark|基准测试|评测集|"
+    r"\bsdk\b|\bapi\b|接口协议|开发框架|framework|repository|仓库|"
+    r"\b(?:v|version)\s*\d+\.\d+\.\d+|小版本|补丁|修复连接器|超时配置|模型训练|"
     r"alignment behavior|对齐行为)",
     re.IGNORECASE,
 )
@@ -36,10 +36,7 @@ def is_editorially_eligible(candidate: Candidate) -> bool:
     text = " ".join((raw.title, raw.source_name, raw.excerpt, raw.category_hint.value))
     if _TECHNICAL_MARKERS.search(text):
         return False
-    return not (
-        _CORPORATE_ONLY_MARKERS.search(text)
-        and not _CONCRETE_IMPACT_MARKERS.search(text)
-    )
+    return not (_CORPORATE_ONLY_MARKERS.search(text) and not _CONCRETE_IMPACT_MARKERS.search(text))
 
 
 __all__ = ["is_editorially_eligible"]
