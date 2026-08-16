@@ -226,6 +226,28 @@ def test_source_collection_concurrency_never_exceeds_six() -> None:
     assert peak == 6
 
 
+def test_pipeline_publishes_available_quality_items_below_nine() -> None:
+    primary_source = _source(0)
+    source_config, collector = _with_filler_sources(
+        primary_source,
+        [_raw(index, source=primary_source) for index in range(4)],
+        filler_count=2,
+    )
+
+    class FourItemAnalyzer(_Analyzer):
+        async def analyze(self, items: list[Any]) -> Any:
+            self.calls.append(items)
+            return {item.id: _analysis(index) for index, item in enumerate(items[:4])}
+
+    report = _run(
+        source_config=source_config,
+        collector=collector,
+        analyzer=FourItemAnalyzer(),
+    )
+
+    assert len(report.items) == 4
+
+
 def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -427,7 +449,7 @@ def test_history_deduplication_and_pretrim_build_balanced_thirty_six_item_pool()
     assert report.candidate_count == 36
 
 
-def test_fewer_than_nine_valid_candidates_does_not_call_analyzer_or_write(
+def test_fewer_than_nine_valid_candidates_publishes_available_items(
     tmp_path: Path,
 ) -> None:
     sources = [_source(index) for index in range(3)]
@@ -438,24 +460,23 @@ def test_fewer_than_nine_valid_candidates_does_not_call_analyzer_or_write(
     }
     analyzer = _Analyzer()
 
-    with pytest.raises(PublicationThresholdError):
-        asyncio.run(
-            run_daily(
-                root=tmp_path,
-                run_date=RUN_DATE,
-                source_config=SourceConfig(sources=sources),
-                collector=_collector(items_by_source),
-                analyzer=analyzer,
-                now=NOW,
-                model="test-model",
-            )
+    report = asyncio.run(
+        run_daily(
+            root=tmp_path,
+            run_date=RUN_DATE,
+            source_config=SourceConfig(sources=sources),
+            collector=_collector(items_by_source),
+            analyzer=analyzer,
+            now=NOW,
+            model="test-model",
         )
+    )
 
-    assert analyzer.calls == []
-    assert list(tmp_path.rglob("*")) == []
+    assert len(report.items) == 8
+    assert len(analyzer.calls) == 1
 
 
-def test_nine_valid_items_build_and_persist_schema_1_1_report(tmp_path: Path) -> None:
+def test_nine_valid_items_build_and_persist_schema_1_2_report(tmp_path: Path) -> None:
     sources = [_source(index) for index in range(3)]
     items_by_source = {
         source.id: [_raw(source_index * 100 + index, source=source) for index in range(3)]
@@ -477,7 +498,7 @@ def test_nine_valid_items_build_and_persist_schema_1_1_report(tmp_path: Path) ->
     markdown_path = tmp_path / "content/2026-07-26.md"
     index_path = tmp_path / "data/index.json"
     assert DailyReport.model_validate_json(report_path.read_bytes()) == report
-    assert report.schema_version == "1.1"
+    assert report.schema_version == "1.2"
     assert len(report.items) == 9
     assert markdown_path.is_file()
     assert index_path.is_file()
@@ -536,7 +557,7 @@ def test_final_nine_items_are_stably_sorted() -> None:
     assert report.items == expected
 
 
-def test_pipeline_rejects_eight_analyzed_items() -> None:
+def test_pipeline_accepts_eight_analyzed_items() -> None:
     sources = [_source(index) for index in range(3)]
     items_by_source = {
         source.id: [_raw(source_index * 100 + index, source=source) for index in range(3)]
@@ -546,15 +567,15 @@ def test_pipeline_rejects_eight_analyzed_items() -> None:
     def eight_analyses(candidates: list[Any]) -> dict[str, Analysis]:
         return {candidate.id: _analysis(index) for index, candidate in enumerate(candidates[:8])}
 
-    with pytest.raises(PublicationThresholdError, match="nine"):
-        _run(
-            source_config=SourceConfig(sources=sources),
-            collector=_collector(items_by_source),
-            analyzer=_Analyzer(eight_analyses),
-        )
+    report = _run(
+        source_config=SourceConfig(sources=sources),
+        collector=_collector(items_by_source),
+        analyzer=_Analyzer(eight_analyses),
+    )
+    assert len(report.items) == 8
 
 
-def test_pipeline_rejects_invalid_editorial_lane_distribution() -> None:
+def test_pipeline_allows_unbalanced_editorial_lanes() -> None:
     sources = [_source(index) for index in range(3)]
     items_by_source = {
         source.id: [_raw(source_index * 100 + index, source=source) for index in range(3)]
@@ -578,12 +599,12 @@ def test_pipeline_rejects_invalid_editorial_lane_distribution() -> None:
             for index, (candidate, lane) in enumerate(zip(candidates[:9], lanes, strict=True))
         }
 
-    with pytest.raises(ReportValidationError, match="distribution"):
-        _run(
-            source_config=SourceConfig(sources=sources),
-            collector=_collector(items_by_source),
-            analyzer=_Analyzer(invalid_lanes),
-        )
+    report = _run(
+        source_config=SourceConfig(sources=sources),
+        collector=_collector(items_by_source),
+        analyzer=_Analyzer(invalid_lanes),
+    )
+    assert len(report.items) == 9
 
 
 def test_pipeline_rejects_more_than_three_final_items_from_one_source() -> None:
@@ -610,7 +631,7 @@ def test_missing_or_invalid_analysis_is_not_fabricated(
     invalid_kind: str,
 ) -> None:
     source = _source(0)
-    items = [_raw(index, source=source) for index in range(5)]
+    items = [_raw(index, source=source) for index in range(3)]
 
     def result(candidates: list[Any]) -> dict[str, Any]:
         values = {candidate.id: _analysis(index) for index, candidate in enumerate(candidates)}
@@ -620,11 +641,11 @@ def test_missing_or_invalid_analysis_is_not_fabricated(
             values[candidates[-1].id] = {"title": "invalid"}
         return values
 
-    with pytest.raises(PublicationThresholdError):
-        _run(
-            collector=_collector({source.id: items}),
-            analyzer=_Analyzer(result),
-        )
+    report = _run(
+        collector=_collector({source.id: items}),
+        analyzer=_Analyzer(result),
+    )
+    assert len(report.items) == 2
 
 
 @pytest.mark.parametrize(

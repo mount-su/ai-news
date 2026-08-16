@@ -78,23 +78,23 @@ def _demo_report() -> DailyReport:
     sources = [
         ("demo-product", "Offline Product"),
         ("demo-business", "Offline Business"),
-        ("demo-research", "Offline Research"),
+        ("demo-platform", "Offline Platform"),
     ]
     lanes = [
-        EditorialLane.PRODUCT_ENGINEERING,
-        EditorialLane.PRODUCT_ENGINEERING,
-        EditorialLane.PRODUCT_ENGINEERING,
-        EditorialLane.PRODUCT_ENGINEERING,
-        EditorialLane.BUSINESS,
-        EditorialLane.BUSINESS,
-        EditorialLane.BUSINESS,
-        EditorialLane.RESEARCH,
-        EditorialLane.RESEARCH,
+        EditorialLane.PRODUCT_APPLICATION,
+        EditorialLane.PRODUCT_APPLICATION,
+        EditorialLane.PRODUCT_APPLICATION,
+        EditorialLane.BUSINESS_MARKET,
+        EditorialLane.BUSINESS_MARKET,
+        EditorialLane.BUSINESS_MARKET,
+        EditorialLane.PLATFORM_POLICY,
+        EditorialLane.PLATFORM_POLICY,
+        EditorialLane.PLATFORM_POLICY,
     ]
     items: list[NewsItem] = []
     for index, lane in enumerate(lanes):
         source_id, source_name = sources[index % len(sources)]
-        category = Category.RESEARCH if lane is EditorialLane.RESEARCH else Category.MODEL
+        category = Category.MODEL
         candidate = to_candidate(
             RawItem(
                 source_id=source_id,

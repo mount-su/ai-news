@@ -33,6 +33,10 @@ class Category(StrEnum):
 
 
 class EditorialLane(StrEnum):
+    PRODUCT_APPLICATION = "产品与应用"
+    BUSINESS_MARKET = "商业与市场"
+    PLATFORM_POLICY = "平台与政策"
+    # Legacy values remain readable for archived 1.0/1.1 reports.
     PRODUCT_ENGINEERING = "产品工程"
     BUSINESS = "商业趋势"
     RESEARCH = "前沿研究"
@@ -429,7 +433,7 @@ class SourceRun(BaseModel):
 class DailyReport(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["1.0", "1.1"] = "1.1"
+    schema_version: Literal["1.0", "1.1", "1.2"] = "1.1"
     date: date
     generated_at: datetime
     model: str = Field(min_length=1, max_length=300)

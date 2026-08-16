@@ -1,13 +1,11 @@
-{% macro news_card(item, rank, priority=false) -%}
+{% macro news_card(item) -%}
   <article
     id="item-{{ item.id }}"
-    class="news-card{% if priority %} news-card--priority{% endif %}"
+    class="news-card"
     data-news-card
     data-item-id="{{ item.id }}"
-    data-priority="{{ 'true' if priority else 'false' }}"
   >
     <header class="news-card__header">
-      <span class="news-card__rank">{{ "%02d"|format(rank) }}</span>
       <div class="news-card__labels">
         <span class="lane">{{ item.editorial_lane.value }}</span>
         <span class="category">{{ item.category.value }}</span>
@@ -23,7 +21,6 @@
       <dl class="brief-fields">
         <div><dt>变化</dt><dd>{{ item.summary }}</dd></div>
         <div><dt>影响</dt><dd>{{ item.why_it_matters }}</dd></div>
-        <div><dt>行动</dt><dd>{{ item.tracking_signal }}</dd></div>
       </dl>
       <a
         class="source-link"

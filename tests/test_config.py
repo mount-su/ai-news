@@ -619,7 +619,7 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
             7,
             "论文研究",
             True,
-            True,
+            False,
         ),
         (
             "github-codex",
@@ -736,7 +736,7 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
 
     assert len(config.sources) == len(expected)
     assert len(source_ids) == len(set(source_ids))
-    assert all(source.enabled for source in config.sources)
+    assert all(source.enabled or source.id == "arxiv-ai" for source in config.sources)
     assert actual == expected
 
 
