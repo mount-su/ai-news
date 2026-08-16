@@ -10,6 +10,9 @@
   --danger: #ff7d8a;
   --paper: #f4efe5;
   --paper-ink: #111b25;
+  --font-body: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-display: "Noto Serif SC", "Songti SC", "STSong", "SimSun", Georgia, serif;
+  --font-meta: "DIN Alternate", "Arial Narrow", ui-monospace, SFMono-Regular, Menlo, monospace;
   --max-width: 1240px;
   --reading-width: 1060px;
   --shadow: 0 18px 55px rgb(0 0 0 / 24%);
@@ -30,7 +33,8 @@ body {
   background:
     linear-gradient(180deg, #0a1726 0, var(--ink) 30rem),
     var(--ink);
-  font-family: "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-body);
+  font-kerning: normal;
   line-height: 1.6;
 }
 
@@ -101,14 +105,14 @@ button:focus-visible {
 .eyebrow,
 .section-heading > p {
   color: var(--amber);
-  font: 700 0.68rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 700 0.68rem/1.2 var(--font-meta);
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 .brand__name {
   color: var(--paper);
-  font-family: Georgia, "Noto Serif SC", "Songti SC", serif;
+  font-family: var(--font-display);
   font-size: clamp(1.55rem, 4vw, 2.35rem);
   font-weight: 700;
   letter-spacing: -0.04em;
@@ -157,7 +161,7 @@ button:focus-visible {
   gap: 0.5rem;
   margin-block: 0;
   color: #9db3c1;
-  font: 600 0.68rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 600 0.68rem/1.4 var(--font-meta);
   letter-spacing: 0.04em;
 }
 
@@ -181,7 +185,7 @@ button:focus-visible {
   max-width: 15ch;
   margin: 0.55rem 0 0.8rem;
   color: var(--paper);
-  font-family: Georgia, "Noto Serif SC", "Songti SC", serif;
+  font-family: var(--font-display);
   font-size: clamp(2.8rem, 8vw, 6rem);
   font-weight: 700;
   line-height: 0.98;
@@ -199,14 +203,14 @@ button:focus-visible {
   border: 0;
   border-bottom: 1px solid rgb(255 189 89 / 55%);
   color: var(--amber);
-  font: 700 0.7rem/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 700 0.7rem/1.3 var(--font-meta);
   letter-spacing: 0.04em;
 }
 
 .brief-shell { padding-top: 2.4rem; }
 
 .section-heading--brief { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; padding-bottom: 0.7rem; border-bottom: 1px solid var(--line); }
-.section-heading h2 { margin: 0; color: var(--paper); font-family: Georgia, "Noto Serif SC", "Songti SC", serif; font-size: 1.55rem; letter-spacing: -0.025em; }
+.section-heading h2 { margin: 0; color: var(--paper); font-family: var(--font-display); font-size: 1.55rem; letter-spacing: -0.025em; }
 
 .news-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; counter-reset: news; }
 .news-list > li { counter-increment: news; }
@@ -227,7 +231,7 @@ button:focus-visible {
   left: 0;
   color: var(--amber);
   content: counter(news, decimal-leading-zero);
-  font: 700 1.8rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 700 1.8rem/1 var(--font-meta);
   letter-spacing: -0.1em;
 }
 
@@ -239,7 +243,7 @@ button:focus-visible {
 .category { color: var(--muted); font-weight: 600; }
 
 .news-card__body { min-width: 0; padding: 1.35rem 0 1.5rem; }
-.news-card h3 { margin: 0; color: var(--paper); overflow-wrap: anywhere; font-family: Georgia, "Noto Serif SC", "Songti SC", serif; font-size: clamp(1.2rem, 2.4vw, 1.8rem); font-weight: 700; line-height: 1.2; }
+.news-card h3 { margin: 0; color: var(--paper); overflow-wrap: anywhere; font-family: var(--font-display); font-size: clamp(1.2rem, 2.4vw, 1.8rem); font-weight: 700; line-height: 1.24; letter-spacing: -0.02em; }
 .news-card__source { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.55rem 0 1.1rem; color: var(--muted); font-size: 0.68rem; }
 
 .brief-fields { display: grid; gap: 0.45rem; margin: 0; }
@@ -255,7 +259,7 @@ button:focus-visible {
 .archive-ledger article { border-bottom: 1px solid var(--line); }
 .archive-ledger a { display: grid; min-height: 78px; grid-template-columns: minmax(10rem, 1fr) repeat(2, 1fr) auto; align-items: center; gap: 1rem; padding: 1rem 0; text-decoration: none; }
 .archive-ledger a:hover { background: rgb(255 255 255 / 3%); }
-.archive-ledger time { color: var(--paper); font: 700 1.05rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.archive-ledger time { color: var(--paper); font: 700 1.05rem/1 var(--font-meta); }
 .archive-ledger span { color: var(--muted); font-size: 0.74rem; }
 .archive-ledger strong { color: var(--amber); font-size: 0.74rem; }
 
