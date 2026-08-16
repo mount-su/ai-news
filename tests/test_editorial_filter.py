@@ -1,3 +1,5 @@
+# ruff: noqa: RUF001
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -75,3 +77,32 @@ def test_editorial_filter_accepts_concrete_user_or_market_changes(
 )
 def test_editorial_filter_rejects_github_release_details(title: str) -> None:
     assert is_editorially_eligible(_candidate(title, source_id="github-langchain")) is False
+
+
+@pytest.mark.parametrize(
+    "title,excerpt",
+    [
+        (
+            "OpenAI 发布可显著降低企业推理成本的新模型",
+            "新模型在公开评测和生产部署中带来明显的成本与性能改善。",
+        ),
+        (
+            "PyTorch 发布重大安全漏洞缓解方案，影响主流 AI 部署",
+            "该漏洞影响大量线上部署，修复建议已公开并可立即执行。",
+        ),
+        (
+            "多模态模型在真实客服场景实现大规模落地",
+            "企业客户已将该能力用于客服流程，服务覆盖范围显著扩大。",
+        ),
+        (
+            "多模态 benchmark 显示推理性能提升 40%",
+            "公开评测显示该提升已在生产部署中得到验证。",
+        ),
+    ],
+)
+def test_editorial_filter_keeps_high_impact_technical_news(
+    title: str,
+    excerpt: str,
+) -> None:
+    source_id = "github-pytorch" if title.startswith("PyTorch") else "source-test"
+    assert is_editorially_eligible(_candidate(title, excerpt, source_id=source_id)) is True

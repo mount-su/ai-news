@@ -28,6 +28,11 @@ _GITHUB_RELEASE_MARKERS = re.compile(
     r"\b\d+\.\d+\.\d+\b)",
     re.IGNORECASE,
 )
+_HIGH_IMPACT_TECHNICAL_MARKERS = re.compile(
+    r"(?:安全漏洞|漏洞|security|vulnerability|重大故障|中断|outage|大规模落地|大规模采用|"
+    r"生产部署|成本降低|性能提升|performance|adoption|breaking change)",
+    re.IGNORECASE,
+)
 
 
 def is_editorially_eligible(candidate: Candidate) -> bool:
@@ -39,9 +44,13 @@ def is_editorially_eligible(candidate: Candidate) -> bool:
 
     raw = candidate.raw
     text = " ".join((raw.title, raw.source_name, raw.excerpt, raw.category_hint.value))
-    if _TECHNICAL_MARKERS.search(text):
+    if _TECHNICAL_MARKERS.search(text) and not _HIGH_IMPACT_TECHNICAL_MARKERS.search(text):
         return False
-    if raw.source_id.startswith("github-") and _GITHUB_RELEASE_MARKERS.search(text):
+    if (
+        raw.source_id.startswith("github-")
+        and _GITHUB_RELEASE_MARKERS.search(text)
+        and not _HIGH_IMPACT_TECHNICAL_MARKERS.search(text)
+    ):
         return False
     return not (_CORPORATE_ONLY_MARKERS.search(text) and not _CONCRETE_IMPACT_MARKERS.search(text))
 
