@@ -105,7 +105,7 @@ def test_concise_brief_cards_are_accessible_without_javascript(
     for page in [
         output / "index.html",
         output / "days/2026-07-26/index.html",
-        output / "categories/coding-agent/index.html",
+        output / "categories/agent/index.html",
     ]:
         parser = _parse(page)
         visible_text = " ".join(parser.text_parts)

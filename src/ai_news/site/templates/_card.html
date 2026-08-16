@@ -8,7 +8,7 @@
     <header class="news-card__header">
       <div class="news-card__labels">
         <span class="lane">{{ item.editorial_lane.value }}</span>
-        <span class="category">{{ item.category.value }}</span>
+        <span class="category">{{ item.category.value|display_category }}</span>
       </div>
     </header>
     <div class="news-card__body">

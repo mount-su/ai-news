@@ -24,7 +24,6 @@ BASE_PATH = "/ai-news/"
 CATEGORY_SLUGS = {
     Category.MODEL: "model",
     Category.AGENT: "agent",
-    Category.CODING_AGENT: "coding-agent",
     Category.TOOL: "ai-tools",
     Category.OPEN_SOURCE: "open-source",
     Category.RESEARCH: "research",
@@ -326,8 +325,13 @@ def test_home_uses_latest_report_and_feed_category_order_is_stable(
     assert homepage.article_ids == latest_expected
     assert len(homepage.article_ids) == len(set(homepage.article_ids))
     assert items["old-coding"].id not in homepage.article_ids
-    coding_page = _parse(output / "categories/coding-agent/index.html")
-    assert coding_page.article_ids == [items["coding"].id, items["old-coding"].id]
+    agent_page = _parse(output / "categories/agent/index.html")
+    assert agent_page.article_ids == [
+        items["coding"].id,
+        items["agent"].id,
+        items["old-coding"].id,
+    ]
+    assert not (output / "categories/coding-agent/index.html").exists()
 
     archive_text = (output / "archive/index.html").read_text(encoding="utf-8")
     assert archive_text.index("2026-07-26") < archive_text.index("2026-07-25")

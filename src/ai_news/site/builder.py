@@ -27,11 +27,15 @@ _RESERVED_ROOT_DIRECTORIES = ("data", "content", "sources")
 CATEGORY_SLUGS: dict[Category, str] = {
     Category.MODEL: "model",
     Category.AGENT: "agent",
-    Category.CODING_AGENT: "coding-agent",
     Category.TOOL: "ai-tools",
     Category.OPEN_SOURCE: "open-source",
     Category.RESEARCH: "research",
 }
+
+
+def _display_category(category: Category) -> Category:
+    """Collapse the legacy Coding Agent label into the Agent section."""
+    return Category.AGENT if category is Category.CODING_AGENT else category
 
 
 def _validate_base_path(base_path: str) -> str:
@@ -155,11 +159,14 @@ def _environment(base_path: str) -> Environment:
     )
     environment.filters["beijing_datetime"] = _beijing_datetime
     environment.filters["github_url"] = _is_github
+    environment.filters["display_category"] = lambda category: _display_category(
+        Category(category)
+    ).value
     return environment
 
 
 def _category_navigation(categories: Iterable[Category]) -> list[dict[str, str]]:
-    category_set = set(categories)
+    category_set = {_display_category(category) for category in categories}
     return [
         {"name": category.value, "slug": slug}
         for category, slug in CATEGORY_SLUGS.items()
@@ -269,7 +276,7 @@ def _build_staging(
 
     category_items: dict[Category, list[NewsItem]] = defaultdict(list)
     for _report, item in all_pairs:
-        category_items[item.category].append(item)
+        category_items[_display_category(item.category)].append(item)
     for category, items in category_items.items():
         ordered_items = _sort_items(items)
         _render(
@@ -310,7 +317,11 @@ def _validate_staging(staging: Path, reports: list[DailyReport]) -> None:
         staging / "search.json",
         *(staging / f"days/{report.date.isoformat()}/index.html" for report in reports),
     }
-    category_slugs = {CATEGORY_SLUGS[item.category] for report in reports for item in report.items}
+    category_slugs = {
+        CATEGORY_SLUGS[_display_category(item.category)]
+        for report in reports
+        for item in report.items
+    }
     required.update(staging / f"categories/{slug}/index.html" for slug in category_slugs)
     missing = [path for path in required if not path.is_file()]
     if missing:
