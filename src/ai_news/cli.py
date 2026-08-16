@@ -161,9 +161,12 @@ def _generate(root: Path, run_date: date | None) -> int:
     except ConfigurationPipelineError as error:
         _safe_error(_CONFIGURATION_ERROR, error)
         return 2
-    except PublicationThresholdError as error:
-        _safe_error(_PUBLICATION_THRESHOLD, error)
-        return 3
+    except PublicationThresholdError:
+        print(
+            f"{_PUBLICATION_THRESHOLD}: no eligible items; keeping previous report",
+            file=sys.stderr,
+        )
+        return 0
     except PipelineError as error:
         _safe_error(_PIPELINE_ERROR, error)
         return 4
