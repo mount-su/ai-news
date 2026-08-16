@@ -1,0 +1,187 @@
+{
+  "candidate_count": 3,
+  "date": "2026-08-16",
+  "degraded": true,
+  "generated_at": "2026-08-16T02:21:11.899815Z",
+  "items": [
+    {
+      "canonical_url": "https://github.com/langchain-ai/langchain/releases/tag/langchain-core%3D%3D1.5.5",
+      "category": "Agent",
+      "editorial_lane": "产品与应用",
+      "id": "1eb89354ef181e94",
+      "importance": 4,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "langchain-core==1.5.5",
+      "published_at": "2026-08-14T18:56:41Z",
+      "source": "LangChain",
+      "summary": "LangChain 核心库发布 1.5.5 版本，修复了工具输入验证、异步批处理一致性、合并块异常等多个问题，并增加了对 httpx 的显式依赖。",
+      "tags": [
+        "LangChain",
+        "Agent框架",
+        "版本更新"
+      ],
+      "title": "LangChain 核心库 1.5.5 版修复多项工具与异步处理问题",
+      "tracking_signal": "检查项目中 LangChain 核心库版本，并关注其变更日志中关于工具模式和异步处理的修复详情。",
+      "why_it_matters": "对依赖 LangChain 构建 Agent 应用的开发者，此更新提升了工具调用和异步处理的稳定性与可靠性，减少了因框架缺陷导致的运行时错误。"
+    },
+    {
+      "canonical_url": "https://github.com/langchain-ai/langchain/releases/tag/langchain-openrouter%3D%3D0.2.8",
+      "category": "Agent",
+      "editorial_lane": "产品与应用",
+      "id": "c286050243ecdec0",
+      "importance": 3,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "langchain-openrouter==0.2.8",
+      "published_at": "2026-08-14T19:03:45Z",
+      "source": "LangChain",
+      "summary": "LangChain 发布 langchain-openrouter 0.2.8 版本，修复了使用量块中成本元数据保留问题，并新增在响应中保留提供商信息的功能。",
+      "tags": [
+        "LangChain",
+        "OpenRouter",
+        "版本更新"
+      ],
+      "title": "LangChain OpenRouter 集成更新至 0.2.8 版",
+      "tracking_signal": "关注 LangChain 官方文档中 OpenRouter 集成的成本追踪和提供商信息字段的使用说明。",
+      "why_it_matters": "对使用 LangChain 调用 OpenRouter 的开发者，此更新修复了成本追踪的准确性，并提供了更细粒度的提供商信息，有助于成本管理和模型选择。"
+    },
+    {
+      "canonical_url": "https://github.com/langchain-ai/langchain/releases/tag/langchain-openai%3D%3D1.5.1",
+      "category": "Agent",
+      "editorial_lane": "产品与应用",
+      "id": "ff23d01934d54c08",
+      "importance": 3,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "langchain-openai==1.5.1",
+      "published_at": "2026-08-14T15:47:44Z",
+      "source": "LangChain",
+      "summary": "LangChain 发布 langchain-openai 1.5.1 版本，修复了在流式传输中保留加密推理内容的问题。",
+      "tags": [
+        "LangChain",
+        "OpenAI",
+        "版本更新"
+      ],
+      "title": "LangChain OpenAI 集成更新至 1.5.1 版",
+      "tracking_signal": "查看 langchain-openai 的发布说明，确认流式传输中加密推理内容的处理方式变更。",
+      "why_it_matters": "对使用 LangChain 调用 OpenAI 模型并依赖流式输出推理内容的开发者，此更新确保了加密推理信息在流式传输中不丢失，保障了功能完整性。"
+    }
+  ],
+  "model": "deepseek-v4-pro",
+  "schema_version": "1.2",
+  "source_runs": [
+    {
+      "elapsed_ms": 1235,
+      "error_type": null,
+      "item_count": 1129,
+      "source_id": "openai",
+      "source_name": "OpenAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1331,
+      "error_type": null,
+      "item_count": 20,
+      "source_id": "google-ai",
+      "source_name": "Google AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 524,
+      "error_type": null,
+      "item_count": 100,
+      "source_id": "deepmind",
+      "source_name": "DeepMind",
+      "success": true
+    },
+    {
+      "elapsed_ms": 440,
+      "error_type": null,
+      "item_count": 842,
+      "source_id": "hugging-face",
+      "source_name": "Hugging Face",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1242,
+      "error_type": "HttpFetchError",
+      "item_count": 0,
+      "source_id": "github-codex",
+      "source_name": "OpenAI Codex",
+      "success": false
+    },
+    {
+      "elapsed_ms": 463,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-claude-code",
+      "source_name": "Claude Code",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1053,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "github-gemini-cli",
+      "source_name": "Gemini CLI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 952,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-langchain",
+      "source_name": "LangChain",
+      "success": true
+    },
+    {
+      "elapsed_ms": 936,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-crewai",
+      "source_name": "CrewAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 428,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-llama-index",
+      "source_name": "LlamaIndex",
+      "success": true
+    },
+    {
+      "elapsed_ms": 297,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-transformers",
+      "source_name": "Transformers",
+      "success": true
+    },
+    {
+      "elapsed_ms": 375,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-vllm",
+      "source_name": "vLLM",
+      "success": true
+    },
+    {
+      "elapsed_ms": 342,
+      "error_type": null,
+      "item_count": 8,
+      "source_id": "github-ollama",
+      "source_name": "Ollama",
+      "success": true
+    },
+    {
+      "elapsed_ms": 238,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-cline",
+      "source_name": "Cline",
+      "success": true
+    }
+  ]
+}
