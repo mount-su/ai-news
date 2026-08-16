@@ -9,10 +9,10 @@ from ai_news.pipeline.editorial import is_editorially_eligible
 from ai_news.pipeline.normalize import to_candidate
 
 
-def _candidate(title: str, excerpt: str = ""):
+def _candidate(title: str, excerpt: str = "", source_id: str = "source-test"):
     return to_candidate(
         RawItem(
-            source_id="source-test",
+            source_id=source_id,
             source_name="Test source",
             source_weight=7,
             title=title,
@@ -63,3 +63,15 @@ def test_editorial_filter_accepts_concrete_user_or_market_changes(
     excerpt: str,
 ) -> None:
     assert is_editorially_eligible(_candidate(title, excerpt)) is True
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "LangChain core 1.5.5 release fixes tool validation",
+        "LangChain v0.2.8 changelog adds provider metadata",
+        "LangChain patch fixes streaming reasoning content",
+    ],
+)
+def test_editorial_filter_rejects_github_release_details(title: str) -> None:
+    assert is_editorially_eligible(_candidate(title, source_id="github-langchain")) is False
