@@ -1,14 +1,36 @@
 {
-  "candidate_count": 0,
+  "candidate_count": 1,
   "date": "2026-08-16",
   "degraded": true,
-  "generated_at": "2026-08-16T02:21:11.899815Z",
-  "items": [],
+  "generated_at": "2026-08-16T03:02:45.226180Z",
+  "items": [
+    {
+      "canonical_url": "https://github.com/ollama/ollama/releases/tag/v0.32.12",
+      "category": "AI 工具",
+      "editorial_lane": "产品与应用",
+      "id": "15d55fc07a614323",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "v0.32.12",
+      "published_at": "2026-08-14T16:37:00Z",
+      "source": "Ollama",
+      "summary": "Ollama v0.32.12 版本新增对 Qwen 3.8 27B 模型的支持，该模型在编程、专业工作、研究和长时间智能体任务上表现提升。同时为苹果芯片设备提供了 MLX 优化版本，以提升性能和输出质量。",
+      "tags": [
+        "Ollama",
+        "Qwen",
+        "本地模型"
+      ],
+      "title": "Ollama 新增 Qwen 3.8 27B 模型支持，针对苹果芯片优化",
+      "tracking_signal": "在 Ollama 中运行 ollama run qwen3.8:27b 或 ollama run qwen3.8:27b-mlx 测试模型效果。",
+      "why_it_matters": "本地运行大模型的用户现在可以直接在 Ollama 中体验 Qwen 3.8 27B，苹果芯片用户能获得更好的性能，适合编程和智能体任务。"
+    }
+  ],
   "model": "deepseek-v4-pro",
   "schema_version": "1.2",
   "source_runs": [
     {
-      "elapsed_ms": 1235,
+      "elapsed_ms": 706,
       "error_type": null,
       "item_count": 1129,
       "source_id": "openai",
@@ -16,7 +38,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1331,
+      "elapsed_ms": 1121,
       "error_type": null,
       "item_count": 20,
       "source_id": "google-ai",
@@ -24,7 +46,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 524,
+      "elapsed_ms": 1016,
       "error_type": null,
       "item_count": 100,
       "source_id": "deepmind",
@@ -32,7 +54,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 440,
+      "elapsed_ms": 958,
       "error_type": null,
       "item_count": 842,
       "source_id": "hugging-face",
@@ -40,7 +62,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1242,
+      "elapsed_ms": 1421,
       "error_type": "HttpFetchError",
       "item_count": 0,
       "source_id": "github-codex",
@@ -48,7 +70,7 @@
       "success": false
     },
     {
-      "elapsed_ms": 463,
+      "elapsed_ms": 967,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-claude-code",
@@ -56,7 +78,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1053,
+      "elapsed_ms": 561,
       "error_type": null,
       "item_count": 1,
       "source_id": "github-gemini-cli",
@@ -64,7 +86,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 952,
+      "elapsed_ms": 305,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-langchain",
@@ -72,7 +94,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 936,
+      "elapsed_ms": 262,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-crewai",
@@ -80,7 +102,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 428,
+      "elapsed_ms": 335,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-llama-index",
@@ -88,7 +110,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 297,
+      "elapsed_ms": 265,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-transformers",
@@ -96,7 +118,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 375,
+      "elapsed_ms": 316,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-vllm",
@@ -104,7 +126,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 342,
+      "elapsed_ms": 352,
       "error_type": null,
       "item_count": 8,
       "source_id": "github-ollama",
@@ -112,7 +134,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 238,
+      "elapsed_ms": 253,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-cline",
