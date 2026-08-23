@@ -98,6 +98,14 @@ def test_editorial_filter_rejects_github_release_details(title: str) -> None:
             "多模态 benchmark 显示推理性能提升 40%",
             "公开评测显示该提升已在生产部署中得到验证。",
         ),
+        (
+            "Benchmark shows 40% lower inference cost for production API",
+            "The benchmark reports lower latency and cost for teams using the API.",
+        ),
+        (
+            "LangChain major release changes runtime architecture",
+            "The major release introduces migration requirements for production agent systems.",
+        ),
     ],
 )
 def test_editorial_filter_keeps_high_impact_technical_news(
@@ -106,3 +114,70 @@ def test_editorial_filter_keeps_high_impact_technical_news(
 ) -> None:
     source_id = "github-pytorch" if title.startswith("PyTorch") else "source-test"
     assert is_editorially_eligible(_candidate(title, excerpt, source_id=source_id)) is True
+
+
+@pytest.mark.parametrize(
+    "title,excerpt",
+    [
+        (
+            "LangChain v1.0 introduces breaking agent runtime changes",
+            "The release changes production agent deployment paths and migration requirements.",
+        ),
+        (
+            "OpenAI API update reduces enterprise inference latency",
+            "The API change improves latency and lowers cost for production deployments.",
+        ),
+        (
+            "Claude Code SDK adds production stability controls",
+            "The SDK update targets enterprise rollout reliability and compatibility.",
+        ),
+        (
+            "Transformers release expands model availability for developers",
+            "The release changes access to widely used models across production AI applications.",
+        ),
+        (
+            "OpenAI API adds prompt template controls for production teams",
+            "The API controls improve reliability for enterprise production deployments.",
+        ),
+        (
+            "Google NotebookLM expands enterprise availability",
+            "NotebookLM is now available to more enterprise customers with admin controls.",
+        ),
+    ],
+)
+def test_editorial_filter_accepts_high_impact_developer_ecosystem_updates(
+    title: str,
+    excerpt: str,
+) -> None:
+    assert is_editorially_eligible(_candidate(title, excerpt, source_id="github-langchain")) is True
+
+
+@pytest.mark.parametrize(
+    "title,excerpt",
+    [
+        (
+            "How to build a prompt template in five minutes",
+            "A generic tutorial with no new product facts.",
+        ),
+        (
+            "Model benchmark leaderboard update",
+            "Scores changed without product availability or cost impact.",
+        ),
+        ("SDK v2.4.1 fixes connector timeout", "A patch-level changelog item for one connector."),
+        (
+            "Framework repository adds example notebooks",
+            "The update is documentation-only and not a major release.",
+        ),
+        (
+            "LangChain v1.0 tutorial for migration",
+            "A prompt-template tutorial with no new product facts.",
+        ),
+    ],
+)
+def test_editorial_filter_rejects_low_value_technical_content(
+    title: str,
+    excerpt: str,
+) -> None:
+    assert (
+        is_editorially_eligible(_candidate(title, excerpt, source_id="github-langchain")) is False
+    )
