@@ -1,35 +1,57 @@
 {
-  "candidate_count": 1,
+  "candidate_count": 2,
   "date": "2026-08-22",
-  "degraded": true,
-  "generated_at": "2026-08-22T01:49:59.019442Z",
+  "degraded": false,
+  "generated_at": "2026-08-22T15:59:59.999999Z",
   "items": [
     {
-      "canonical_url": "https://huggingface.co/blog/LiquidAI/lfm25-dspark",
-      "category": "开源项目",
+      "canonical_url": "https://blog.google/products-and-platforms/products/search/back-to-school-study-tools",
+      "category": "AI 工具",
       "editorial_lane": "产品与应用",
-      "id": "eab5285cfdebeb65",
-      "importance": 3,
+      "id": "d96b4129d44ca7f6",
+      "importance": 7,
       "is_official": true,
-      "marketing_risk": "high",
-      "original_title": "Up to 3.2x Faster Inference with LFM2.5-DSpark",
-      "published_at": "2026-08-20T16:52:57Z",
-      "source": "Hugging Face",
-      "summary": "开源项目 LFM2.5-DSpark 声称可将推理速度提升至最高 3.2 倍，但未提供具体模型、硬件环境或应用场景。",
+      "marketing_risk": "medium",
+      "original_title": "5 new ways to level up your learning with Search",
+      "published_at": "2026-08-19T19:00:00Z",
+      "source": "Google AI",
+      "summary": "Google 搜索推出 5 种新的 AI 驱动学习方式，包括添加笔记和向 Google 提问等功能，旨在提升用户的学习体验。",
       "tags": [
-        "推理加速",
-        "开源模型"
+        "Google",
+        "AI 搜索",
+        "教育"
       ],
-      "title": "LFM2.5-DSpark 实现最高 3.2 倍推理加速",
-      "tracking_signal": "等待该项目在 Hugging Face 上补充基准测试、硬件要求和具体模型支持列表后再评估。",
-      "why_it_matters": "若该加速方案稳定可用，普通用户和开发者可在本地或云端以更低延迟运行模型，但当前缺乏可验证细节，实际影响有限。"
+      "title": "Google 搜索新增 AI 学习功能，支持添加笔记和提问",
+      "tracking_signal": "在 Google 搜索中测试“Add Notebook”和“Ask Google”等新功能，评估其对信息检索和学习效率的实际提升。",
+      "why_it_matters": "作为全球最大的搜索引擎，Google 将 AI 深度整合进核心搜索功能，直接改变了数亿用户获取和消化信息的方式，使学习过程更具互动性。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/introducing-ai-futures",
+      "category": "大模型",
+      "editorial_lane": "平台与政策",
+      "id": "fc1a9abd82b35a9c",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Introducing AI Futures",
+      "published_at": "2026-08-20T07:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 发布新博客栏目 AI Futures，旨在探讨变革性 AI 如何重塑权力、治理、经济和个人自由。",
+      "tags": [
+        "OpenAI",
+        "AI 治理",
+        "社会影响"
+      ],
+      "title": "OpenAI 推出 AI Futures 博客探讨 AI 对社会结构的深远影响",
+      "tracking_signal": "关注该博客后续发布的具体分析文章，以了解 OpenAI 对 AI 治理和政策的立场。",
+      "why_it_matters": "该举措表明头部 AI 公司正主动引导关于 AI 社会影响的讨论，可能影响公众认知和未来政策制定方向。"
     }
   ],
   "model": "deepseek-v4-pro",
   "schema_version": "1.2",
   "source_runs": [
     {
-      "elapsed_ms": 967,
+      "elapsed_ms": 992,
       "error_type": null,
       "item_count": 1143,
       "source_id": "openai",
@@ -37,7 +59,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1108,
+      "elapsed_ms": 1154,
       "error_type": null,
       "item_count": 20,
       "source_id": "google-ai",
@@ -45,7 +67,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1166,
+      "elapsed_ms": 1220,
       "error_type": null,
       "item_count": 100,
       "source_id": "deepmind",
@@ -53,7 +75,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 384,
+      "elapsed_ms": 396,
       "error_type": null,
       "item_count": 846,
       "source_id": "hugging-face",
@@ -61,83 +83,83 @@
       "success": true
     },
     {
-      "elapsed_ms": 980,
-      "error_type": "HttpFetchError",
-      "item_count": 0,
-      "source_id": "github-codex",
-      "source_name": "OpenAI Codex",
-      "success": false
-    },
-    {
-      "elapsed_ms": 403,
+      "elapsed_ms": 423,
       "error_type": null,
-      "item_count": 10,
-      "source_id": "github-claude-code",
-      "source_name": "Claude Code",
+      "item_count": 81,
+      "source_id": "mistral",
+      "source_name": "Mistral",
       "success": true
     },
     {
-      "elapsed_ms": 920,
+      "elapsed_ms": 136,
+      "error_type": null,
+      "item_count": 44,
+      "source_id": "qwen",
+      "source_name": "通义千问 Qwen",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1147,
       "error_type": null,
       "item_count": 1,
-      "source_id": "github-gemini-cli",
-      "source_name": "Gemini CLI",
+      "source_id": "anthropic",
+      "source_name": "Anthropic",
       "success": true
     },
     {
-      "elapsed_ms": 832,
+      "elapsed_ms": 11142,
       "error_type": null,
-      "item_count": 10,
-      "source_id": "github-langchain",
-      "source_name": "LangChain",
+      "item_count": 4,
+      "source_id": "meta-ai",
+      "source_name": "Meta AI",
       "success": true
     },
     {
-      "elapsed_ms": 259,
+      "elapsed_ms": 639,
       "error_type": null,
-      "item_count": 10,
-      "source_id": "github-crewai",
-      "source_name": "CrewAI",
+      "item_count": 1,
+      "source_id": "deepseek",
+      "source_name": "DeepSeek",
       "success": true
     },
     {
-      "elapsed_ms": 320,
+      "elapsed_ms": 878,
       "error_type": null,
-      "item_count": 10,
-      "source_id": "github-llama-index",
-      "source_name": "LlamaIndex",
+      "item_count": 1,
+      "source_id": "zhipu-glm",
+      "source_name": "智谱 GLM",
       "success": true
     },
     {
-      "elapsed_ms": 263,
-      "error_type": null,
-      "item_count": 10,
-      "source_id": "github-transformers",
-      "source_name": "Transformers",
-      "success": true
-    },
-    {
-      "elapsed_ms": 358,
-      "error_type": null,
-      "item_count": 10,
-      "source_id": "github-vllm",
-      "source_name": "vLLM",
-      "success": true
-    },
-    {
-      "elapsed_ms": 266,
-      "error_type": null,
-      "item_count": 8,
-      "source_id": "github-ollama",
-      "source_name": "Ollama",
-      "success": true
-    },
-    {
-      "elapsed_ms": 294,
+      "elapsed_ms": 9268,
       "error_type": null,
       "item_count": 7,
-      "source_id": "github-cline",
-      "source_name": "Cline",
+      "source_id": "minimax",
+      "source_name": "MiniMax",
+      "success": true
+    },
+    {
+      "elapsed_ms": 789,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "tencent-hunyuan",
+      "source_name": "腾讯混元",
+      "success": true
+    },
+    {
+      "elapsed_ms": 4881,
+      "error_type": null,
+      "item_count": 5,
+      "source_id": "volcengine-doubao",
+      "source_name": "豆包与火山方舟",
+      "success": true
+    },
+    {
+      "elapsed_ms": 2496,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "baidu-ernie",
+      "source_name": "百度文心",
       "success": true
     }
   ]
