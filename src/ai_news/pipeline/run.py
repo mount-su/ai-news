@@ -20,6 +20,7 @@ from pydantic import ValidationError
 from ai_news.collectors.arxiv import collect_arxiv
 from ai_news.collectors.feed import parse_feed
 from ai_news.collectors.github import collect_github_releases
+from ai_news.collectors.official_pages import collect_official_page
 from ai_news.http import get_bytes
 from ai_news.llm.base import AnalysisError
 from ai_news.llm.factory import create_analyzer
@@ -142,6 +143,8 @@ async def _collect_live(
             raise ValueError("feed source requires a URL")
         payload = await get_bytes(client, str(source.url))
         return parse_feed(payload, source)
+    if source.kind == "official_page":
+        return await collect_official_page(client, source)
     if source.kind == "arxiv":
         return await collect_arxiv(client, source)
     if source.kind == "github":
