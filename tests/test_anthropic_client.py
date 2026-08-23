@@ -576,8 +576,8 @@ def test_invalid_first_text_block_is_not_skipped_for_a_later_text_block() -> Non
     assert attempts == 1
 
 
-@pytest.mark.parametrize("invalid_kind", ["unknown", "duplicate", "missing"])
-def test_unknown_duplicate_and_missing_response_ids_trigger_one_repair_then_fail(
+@pytest.mark.parametrize("invalid_kind", ["unknown", "duplicate"])
+def test_unknown_and_duplicate_response_ids_trigger_one_repair_then_fail(
     invalid_kind: str,
 ) -> None:
     first = _candidate(f"{invalid_kind}-first")
@@ -587,8 +587,6 @@ def test_unknown_duplicate_and_missing_response_ids_trigger_one_repair_then_fail
         rows[0]["id"] = "0123456789abcdef"
     elif invalid_kind == "duplicate":
         rows[1]["id"] = first.id
-    else:
-        rows.pop()
     prompts: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -601,6 +599,22 @@ def test_unknown_duplicate_and_missing_response_ids_trigger_one_repair_then_fail
     assert len(prompts) == 2
     assert "修复" in prompts[1]
     assert invalid_kind in prompts[1]
+
+
+def test_missing_response_ids_are_a_valid_editorial_subset() -> None:
+    first = _candidate("subset-first")
+    second = _candidate("subset-second")
+    rows = [_analysis_row(first)]
+    prompts: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        prompts.append(json.loads(request.content)["messages"][0]["content"])
+        return httpx.Response(200, content=_anthropic_response(rows), request=request)
+
+    result = _run_analyze(handler, [first, second])
+
+    assert list(result) == [first.id]
+    assert len(prompts) == 1
 
 
 @pytest.mark.parametrize(

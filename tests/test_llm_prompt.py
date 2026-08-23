@@ -84,6 +84,8 @@ def test_prompt_marks_each_item_untrusted_and_lists_all_six_categories_and_schem
     assert "同一事件只保留" in prompt
     assert "单一来源最多 3 条" in prompt
     assert "具有重要意义" in prompt
+    assert "选择 1 至 1 条" in prompt
+    assert "恰好" not in prompt
     for category in Category:
         assert category.value in prompt
         assert category.value in SYSTEM_PROMPT
@@ -139,5 +141,5 @@ def test_thirty_six_item_prompt_has_a_conservative_utf8_byte_bound() -> None:
 
     prompt = build_analysis_prompt(items)
 
-    assert "从全部候选中选择恰好 9 条" in prompt
+    assert "从全部候选中选择 1 至 9 条" in prompt
     assert len(prompt.encode("utf-8")) < 250_000

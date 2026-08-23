@@ -145,7 +145,7 @@ def _parse_analysis(
     candidate_by_id = {candidate.id: candidate for candidate in candidates}
     if any(row_id not in candidate_by_id for row_id in row_ids):
         return None, "unknown"
-    if len(row_ids) < selection_count:
+    if not row_ids:
         return None, "missing"
     if len(row_ids) > selection_count:
         return None, "count"

@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 import types
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -67,6 +67,7 @@ sources:
 
     monkeypatch.setattr(cli, "load_settings", lambda: settings)
     monkeypatch.setattr(cli, "run_daily", fake_run_daily)
+    monkeypatch.setattr(cli, "_shanghai_today", lambda: date(2026, 8, 23))
 
     result = cli.main(["generate", "--date", RUN_DATE.isoformat(), "--root", str(tmp_path)])
 
@@ -75,6 +76,16 @@ sources:
     assert run_arguments[0]["root"] == tmp_path
     assert run_arguments[0]["run_date"] == RUN_DATE
     assert run_arguments[0]["settings"] == settings
+    assert run_arguments[0]["now"] == datetime(
+        2026,
+        7,
+        26,
+        15,
+        59,
+        59,
+        999999,
+        tzinfo=UTC,
+    )
     assert [source.id for source in run_arguments[0]["source_config"].sources] == ["actual-layout"]
 
 
@@ -95,6 +106,25 @@ def test_generate_uses_shanghai_today_when_date_is_omitted(
 
     assert cli.main(["generate", "--root", str(tmp_path)]) == 0
     assert run_dates == [RUN_DATE]
+
+
+def test_generate_does_not_override_collection_clock_for_current_date(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_arguments: list[dict[str, Any]] = []
+    monkeypatch.setattr(cli, "_shanghai_today", lambda: RUN_DATE)
+    monkeypatch.setattr(cli, "load_source_config", lambda _path: _source_config())
+    monkeypatch.setattr(cli, "load_settings", _settings)
+
+    async def fake_run_daily(**kwargs: Any) -> object:
+        run_arguments.append(kwargs)
+        return object()
+
+    monkeypatch.setattr(cli, "run_daily", fake_run_daily)
+
+    assert cli.main(["generate", "--date", RUN_DATE.isoformat(), "--root", str(tmp_path)]) == 0
+    assert "now" not in run_arguments[0]
 
 
 def test_invalid_iso_date_is_rejected_by_argparse_without_echoing_value(

@@ -80,7 +80,7 @@ def build_analysis_prompt(items: list[Candidate]) -> str:
 category 只能使用六个中文分类：{_CATEGORY_VALUES}。
 editorial_lane 只能使用三个当前中文方向：{_CURRENT_EDITORIAL_LANE_VALUES}。
 历史归档可能出现兼容方向值：{_EDITORIAL_LANE_VALUES}；新输出只能使用当前方向。
-从全部候选中选择恰好 {selection_count} 条，不得逐条机械摘要。
+从全部候选中选择 1 至 {selection_count} 条，不得逐条机械摘要或为凑数保留弱内容。
 同一事件只保留信息最完整的一条。
 正式九条简报中，单一来源最多 3 条。
 {distribution_rules}
