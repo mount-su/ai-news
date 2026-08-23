@@ -110,6 +110,24 @@ def test_readme_links_the_design_and_implementation_plan() -> None:
     assert "docs/superpowers/plans/2026-07-26-ai-news-github-pages.md" not in readme
 
 
+def test_readme_documents_official_page_and_reddit_rss_boundaries() -> None:
+    readme = _readme()
+
+    required_fragments = [
+        "官方页面适配器",
+        "Reddit RSS",
+        "不需要 `REDDIT_CLIENT_ID`",
+        "`REDDIT_CLIENT_SECRET`",
+        "不使用通用网页抓取",
+        "可信外部原文",
+        "docs/superpowers/specs/2026-08-23-official-model-vendor-sources-design.md",
+        "docs/superpowers/plans/2026-08-23-official-model-vendor-sources.md",
+    ]
+
+    for fragment in required_fragments:
+        assert fragment in readme
+
+
 def test_superseded_plan_warns_before_any_executable_content() -> None:
     old_plan = OLD_IMPLEMENTATION_PLAN.read_text(encoding="utf-8")
     canonical_plan = "docs/superpowers/plans/2026-07-29-ark-coding-plan.md"

@@ -1,7 +1,7 @@
 # AI 情报雷达
 
-一个由 Python 生成的中文 AI 资讯静态站。它从受控的官方 Feed、GitHub
-Releases 和 arXiv 获取候选内容，经过去重、排序和结构化模型分析后，将可追溯的
+一个由 Python 生成的中文 AI 资讯静态站。它从受控的官方 Feed、显式官网页面适配器
+和受限 Reddit RSS 获取候选内容，经过去重、排序和结构化模型分析后，将可追溯的
 JSON、Markdown 日报写入仓库，再用 Jinja 构建 GitHub Pages。
 
 预期 Pages 地址（完成部署后）：<https://mount-su.github.io/ai-news/>
@@ -11,14 +11,16 @@ JSON、Markdown 日报写入仓库，再用 Jinja 构建 GitHub Pages。
 [Coding Plan 补充设计](docs/superpowers/specs/2026-07-29-ark-coding-plan-design.md)，
 模型接入与部署的当前步骤见
 [当前实施计划](docs/superpowers/plans/2026-07-29-ark-coding-plan.md)。九条简报的编辑契约见
-[精炼日报设计](docs/superpowers/specs/2026-07-31-concise-editorial-design.md)。
+[精炼日报设计](docs/superpowers/specs/2026-07-31-concise-editorial-design.md)。厂商扩源和
+Reddit 边界见[扩源设计](docs/superpowers/specs/2026-08-23-official-model-vendor-sources-design.md)
+及[扩源实施计划](docs/superpowers/plans/2026-08-23-official-model-vendor-sources.md)。
 
 ## 它如何工作
 
 每日流水线依次执行：
 
 1. 读取 `sources/feeds.yaml` 中启用的受控来源。
-2. 采集 Feed、GitHub Releases 和 arXiv，统一为候选数据。
+2. 采集官方 Feed、允许列表内的官网页面和受限 Reddit RSS，统一为候选数据。
 3. 规范 URL、清理文本，并结合最近 30 天索引跨来源、跨日期去重。
 4. 按来源可信度、时效和官方属性预筛选，建立最多 36 条、单来源最多 6 条的候选池。
 5. 模型一次性选编 9 条，并压缩为“变化、影响、行动”；无效时只允许一次定向修复。
@@ -182,15 +184,23 @@ gh run list --repo mount-su/ai-news --workflow daily-news.yml
 ## 数据源维护
 
 所有网络来源都在 `sources/feeds.yaml` 中显式声明。每项包含稳定 `id`、显示名称、
-`kind`、官方 HTTPS Feed URL 或 GitHub `repo`、默认分类、权重和 `official` 标记。
+`kind`、默认分类、权重和 `official` 标记。Feed 配置官方 HTTPS URL；官网来源配置
+代码内允许列表中的官方页面适配器；Reddit 只配置固定社区名，不能注入请求 URL、
+选择器或解析规则。
+
+Reddit RSS 只承担社区线索发现，不作为事实来源。它只请求 `new` 和 `top/day` 两条
+合并订阅，并验证最终的可信外部原文、主题和明确发布日期；不保存用户、帖子正文、
+评论或投票数据。该方案不需要 `REDDIT_CLIENT_ID`、`REDDIT_CLIENT_SECRET`、Cookie
+或 Reddit 登录。
 
 新增或调整来源时：
 
-1. 优先使用官方 RSS/Atom、arXiv API 或 GitHub Releases，不加入通用网页抓取。
+1. 优先使用官方 RSS/Atom；没有订阅源时只能增加经过审查的官方页面适配器，不使用通用网页抓取。
 2. 保持 `id` 唯一且稳定；变更 `id` 会影响来源统计与历史判断。
 3. URL 必须是 HTTPS，并通过实现中的 host/path 白名单检查。
 4. 为解析和失败情况补固定 fixture 与测试，不让 CI 依赖实时网络。
-5. 运行完整质量门禁和离线演示，再提交 `feeds.yaml`。
+5. Reddit 外部目标只接受启用厂商的官方域名或代码内可信媒体允许列表。
+6. 运行完整质量门禁、实时来源健康检查和离线演示，再提交 `feeds.yaml`。
 
 来源权重代表预筛选可信度，不代表内容必然正确。官方标记也不会替代事实核验。
 
@@ -228,9 +238,10 @@ gh workflow run daily-news.yml --repo mount-su/ai-news -f date=YYYY-MM-DD
 
 ## 安全与版权
 
-采集只访问 `feeds.yaml` 允许的 HTTPS 端点，不执行来源中的指令，也不下载或运行来源
-代码、脚本和二进制文件。外部文本视为不可信输入，长度受限；模板默认转义，客户端
-搜索索引只含公开日报字段。
+采集只访问 `feeds.yaml` 和代码允许列表限定的 HTTPS 端点，不执行来源中的指令，也不
+下载或运行来源代码、脚本和二进制文件。官网页面使用固定适配器，Reddit 只读取 RSS
+及受限的可信外部原文；两者都不会降级为通用抓取或登录绕过。外部文本视为不可信输入，
+长度受限；模板默认转义，客户端搜索索引只含公开日报字段。
 
 仓库不保存文章全文、付费内容或媒体文件，只保存标题、原文链接、必要的短摘录、来源
 元数据和本项目生成的中文分析。版权归原作者或发布方；摘要用于索引与研判，读者应访问
@@ -248,7 +259,7 @@ gh workflow run daily-news.yml --repo mount-su/ai-news -f date=YYYY-MM-DD
 ├── .github/workflows/        # CI、每日生成与 Pages 部署
 ├── sources/feeds.yaml        # 允许的数据源
 ├── src/ai_news/
-│   ├── collectors/           # Feed、GitHub Releases、arXiv
+│   ├── collectors/           # Feed、官方页面适配器、Reddit RSS
 │   ├── llm/                  # 双协议模型适配与严格响应校验
 │   ├── pipeline/             # 规范化、去重、排序与日流水线
 │   ├── site/                 # Jinja 模板、样式、脚本与构建器
