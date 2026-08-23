@@ -159,6 +159,10 @@ gh secret set LLM_API_KEY --repo mount-su/ai-news
 `.github/workflows/ci.yml` 在 push 和 pull request 上运行 lint、格式、完整测试、Secret
 扫描、离线演示、站点校验和 workflow lint。
 
+`.github/workflows/source-health.yml` 在数据源或采集器相关 PR 上运行无 Secret 的实时
+来源健康检查；10 个新增厂商来源必须能解析出带明确日期的历史记录。Reddit 若在
+GitHub Actions 匿名环境中持续被限流，可以保持禁用，不阻止官方来源上线。
+
 `.github/workflows/daily-news.yml` 有三条触发路径：
 
 - `schedule` 使用 GitHub 的 `timezone: "Asia/Shanghai"`，每天北京时间 08:17 运行。

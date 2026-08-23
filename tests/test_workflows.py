@@ -10,6 +10,7 @@ import yaml
 REPOSITORY = Path(__file__).parents[1]
 CI_PATH = REPOSITORY / ".github/workflows/ci.yml"
 DAILY_PATH = REPOSITORY / ".github/workflows/daily-news.yml"
+SOURCE_HEALTH_PATH = REPOSITORY / ".github/workflows/source-health.yml"
 ACTION_PINS = {
     "actions/checkout": (
         "d23441a48e516b6c34aea4fa41551a30e30af803",
@@ -95,7 +96,7 @@ def test_all_external_actions_are_commit_pinned_with_auditable_tag_sources() -> 
     )
     all_usage_lines: list[str] = []
     usages: list[tuple[str, str, str, str]] = []
-    for path in (CI_PATH, DAILY_PATH):
+    for path in (CI_PATH, DAILY_PATH, SOURCE_HEALTH_PATH):
         source = path.read_text(encoding="utf-8")
         all_usage_lines.extend(all_usage_pattern.findall(source))
         usages.extend(usage_pattern.findall(source))
@@ -152,11 +153,46 @@ def test_ci_actionlint_is_pinned_and_only_ignores_the_known_timezone_schema_gap(
     assert re.findall(r"rhysd/actionlint:\S+", commands) == [ACTIONLINT_IMAGE]
     assert ".github/workflows/ci.yml" in commands
     assert ".github/workflows/daily-news.yml" in commands
+    assert ".github/workflows/source-health.yml" in commands
     assert "-ignore" in commands
     assert (
         'element of "schedule" section must be mapping and must contain one key "cron"' in commands
     )
     assert ".*timezone.*" not in commands
+
+
+def test_source_health_workflow_is_read_only_bounded_and_uses_no_secrets() -> None:
+    workflow = _load_workflow(SOURCE_HEALTH_PATH)
+
+    assert workflow["on"] == {
+        "pull_request": {
+            "paths": [
+                "sources/feeds.yaml",
+                "src/ai_news/collectors/**",
+                "src/ai_news/http.py",
+                "src/ai_news/models.py",
+                "src/ai_news/source_health.py",
+                "scripts/check_source_health.py",
+                ".github/workflows/source-health.yml",
+            ]
+        },
+        "workflow_dispatch": {},
+    }
+    assert workflow["permissions"] == {"contents": "read"}
+    jobs = workflow["jobs"]
+    assert isinstance(jobs, dict)
+    job = jobs["live-source-health"]
+    assert job["timeout-minutes"] == 10
+    assert job["permissions"] == {"contents": "read"}
+
+    steps = _steps(workflow, "live-source-health")
+    assert steps[0]["uses"] == f"actions/checkout@{ACTION_PINS['actions/checkout'][0]}"
+    assert steps[1]["uses"] == f"actions/setup-python@{ACTION_PINS['actions/setup-python'][0]}"
+    assert steps[1]["with"] == {"python-version": "3.12", "cache": "pip"}
+    commands = _run_commands(steps)
+    assert "python -m pip install ." in commands
+    assert "python scripts/check_source_health.py" in commands
+    assert "secrets." not in SOURCE_HEALTH_PATH.read_text(encoding="utf-8")
 
 
 def test_daily_triggers_manual_date_and_concurrency_contract() -> None:
