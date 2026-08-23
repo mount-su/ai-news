@@ -1,0 +1,164 @@
+{
+  "candidate_count": 3,
+  "date": "2026-08-17",
+  "degraded": true,
+  "generated_at": "2026-08-17T15:59:59.999999Z",
+  "items": [
+    {
+      "canonical_url": "https://openai.com/index/the-defenders-window",
+      "category": "大模型",
+      "editorial_lane": "平台与政策",
+      "id": "1380f7766171a5a6",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "The Defender’s Window",
+      "published_at": "2026-08-17T05:30:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 发布《防御者之窗》，阐述其如何强化自身安全防御，并为安全团队提供当前可采取的行动建议，以应对 AI 重塑的网络攻击。",
+      "tags": [
+        "网络安全",
+        "安全指南"
+      ],
+      "title": "OpenAI 发布《防御者之窗》安全指南",
+      "tracking_signal": "关注 OpenAI 官方博客获取完整指南，并评估其建议对现有安全策略的适用性。",
+      "why_it_matters": "直接影响企业安全团队，提供具体可操作的 AI 时代防御策略，帮助应对日益复杂的 AI 驱动网络威胁。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/new-policy-ideas-for-the-intelligence-age",
+      "category": "大模型",
+      "editorial_lane": "平台与政策",
+      "id": "3ff02964da6b7f4f",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "New policy ideas for the Intelligence Age",
+      "published_at": "2026-08-17T03:15:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 宣布资助 14 个独立项目，探索新的 AI 政策理念，旨在扩大智能时代的经济机会并增强社会韧性。",
+      "tags": [
+        "AI 政策",
+        "社会影响"
+      ],
+      "title": "OpenAI 资助 14 个独立 AI 政策研究项目",
+      "tracking_signal": "留意 OpenAI 后续公布的具体研究项目名单和中期成果，以了解政策风向。",
+      "why_it_matters": "影响政策制定者和公众，这些研究可能塑造未来 AI 治理方向，为平衡创新与风险提供新思路。"
+    }
+  ],
+  "model": "deepseek-v4-pro",
+  "schema_version": "1.2",
+  "source_runs": [
+    {
+      "elapsed_ms": 758,
+      "error_type": null,
+      "item_count": 1143,
+      "source_id": "openai",
+      "source_name": "OpenAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 845,
+      "error_type": null,
+      "item_count": 20,
+      "source_id": "google-ai",
+      "source_name": "Google AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 967,
+      "error_type": null,
+      "item_count": 100,
+      "source_id": "deepmind",
+      "source_name": "DeepMind",
+      "success": true
+    },
+    {
+      "elapsed_ms": 318,
+      "error_type": null,
+      "item_count": 846,
+      "source_id": "hugging-face",
+      "source_name": "Hugging Face",
+      "success": true
+    },
+    {
+      "elapsed_ms": 885,
+      "error_type": "HttpFetchError",
+      "item_count": 0,
+      "source_id": "github-codex",
+      "source_name": "OpenAI Codex",
+      "success": false
+    },
+    {
+      "elapsed_ms": 766,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-claude-code",
+      "source_name": "Claude Code",
+      "success": true
+    },
+    {
+      "elapsed_ms": 701,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "github-gemini-cli",
+      "source_name": "Gemini CLI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 303,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-langchain",
+      "source_name": "LangChain",
+      "success": true
+    },
+    {
+      "elapsed_ms": 227,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-crewai",
+      "source_name": "CrewAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 325,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-llama-index",
+      "source_name": "LlamaIndex",
+      "success": true
+    },
+    {
+      "elapsed_ms": 298,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-transformers",
+      "source_name": "Transformers",
+      "success": true
+    },
+    {
+      "elapsed_ms": 380,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-vllm",
+      "source_name": "vLLM",
+      "success": true
+    },
+    {
+      "elapsed_ms": 317,
+      "error_type": null,
+      "item_count": 8,
+      "source_id": "github-ollama",
+      "source_name": "Ollama",
+      "success": true
+    },
+    {
+      "elapsed_ms": 252,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-cline",
+      "source_name": "Cline",
+      "success": true
+    }
+  ]
+}
