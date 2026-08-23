@@ -474,6 +474,182 @@ sources:
 
 
 @pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (
+            {
+                "id": "anthropic",
+                "name": "Anthropic",
+                "kind": "official_page",
+                "category": "大模型",
+                "adapter": "anthropic_news",
+            },
+            "official_page sources require a url",
+        ),
+        (
+            {
+                "id": "anthropic",
+                "name": "Anthropic",
+                "kind": "official_page",
+                "url": "https://www.anthropic.com/news",
+                "category": "大模型",
+            },
+            "official_page sources require an adapter",
+        ),
+        (
+            {
+                "id": "anthropic",
+                "name": "Anthropic",
+                "kind": "official_page",
+                "url": "http://www.anthropic.com/news",
+                "adapter": "anthropic_news",
+                "category": "大模型",
+            },
+            "official_page sources require an https url",
+        ),
+        (
+            {
+                "id": "anthropic",
+                "name": "Anthropic",
+                "kind": "official_page",
+                "url": "https://www.anthropic.com/news",
+                "adapter": "unknown_adapter",
+                "category": "大模型",
+            },
+            "unknown official page adapter",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "category": "AI 工具",
+                "communities": [],
+                "official": False,
+            },
+            "reddit_rss sources require communities",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "url": "https://www.reddit.com/.rss",
+                "category": "AI 工具",
+                "communities": ["LocalLLaMA"],
+                "official": False,
+            },
+            "reddit_rss sources do not accept a url",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "category": "AI 工具",
+                "communities": ["LocalLLaMA"],
+                "official": True,
+            },
+            "reddit_rss sources must be unofficial with weight 5",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "category": "AI 工具",
+                "communities": ["LocalLLaMA"],
+                "weight": 6,
+                "official": False,
+            },
+            "reddit_rss sources must be unofficial with weight 5",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "category": "AI 工具",
+                "communities": ["LocalLLaMA", "LocalLLaMA"],
+                "official": False,
+            },
+            "reddit communities must be unique",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "category": "AI 工具",
+                "communities": ["not-a-subreddit"],
+                "official": False,
+            },
+            "reddit communities must use valid subreddit names",
+        ),
+        (
+            {
+                "id": "openai",
+                "name": "OpenAI",
+                "kind": "feed",
+                "url": "https://openai.com/news/rss.xml",
+                "adapter": "anthropic_news",
+                "category": "大模型",
+            },
+            "feed sources do not accept adapter or communities",
+        ),
+        (
+            {
+                "id": "anthropic",
+                "name": "Anthropic",
+                "kind": "official_page",
+                "url": "https://www.anthropic.com/news",
+                "adapter": "anthropic_news",
+                "communities": ["OpenAI"],
+                "category": "大模型",
+            },
+            "official_page sources accept only url and adapter locators",
+        ),
+    ],
+)
+def test_source_spec_rejects_invalid_extended_source_configuration(
+    payload: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        SourceSpec.model_validate(payload)
+
+
+def test_source_spec_accepts_known_official_page_adapter() -> None:
+    source = SourceSpec(
+        id="anthropic",
+        name="Anthropic",
+        kind="official_page",
+        url="https://www.anthropic.com/news",
+        adapter="anthropic_news",
+        category=Category.MODEL,
+    )
+
+    assert source.adapter == "anthropic_news"
+    assert source.communities == []
+
+
+def test_source_spec_accepts_unique_reddit_communities() -> None:
+    source = SourceSpec(
+        id="reddit-ai",
+        name="Reddit AI",
+        kind="reddit_rss",
+        communities=["LocalLLaMA", "OpenAI"],
+        category=Category.TOOL,
+        weight=5,
+        official=False,
+    )
+
+    assert source.communities == ["LocalLLaMA", "OpenAI"]
+    assert source.url is None
+    assert source.adapter is None
+
+
+@pytest.mark.parametrize(
     "repo",
     [
         "",
