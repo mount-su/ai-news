@@ -1,0 +1,187 @@
+{
+  "candidate_count": 6,
+  "date": "2026-08-19",
+  "degraded": true,
+  "generated_at": "2026-08-19T15:59:59.999999Z",
+  "items": [
+    {
+      "canonical_url": "https://openai.com/index/replit",
+      "category": "AI 工具",
+      "editorial_lane": "产品与应用",
+      "id": "2f00013902a29bc1",
+      "importance": 8,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Replit expands access to software creation with GPT-5.6 Luna",
+      "published_at": "2026-08-19T07:00:00Z",
+      "source": "OpenAI",
+      "summary": "Replit 推出 Free Mode，由 GPT-5.6 Luna 驱动，用户无需担心 token 费用即可将想法转化为可运行软件，大幅降低软件开发门槛。",
+      "tags": [
+        "Replit",
+        "GPT-5.6",
+        "免费模式"
+      ],
+      "title": "Replit 基于 GPT-5.6 Luna 推出免费模式，零成本将想法转为软件",
+      "tracking_signal": "关注 Replit 官网 Free Mode 的实际使用限制和用户增长数据。",
+      "why_it_matters": "普通用户和创业者可零成本快速将创意落地为软件原型，可能改变非技术人员的创造方式，并对低代码/无代码市场产生冲击。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/chatgpt-ads-expands-across-europe",
+      "category": "AI 工具",
+      "editorial_lane": "商业与市场",
+      "id": "8393c843a171d723",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "ChatGPT Ads expands across Europe",
+      "published_at": "2026-08-18T22:00:00Z",
+      "source": "OpenAI",
+      "summary": "ChatGPT Ads 广告服务在欧洲 31 个市场推出，广告主可在用户探索、比较和决策时进行投放，标志着 ChatGPT 商业化进一步深化。",
+      "tags": [
+        "ChatGPT",
+        "广告",
+        "欧洲市场"
+      ],
+      "title": "ChatGPT Ads 扩展至 31 个欧洲市场，广告主可触达决策中的用户",
+      "tracking_signal": "观察广告引入后 ChatGPT 用户反馈及广告主初期投放案例。",
+      "why_it_matters": "广告主获得新的高意图用户触达渠道，可能影响数字广告市场格局；ChatGPT 用户体验或将因广告引入而发生变化。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/strengthening-democratic-oversight-in-national-security",
+      "category": "大模型",
+      "editorial_lane": "平台与政策",
+      "id": "f0aa91974e0ad6ca",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Strengthening democratic oversight in national security",
+      "published_at": "2026-08-18T19:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 发起计划，通过提供工具、培训和专业知识，支持政府机构加强对国家安全领域 AI 的民主监督。",
+      "tags": [
+        "OpenAI",
+        "国家安全",
+        "AI 治理"
+      ],
+      "title": "OpenAI 启动国家安全领域 AI 民主监督计划",
+      "tracking_signal": "留意后续是否有具体政府合作项目或政策文件发布。",
+      "why_it_matters": "影响 AI 在政府及国防领域的应用规范，可能推动相关立法和监管框架的形成，对 AI 治理具有长期影响。"
+    }
+  ],
+  "model": "deepseek-v4-pro",
+  "schema_version": "1.2",
+  "source_runs": [
+    {
+      "elapsed_ms": 586,
+      "error_type": null,
+      "item_count": 1143,
+      "source_id": "openai",
+      "source_name": "OpenAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 925,
+      "error_type": null,
+      "item_count": 20,
+      "source_id": "google-ai",
+      "source_name": "Google AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1107,
+      "error_type": null,
+      "item_count": 100,
+      "source_id": "deepmind",
+      "source_name": "DeepMind",
+      "success": true
+    },
+    {
+      "elapsed_ms": 789,
+      "error_type": null,
+      "item_count": 846,
+      "source_id": "hugging-face",
+      "source_name": "Hugging Face",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1274,
+      "error_type": "HttpFetchError",
+      "item_count": 0,
+      "source_id": "github-codex",
+      "source_name": "OpenAI Codex",
+      "success": false
+    },
+    {
+      "elapsed_ms": 797,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-claude-code",
+      "source_name": "Claude Code",
+      "success": true
+    },
+    {
+      "elapsed_ms": 662,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "github-gemini-cli",
+      "source_name": "Gemini CLI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 362,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-langchain",
+      "source_name": "LangChain",
+      "success": true
+    },
+    {
+      "elapsed_ms": 382,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-crewai",
+      "source_name": "CrewAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 529,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-llama-index",
+      "source_name": "LlamaIndex",
+      "success": true
+    },
+    {
+      "elapsed_ms": 421,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-transformers",
+      "source_name": "Transformers",
+      "success": true
+    },
+    {
+      "elapsed_ms": 420,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-vllm",
+      "source_name": "vLLM",
+      "success": true
+    },
+    {
+      "elapsed_ms": 434,
+      "error_type": null,
+      "item_count": 8,
+      "source_id": "github-ollama",
+      "source_name": "Ollama",
+      "success": true
+    },
+    {
+      "elapsed_ms": 343,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-cline",
+      "source_name": "Cline",
+      "success": true
+    }
+  ]
+}
