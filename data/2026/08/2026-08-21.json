@@ -1,0 +1,144 @@
+{
+  "candidate_count": 1,
+  "date": "2026-08-21",
+  "degraded": true,
+  "generated_at": "2026-08-21T15:59:59.999999Z",
+  "items": [
+    {
+      "canonical_url": "https://huggingface.co/blog/LiquidAI/lfm25-dspark",
+      "category": "开源项目",
+      "editorial_lane": "产品与应用",
+      "id": "eab5285cfdebeb65",
+      "importance": 4,
+      "is_official": true,
+      "marketing_risk": "high",
+      "original_title": "Up to 3.2x Faster Inference with LFM2.5-DSpark",
+      "published_at": "2026-08-20T16:52:57Z",
+      "source": "Hugging Face",
+      "summary": "Hugging Face 上发布的 LFM2.5-DSpark 模型声称可实现最高 3.2 倍的推理速度提升。",
+      "tags": [
+        "推理加速",
+        "模型优化"
+      ],
+      "title": "LFM2.5-DSpark 模型推理速度提升最高 3.2 倍",
+      "tracking_signal": "在 Hugging Face 上查看 LFM2.5-DSpark 模型卡，确认其适用场景和实际性能基准。",
+      "why_it_matters": "对使用该模型进行部署的开发者，推理速度提升可降低延迟和计算成本，但缺乏具体应用场景和用户验证信息。"
+    }
+  ],
+  "model": "deepseek-v4-pro",
+  "schema_version": "1.2",
+  "source_runs": [
+    {
+      "elapsed_ms": 970,
+      "error_type": null,
+      "item_count": 1143,
+      "source_id": "openai",
+      "source_name": "OpenAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1061,
+      "error_type": null,
+      "item_count": 20,
+      "source_id": "google-ai",
+      "source_name": "Google AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 586,
+      "error_type": null,
+      "item_count": 100,
+      "source_id": "deepmind",
+      "source_name": "DeepMind",
+      "success": true
+    },
+    {
+      "elapsed_ms": 540,
+      "error_type": null,
+      "item_count": 846,
+      "source_id": "hugging-face",
+      "source_name": "Hugging Face",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1184,
+      "error_type": "HttpFetchError",
+      "item_count": 0,
+      "source_id": "github-codex",
+      "source_name": "OpenAI Codex",
+      "success": false
+    },
+    {
+      "elapsed_ms": 554,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-claude-code",
+      "source_name": "Claude Code",
+      "success": true
+    },
+    {
+      "elapsed_ms": 726,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "github-gemini-cli",
+      "source_name": "Gemini CLI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 691,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-langchain",
+      "source_name": "LangChain",
+      "success": true
+    },
+    {
+      "elapsed_ms": 704,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-crewai",
+      "source_name": "CrewAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 435,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-llama-index",
+      "source_name": "LlamaIndex",
+      "success": true
+    },
+    {
+      "elapsed_ms": 419,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-transformers",
+      "source_name": "Transformers",
+      "success": true
+    },
+    {
+      "elapsed_ms": 401,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-vllm",
+      "source_name": "vLLM",
+      "success": true
+    },
+    {
+      "elapsed_ms": 322,
+      "error_type": null,
+      "item_count": 8,
+      "source_id": "github-ollama",
+      "source_name": "Ollama",
+      "success": true
+    },
+    {
+      "elapsed_ms": 254,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-cline",
+      "source_name": "Cline",
+      "success": true
+    }
+  ]
+}
