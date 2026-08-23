@@ -35,3 +35,98 @@ sources:
     weight: 7
     official: true
     enabled: false
+  - id: mistral
+    name: Mistral
+    kind: feed
+    url: https://mistral.ai/news/rss
+    category: 大模型
+    weight: 9
+    official: true
+  - id: qwen
+    name: 通义千问 Qwen
+    kind: feed
+    url: https://qwenlm.github.io/blog/index.xml
+    category: 大模型
+    weight: 10
+    official: true
+  - id: anthropic
+    name: Anthropic
+    kind: official_page
+    url: https://www.anthropic.com/news
+    adapter: anthropic_news
+    category: 大模型
+    weight: 10
+    official: true
+  - id: meta-ai
+    name: Meta AI
+    kind: official_page
+    url: https://ai.meta.com/blog/
+    adapter: meta_ai_blog
+    category: 大模型
+    weight: 9
+    official: true
+  - id: deepseek
+    name: DeepSeek
+    kind: official_page
+    url: https://www.deepseek.com/en/news/
+    adapter: deepseek_news
+    category: 大模型
+    weight: 10
+    official: true
+  - id: zhipu-glm
+    name: 智谱 GLM
+    kind: official_page
+    url: https://docs.bigmodel.cn/cn/update/new-releases.md
+    adapter: zhipu_releases
+    category: 大模型
+    weight: 9
+    official: true
+  - id: minimax
+    name: MiniMax
+    kind: official_page
+    url: https://platform.minimaxi.com/docs/release-notes/models.md
+    adapter: minimax_releases
+    category: 大模型
+    weight: 9
+    official: true
+  - id: tencent-hunyuan
+    name: 腾讯混元
+    kind: official_page
+    url: https://www.tencent.com/zh-cn/newsroom/all-news/
+    adapter: tencent_hunyuan
+    category: 大模型
+    weight: 8
+    official: true
+  - id: volcengine-doubao
+    name: 豆包与火山方舟
+    kind: official_page
+    url: https://www.volcengine.com/news
+    adapter: volcengine_doubao
+    category: 大模型
+    weight: 9
+    official: true
+  - id: baidu-ernie
+    name: 百度文心
+    kind: official_page
+    url: https://cloud.baidu.com/news/news
+    adapter: baidu_ernie
+    category: 大模型
+    weight: 8
+    official: true
+  - id: reddit-ai
+    name: Reddit AI 线索
+    kind: reddit_rss
+    enabled: false
+    communities:
+      - LocalLLaMA
+      - OpenAI
+      - ClaudeAI
+      - GeminiAI
+      - artificial
+      - ChatGPT
+      - aiagents
+      - perplexity_ai
+      - StableDiffusion
+    category: AI 工具
+    weight: 5
+    official: false

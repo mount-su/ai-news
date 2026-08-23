@@ -20,6 +20,8 @@ from pydantic import ValidationError
 from ai_news.collectors.arxiv import collect_arxiv
 from ai_news.collectors.feed import parse_feed
 from ai_news.collectors.github import collect_github_releases
+from ai_news.collectors.official_pages import collect_official_page
+from ai_news.collectors.reddit_rss import collect_reddit_rss
 from ai_news.http import get_bytes
 from ai_news.llm.base import AnalysisError
 from ai_news.llm.factory import create_analyzer
@@ -136,12 +138,22 @@ def _elapsed_ms(start: float, monotonic: Callable[[], float]) -> int:
 async def _collect_live(
     client: httpx.AsyncClient,
     source: SourceSpec,
+    *,
+    official_domains: frozenset[str] = frozenset(),
 ) -> list[RawItem]:
     if source.kind == "feed":
         if source.url is None:
             raise ValueError("feed source requires a URL")
         payload = await get_bytes(client, str(source.url))
         return parse_feed(payload, source)
+    if source.kind == "official_page":
+        return await collect_official_page(client, source)
+    if source.kind == "reddit_rss":
+        return await collect_reddit_rss(
+            client,
+            source,
+            official_domains=official_domains,
+        )
     if source.kind == "arxiv":
         return await collect_arxiv(client, source)
     if source.kind == "github":
@@ -471,7 +483,26 @@ async def _run_with_client(
     monotonic: Callable[[], float],
     history_loader: HistoryLoader,
 ) -> DailyReport:
-    selected_collector = collector or _collect_live
+    if collector is None:
+        official_domains = frozenset(
+            hostname
+            for source in source_config.sources
+            if source.enabled and source.official and source.url is not None
+            if (hostname := urlsplit(str(source.url)).hostname) is not None
+        )
+
+        async def selected_collector(
+            selected_client: httpx.AsyncClient,
+            selected_source: SourceSpec,
+        ) -> list[RawItem]:
+            return await _collect_live(
+                selected_client,
+                selected_source,
+                official_domains=official_domains,
+            )
+
+    else:
+        selected_collector = collector
     enabled_sources = [source for source in source_config.sources if source.enabled]
     semaphore = asyncio.Semaphore(_COLLECTION_CONCURRENCY)
     collection_results = await asyncio.gather(

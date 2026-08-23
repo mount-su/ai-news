@@ -50,6 +50,13 @@ def _source(
     }
     if kind in {"feed", "arxiv"}:
         values["url"] = f"https://example.com/{number}.xml"
+    elif kind == "official_page":
+        values["url"] = "https://www.anthropic.com/news"
+        values["adapter"] = "anthropic_news"
+    elif kind == "reddit_rss":
+        values["communities"] = ["LocalLLaMA", "OpenAI"]
+        values["weight"] = 5
+        values["official"] = False
     else:
         values["repo"] = f"owner/repo-{number}"
     return SourceSpec.model_validate(values)
@@ -257,7 +264,9 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
         _source(0, kind="feed"),
         _source(1, kind="arxiv"),
         _source(2, kind="github"),
-        _source(3, kind="feed", enabled=False),
+        _source(3, kind="official_page"),
+        _source(4, kind="reddit_rss"),
+        _source(5, kind="feed", enabled=False),
     ]
     client = object()
     factory_timeouts: list[int] = []
@@ -296,6 +305,23 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
         assert token == "github-secret"
         return [_raw(200 + index, source=source) for index in range(3)]
 
+    async def fake_official_page(
+        received_client: object,
+        source: SourceSpec,
+    ) -> list[RawItem]:
+        seen_clients.append(received_client)
+        return [_raw(300 + index, source=source) for index in range(3)]
+
+    async def fake_reddit(
+        received_client: object,
+        source: SourceSpec,
+        *,
+        official_domains: set[str] | frozenset[str],
+    ) -> list[RawItem]:
+        seen_clients.append(received_client)
+        assert official_domains == {"example.com", "www.anthropic.com"}
+        return [_raw(400 + index, source=source) for index in range(3)]
+
     def analyzer_factory(settings: Settings, *, client: object) -> _Analyzer:
         seen_settings.append(settings)
         seen_clients.append(client)
@@ -305,6 +331,8 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     monkeypatch.setattr(run_module, "parse_feed", fake_parse_feed)
     monkeypatch.setattr(run_module, "collect_arxiv", fake_arxiv)
     monkeypatch.setattr(run_module, "collect_github_releases", fake_github)
+    monkeypatch.setattr(run_module, "collect_official_page", fake_official_page)
+    monkeypatch.setattr(run_module, "collect_reddit_rss", fake_reddit)
     monkeypatch.setattr(run_module, "create_analyzer", analyzer_factory)
     monkeypatch.setenv("GITHUB_TOKEN", "github-secret")
 
@@ -327,9 +355,47 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     assert seen_settings == [settings]
     assert seen_settings[0].llm_protocol == "openai-chat"
     assert seen_settings[0].llm_model == "live-model"
-    assert seen_clients == [client, client, client, client]
-    assert len(report.source_runs) == 3
+    assert seen_clients == [client, client, client, client, client, client]
+    assert len(report.source_runs) == 5
     assert len(analyzer.calls) == 1
+
+
+def test_live_official_structure_failure_isolated_from_healthy_feed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ai_news.collectors.official_pages.base import OfficialPageStructureError
+    from ai_news.pipeline import run as run_module
+
+    official_source = _source(0, kind="official_page")
+    feed_source = _source(1, kind="feed")
+
+    async def fake_official_page(
+        _client: object,
+        _source: SourceSpec,
+    ) -> list[RawItem]:
+        raise OfficialPageStructureError("reviewed structure missing")
+
+    async def fake_get_bytes(_client: object, _url: str) -> bytes:
+        return b"feed"
+
+    def fake_parse_feed(_payload: bytes, source: SourceSpec) -> list[RawItem]:
+        return [_raw(100 + index, source=source) for index in range(3)]
+
+    monkeypatch.setattr(run_module, "collect_official_page", fake_official_page)
+    monkeypatch.setattr(run_module, "get_bytes", fake_get_bytes)
+    monkeypatch.setattr(run_module, "parse_feed", fake_parse_feed)
+
+    report = _run(
+        source_config=SourceConfig(sources=[official_source, feed_source]),
+        collector=None,
+        analyzer=_Analyzer(),
+    )
+    runs_by_id = {run.source_id: run for run in report.source_runs}
+
+    assert runs_by_id[official_source.id].success is False
+    assert runs_by_id[official_source.id].error_type == "OfficialPageStructureError"
+    assert runs_by_id[feed_source.id].success is True
+    assert report.degraded is True
 
 
 def test_analyzer_factory_failure_does_not_expose_or_retain_sensitive_state(

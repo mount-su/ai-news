@@ -21,6 +21,29 @@ from pydantic import (
 
 _GITHUB_OWNER_PATTERN = re.compile(r"^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")
 _GITHUB_REPO_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
+_OFFICIAL_PAGE_ADAPTERS = frozenset(
+    {
+        "anthropic_news",
+        "meta_ai_blog",
+        "deepseek_news",
+        "zhipu_releases",
+        "minimax_releases",
+        "tencent_hunyuan",
+        "volcengine_doubao",
+        "baidu_ernie",
+    }
+)
+
+OfficialPageAdapter = Literal[
+    "anthropic_news",
+    "meta_ai_blog",
+    "deepseek_news",
+    "zhipu_releases",
+    "minimax_releases",
+    "tencent_hunyuan",
+    "volcengine_doubao",
+    "baidu_ernie",
+]
 
 
 class Category(StrEnum):
@@ -54,18 +77,34 @@ class SourceSpec(BaseModel):
 
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]+$")
     name: str
-    kind: Literal["feed", "arxiv", "github"]
+    kind: Literal["feed", "arxiv", "github", "official_page", "reddit_rss"]
     url: HttpUrl | None = None
     repo: str | None = None
+    adapter: OfficialPageAdapter | None = None
+    communities: list[str] = Field(default_factory=list, max_length=20)
     category: Category
     weight: int = Field(default=5, ge=1, le=10)
     official: bool = True
     enabled: bool = True
 
+    @model_validator(mode="before")
+    @classmethod
+    def reject_unknown_official_page_adapter(cls, values: object) -> object:
+        if not isinstance(values, Mapping) or values.get("kind") != "official_page":
+            return values
+        adapter = values.get("adapter")
+        if adapter is not None and adapter not in _OFFICIAL_PAGE_ADAPTERS:
+            raise ValueError("unknown official page adapter")
+        return values
+
     @model_validator(mode="after")
     def require_source_locator(self) -> SourceSpec:
         if self.kind in {"feed", "arxiv"} and self.url is None:
             raise ValueError(f"{self.kind} sources require a url")
+        if self.kind in {"feed", "arxiv", "github"} and (
+            self.adapter is not None or self.communities
+        ):
+            raise ValueError(f"{self.kind} sources do not accept adapter or communities")
         if self.kind == "github":
             if self.repo is None:
                 raise ValueError("github sources require a repo")
@@ -82,6 +121,30 @@ class SourceSpec(BaseModel):
             ):
                 raise ValueError("github repo must use a valid GitHub owner and repository name")
             self.repo = repo
+        elif self.kind == "official_page":
+            if self.url is None:
+                raise ValueError("official_page sources require a url")
+            if self.url.scheme != "https":
+                raise ValueError("official_page sources require an https url")
+            if self.adapter is None:
+                raise ValueError("official_page sources require an adapter")
+            if self.repo is not None or self.communities:
+                raise ValueError("official_page sources accept only url and adapter locators")
+        elif self.kind == "reddit_rss":
+            if self.url is not None:
+                raise ValueError("reddit_rss sources do not accept a url")
+            if self.repo is not None or self.adapter is not None:
+                raise ValueError("reddit_rss sources do not accept repo or adapter")
+            if not self.communities:
+                raise ValueError("reddit_rss sources require communities")
+            if len(self.communities) != len(set(self.communities)):
+                raise ValueError("reddit communities must be unique")
+            if any(
+                not re.fullmatch(r"[A-Za-z0-9_]{2,21}", community) for community in self.communities
+            ):
+                raise ValueError("reddit communities must use valid subreddit names")
+            if self.official or self.weight != 5:
+                raise ValueError("reddit_rss sources must be unofficial with weight 5")
         return self
 
 

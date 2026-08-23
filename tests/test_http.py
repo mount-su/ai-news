@@ -215,7 +215,9 @@ def test_headers_merge_without_removing_default_user_agent_and_timeout_is_20_sec
 
     assert asyncio.run(exercise()) == b"ok"
     assert captured_headers is not None
-    assert captured_headers["User-Agent"] == "mount-su-ai-news/0.1"
+    assert captured_headers["User-Agent"] == (
+        "mount-su-ai-news/0.1 (+https://github.com/mount-su/ai-news)"
+    )
     assert captured_headers["X-Trace"] == "enabled"
     assert captured_timeout == {"connect": 20.0, "read": 20.0, "write": 20.0, "pool": 20.0}
 

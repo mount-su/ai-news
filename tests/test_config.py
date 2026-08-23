@@ -474,6 +474,182 @@ sources:
 
 
 @pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (
+            {
+                "id": "anthropic",
+                "name": "Anthropic",
+                "kind": "official_page",
+                "category": "大模型",
+                "adapter": "anthropic_news",
+            },
+            "official_page sources require a url",
+        ),
+        (
+            {
+                "id": "anthropic",
+                "name": "Anthropic",
+                "kind": "official_page",
+                "url": "https://www.anthropic.com/news",
+                "category": "大模型",
+            },
+            "official_page sources require an adapter",
+        ),
+        (
+            {
+                "id": "anthropic",
+                "name": "Anthropic",
+                "kind": "official_page",
+                "url": "http://www.anthropic.com/news",
+                "adapter": "anthropic_news",
+                "category": "大模型",
+            },
+            "official_page sources require an https url",
+        ),
+        (
+            {
+                "id": "anthropic",
+                "name": "Anthropic",
+                "kind": "official_page",
+                "url": "https://www.anthropic.com/news",
+                "adapter": "unknown_adapter",
+                "category": "大模型",
+            },
+            "unknown official page adapter",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "category": "AI 工具",
+                "communities": [],
+                "official": False,
+            },
+            "reddit_rss sources require communities",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "url": "https://www.reddit.com/.rss",
+                "category": "AI 工具",
+                "communities": ["LocalLLaMA"],
+                "official": False,
+            },
+            "reddit_rss sources do not accept a url",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "category": "AI 工具",
+                "communities": ["LocalLLaMA"],
+                "official": True,
+            },
+            "reddit_rss sources must be unofficial with weight 5",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "category": "AI 工具",
+                "communities": ["LocalLLaMA"],
+                "weight": 6,
+                "official": False,
+            },
+            "reddit_rss sources must be unofficial with weight 5",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "category": "AI 工具",
+                "communities": ["LocalLLaMA", "LocalLLaMA"],
+                "official": False,
+            },
+            "reddit communities must be unique",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "category": "AI 工具",
+                "communities": ["not-a-subreddit"],
+                "official": False,
+            },
+            "reddit communities must use valid subreddit names",
+        ),
+        (
+            {
+                "id": "openai",
+                "name": "OpenAI",
+                "kind": "feed",
+                "url": "https://openai.com/news/rss.xml",
+                "adapter": "anthropic_news",
+                "category": "大模型",
+            },
+            "feed sources do not accept adapter or communities",
+        ),
+        (
+            {
+                "id": "anthropic",
+                "name": "Anthropic",
+                "kind": "official_page",
+                "url": "https://www.anthropic.com/news",
+                "adapter": "anthropic_news",
+                "communities": ["OpenAI"],
+                "category": "大模型",
+            },
+            "official_page sources accept only url and adapter locators",
+        ),
+    ],
+)
+def test_source_spec_rejects_invalid_extended_source_configuration(
+    payload: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        SourceSpec.model_validate(payload)
+
+
+def test_source_spec_accepts_known_official_page_adapter() -> None:
+    source = SourceSpec(
+        id="anthropic",
+        name="Anthropic",
+        kind="official_page",
+        url="https://www.anthropic.com/news",
+        adapter="anthropic_news",
+        category=Category.MODEL,
+    )
+
+    assert source.adapter == "anthropic_news"
+    assert source.communities == []
+
+
+def test_source_spec_accepts_unique_reddit_communities() -> None:
+    source = SourceSpec(
+        id="reddit-ai",
+        name="Reddit AI",
+        kind="reddit_rss",
+        communities=["LocalLLaMA", "OpenAI"],
+        category=Category.TOOL,
+        weight=5,
+        official=False,
+    )
+
+    assert source.communities == ["LocalLLaMA", "OpenAI"]
+    assert source.url is None
+    assert source.adapter is None
+
+
+@pytest.mark.parametrize(
     "repo",
     [
         "",
@@ -557,6 +733,8 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
             source.kind,
             str(source.url) if source.url is not None else None,
             source.repo,
+            source.adapter,
+            tuple(source.communities),
             source.weight,
             source.category.value,
             source.official,
@@ -571,6 +749,8 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
             "feed",
             "https://openai.com/news/rss.xml",
             None,
+            None,
+            (),
             10,
             "大模型",
             True,
@@ -582,6 +762,8 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
             "feed",
             "https://blog.google/technology/ai/rss/",
             None,
+            None,
+            (),
             9,
             "大模型",
             True,
@@ -593,6 +775,8 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
             "feed",
             "https://deepmind.google/blog/rss.xml",
             None,
+            None,
+            (),
             9,
             "论文研究",
             True,
@@ -604,6 +788,8 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
             "feed",
             "https://huggingface.co/blog/feed.xml",
             None,
+            None,
+            (),
             8,
             "开源项目",
             True,
@@ -616,9 +802,164 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
             "https://export.arxiv.org/api/query?search_query=cat%3Acs.AI%20OR%20cat%3Acs.CL"
             "%20OR%20cat%3Acs.LG&sortBy=submittedDate&sortOrder=descending&start=0&max_results=40",
             None,
+            None,
+            (),
             7,
             "论文研究",
             True,
+            False,
+        ),
+        (
+            "mistral",
+            "Mistral",
+            "feed",
+            "https://mistral.ai/news/rss",
+            None,
+            None,
+            (),
+            9,
+            "大模型",
+            True,
+            True,
+        ),
+        (
+            "qwen",
+            "通义千问 Qwen",
+            "feed",
+            "https://qwenlm.github.io/blog/index.xml",
+            None,
+            None,
+            (),
+            10,
+            "大模型",
+            True,
+            True,
+        ),
+        (
+            "anthropic",
+            "Anthropic",
+            "official_page",
+            "https://www.anthropic.com/news",
+            None,
+            "anthropic_news",
+            (),
+            10,
+            "大模型",
+            True,
+            True,
+        ),
+        (
+            "meta-ai",
+            "Meta AI",
+            "official_page",
+            "https://ai.meta.com/blog/",
+            None,
+            "meta_ai_blog",
+            (),
+            9,
+            "大模型",
+            True,
+            True,
+        ),
+        (
+            "deepseek",
+            "DeepSeek",
+            "official_page",
+            "https://www.deepseek.com/en/news/",
+            None,
+            "deepseek_news",
+            (),
+            10,
+            "大模型",
+            True,
+            True,
+        ),
+        (
+            "zhipu-glm",
+            "智谱 GLM",
+            "official_page",
+            "https://docs.bigmodel.cn/cn/update/new-releases.md",
+            None,
+            "zhipu_releases",
+            (),
+            9,
+            "大模型",
+            True,
+            True,
+        ),
+        (
+            "minimax",
+            "MiniMax",
+            "official_page",
+            "https://platform.minimaxi.com/docs/release-notes/models.md",
+            None,
+            "minimax_releases",
+            (),
+            9,
+            "大模型",
+            True,
+            True,
+        ),
+        (
+            "tencent-hunyuan",
+            "腾讯混元",
+            "official_page",
+            "https://www.tencent.com/zh-cn/newsroom/all-news/",
+            None,
+            "tencent_hunyuan",
+            (),
+            8,
+            "大模型",
+            True,
+            True,
+        ),
+        (
+            "volcengine-doubao",
+            "豆包与火山方舟",
+            "official_page",
+            "https://www.volcengine.com/news",
+            None,
+            "volcengine_doubao",
+            (),
+            9,
+            "大模型",
+            True,
+            True,
+        ),
+        (
+            "baidu-ernie",
+            "百度文心",
+            "official_page",
+            "https://cloud.baidu.com/news/news",
+            None,
+            "baidu_ernie",
+            (),
+            8,
+            "大模型",
+            True,
+            True,
+        ),
+        (
+            "reddit-ai",
+            "Reddit AI 线索",
+            "reddit_rss",
+            None,
+            None,
+            None,
+            (
+                "LocalLLaMA",
+                "OpenAI",
+                "ClaudeAI",
+                "GeminiAI",
+                "artificial",
+                "ChatGPT",
+                "aiagents",
+                "perplexity_ai",
+                "StableDiffusion",
+            ),
+            5,
+            "AI 工具",
+            False,
             False,
         ),
     }
@@ -626,7 +967,11 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
 
     assert len(config.sources) == len(expected)
     assert len(source_ids) == len(set(source_ids))
-    assert all(source.enabled or source.id == "arxiv-ai" for source in config.sources)
+    assert [source.id for source in config.sources if not source.enabled] == [
+        "arxiv-ai",
+        "reddit-ai",
+    ]
+    assert config.sources[-1].id == "reddit-ai"
     assert actual == expected
 
 
