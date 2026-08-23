@@ -29,9 +29,9 @@
 | --- | --- | --- | ---: | --- |
 | Anthropic | `https://www.anthropic.com/news` | 大模型 | 10 | 不额外限制 |
 | Meta AI | `https://ai.meta.com/blog/` | 大模型 | 9 | 不额外限制 |
-| DeepSeek | `https://deepseek.com/en/news/` | 大模型 | 10 | 不额外限制 |
+| DeepSeek | `https://www.deepseek.com/en/news/` | 大模型 | 10 | 不额外限制 |
 | 智谱 GLM | `https://docs.bigmodel.cn/cn/update/new-releases.md` | 大模型 | 9 | 仅模型、产品和平台发布记录 |
-| MiniMax | `https://platform.minimaxi.com/docs/release-notes/models` | 大模型 | 9 | 仅模型发布记录，不采集普通接口小改动 |
+| MiniMax | `https://platform.minimaxi.com/docs/release-notes/models.md` | 大模型 | 9 | 仅模型发布记录，不采集普通接口小改动 |
 | 腾讯混元 | `https://www.tencent.com/zh-cn/newsroom/all-news/` | 大模型 | 8 | 标题或摘要必须明确涉及“混元”或“Hunyuan” |
 | 豆包/火山方舟 | `https://www.volcengine.com/news` | 大模型 | 9 | 必须涉及“豆包”“方舟”或大模型产品 |
 | 百度文心 | `https://cloud.baidu.com/news/news` | 大模型 | 8 | 必须涉及“文心”“ERNIE”或“千帆” |
@@ -71,7 +71,7 @@ Reddit Atom 条目的主链接指向讨论页，正文中的 `[link]` 才可能�
 2. 拒绝自帖、讨论页、图片/视频直链、Reddit 媒体域名、短链接、求助、传闻、Meme 和自我推广；
 3. 标题和外部页面元数据必须明确命中“大模型”“AI 应用”或“AI 产品”主题；
 4. 外部目标必须属于已启用厂商官方域名，或显式可信域名列表；首批可信媒体域名为 `reuters.com`、`apnews.com`、`theverge.com`、`arstechnica.com`、`techcrunch.com` 和 `wired.com`；
-5. 受限读取外部页面的标题、摘要和明确发布日期；无可验证发布日期、无法读取或跳转到非允许域名的条目直接拒绝；
+5. 每次运行最多受限读取 8 个外部页面的标题、摘要和明确发布日期；无可验证发布日期、无法读取或跳转到非允许域名的条目直接拒绝；
 6. 使用外部原文 URL 和原文发布日期生成 `RawItem`，来源名记录为 `Reddit · r/<community>`，权重固定为 5，`official` 固定为 `false`；
 7. `new` 与 `top/day` 中指向同一原文的记录按规范 URL 合并，再与厂商官方来源做全局去重；官方来源的高权重使其在重复时胜出。
 
