@@ -14,8 +14,8 @@
         <h2 id="feed-title">{{ category_name }} 情报</h2>
       </div>
       <ol class="news-list">
-        {% for item in items %}
-          <li>{{ news_card(item) }}</li>
+        {% for entry in entries %}
+          <li>{{ news_card(entry.item, entry.report_date) }}</li>
         {% endfor %}
       </ol>
     </section>

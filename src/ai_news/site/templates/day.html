@@ -18,7 +18,7 @@
         <section class="lane-section" aria-labelledby="day-lane-{{ loop.index }}">
           <h3 id="day-lane-{{ loop.index }}">{{ lane }}</h3>
           <div class="news-grid">
-            {% for item in lane_items %}{{ news_card(item) }}{% endfor %}
+            {% for item in lane_items %}{{ news_card(item, report.date) }}{% endfor %}
           </div>
         </section>
       {% endfor %}
