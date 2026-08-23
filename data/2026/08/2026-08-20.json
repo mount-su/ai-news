@@ -1,9 +1,30 @@
 {
-  "candidate_count": 4,
+  "candidate_count": 6,
   "date": "2026-08-20",
   "degraded": false,
   "generated_at": "2026-08-20T15:59:59.999999Z",
   "items": [
+    {
+      "canonical_url": "https://openai.com/index/pacing-model-development-cyber-capabilities",
+      "category": "大模型",
+      "editorial_lane": "平台与政策",
+      "id": "9c25f4ae7a186d68",
+      "importance": 8,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Pacing model development in an era of cyber-critical capabilities",
+      "published_at": "2026-08-18T11:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 宣布加强前沿模型的监控、对齐和安全措施，以指导模型开发节奏，应对网络关键能力带来的潜在风险。",
+      "tags": [
+        "OpenAI",
+        "模型安全",
+        "前沿模型"
+      ],
+      "title": "OpenAI 加强前沿模型安全防护，应对网络关键能力风险",
+      "tracking_signal": "查阅 OpenAI 安全博客获取新的安全防护措施细节和开发者合规要求。",
+      "why_it_matters": "影响所有使用 OpenAI 前沿模型的企业和开发者，新的安全框架可能改变模型访问权限和部署流程。"
+    },
     {
       "canonical_url": "https://mistral.ai/news/agentic-search",
       "category": "AI 工具",
@@ -11,7 +32,7 @@
       "id": "afd54bbe19c44fc2",
       "importance": 7,
       "is_official": true,
-      "marketing_risk": "medium",
+      "marketing_risk": "low",
       "original_title": "Agentic Search. More accurate and efficient results from your AI systems.",
       "published_at": "2026-08-20T12:00:17Z",
       "source": "Mistral",
@@ -19,39 +40,18 @@
       "tags": [
         "Mistral",
         "检索增强",
-        "企业AI"
+        "企业搜索"
       ],
-      "title": "Mistral 推出 Agentic Search 检索层，提升 AI 系统文档理解与验证能力",
-      "tracking_signal": "关注 Mistral 官方文档和定价信息，评估其与现有企业搜索和 RAG 方案的集成难度与成本。",
-      "why_it_matters": "该工具直接面向需要处理大量复杂文档的企业用户和开发者，可提升 AI 应用在信息检索和事实核查方面的可靠性，减少幻觉输出。"
-    },
-    {
-      "canonical_url": "https://blog.google/products-and-platforms/products/search/back-to-school-study-tools",
-      "category": "AI 工具",
-      "editorial_lane": "产品与应用",
-      "id": "d96b4129d44ca7f6",
-      "importance": 6,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "5 new ways to level up your learning with Search",
-      "published_at": "2026-08-19T19:00:00Z",
-      "source": "Google AI",
-      "summary": "Google 搜索推出 5 项新功能，包括“添加笔记”和“询问 Google”等，利用 AI 增强用户的学习和知识获取体验。",
-      "tags": [
-        "Google搜索",
-        "AI学习",
-        "知识管理"
-      ],
-      "title": "Google 搜索新增 5 项 AI 学习功能，支持笔记和提问",
-      "tracking_signal": "在 Google 搜索中试用“添加笔记”和“询问 Google”功能，观察其对信息检索效率和学习流程的实际影响。",
-      "why_it_matters": "这些功能直接集成在全球用户最常用的搜索引擎中，将改变普通用户获取、整理和消化信息的方式，可能对教育类产品形成竞争。"
+      "title": "Mistral 推出 Agentic Search 检索层，提升复杂文档信息提取准确性",
+      "tracking_signal": "关注 Mistral 官方文档了解 Agentic Search 的 API 接入方式和定价。",
+      "why_it_matters": "直接提升企业用户在合同、报告等复杂文档中的信息检索准确性和效率，减少人工核对成本。"
     }
   ],
   "model": "deepseek-v4-pro",
   "schema_version": "1.2",
   "source_runs": [
     {
-      "elapsed_ms": 734,
+      "elapsed_ms": 925,
       "error_type": null,
       "item_count": 1143,
       "source_id": "openai",
@@ -59,7 +59,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 921,
+      "elapsed_ms": 1347,
       "error_type": null,
       "item_count": 20,
       "source_id": "google-ai",
@@ -67,7 +67,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1067,
+      "elapsed_ms": 1607,
       "error_type": null,
       "item_count": 100,
       "source_id": "deepmind",
@@ -75,7 +75,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 3238,
+      "elapsed_ms": 1230,
       "error_type": null,
       "item_count": 846,
       "source_id": "hugging-face",
@@ -83,7 +83,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 757,
+      "elapsed_ms": 158,
       "error_type": null,
       "item_count": 81,
       "source_id": "mistral",
@@ -91,7 +91,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 163,
+      "elapsed_ms": 211,
       "error_type": null,
       "item_count": 44,
       "source_id": "qwen",
@@ -99,7 +99,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 856,
+      "elapsed_ms": 1386,
       "error_type": null,
       "item_count": 1,
       "source_id": "anthropic",
@@ -107,7 +107,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 6508,
+      "elapsed_ms": 12270,
       "error_type": null,
       "item_count": 4,
       "source_id": "meta-ai",
@@ -115,7 +115,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 219,
+      "elapsed_ms": 207,
       "error_type": null,
       "item_count": 1,
       "source_id": "deepseek",
@@ -123,7 +123,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1054,
+      "elapsed_ms": 1246,
       "error_type": null,
       "item_count": 1,
       "source_id": "zhipu-glm",
@@ -131,7 +131,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 9441,
+      "elapsed_ms": 8307,
       "error_type": null,
       "item_count": 7,
       "source_id": "minimax",
@@ -139,7 +139,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 720,
+      "elapsed_ms": 910,
       "error_type": null,
       "item_count": 2,
       "source_id": "tencent-hunyuan",
@@ -147,7 +147,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 4177,
+      "elapsed_ms": 3773,
       "error_type": null,
       "item_count": 5,
       "source_id": "volcengine-doubao",
@@ -155,7 +155,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 4901,
+      "elapsed_ms": 3896,
       "error_type": null,
       "item_count": 2,
       "source_id": "baidu-ernie",
