@@ -960,14 +960,17 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
             5,
             "AI 工具",
             False,
-            True,
+            False,
         ),
     }
     source_ids = [source.id for source in config.sources]
 
     assert len(config.sources) == len(expected)
     assert len(source_ids) == len(set(source_ids))
-    assert [source.id for source in config.sources if not source.enabled] == ["arxiv-ai"]
+    assert [source.id for source in config.sources if not source.enabled] == [
+        "arxiv-ai",
+        "reddit-ai",
+    ]
     assert config.sources[-1].id == "reddit-ai"
     assert actual == expected
 

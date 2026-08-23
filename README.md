@@ -195,7 +195,8 @@ gh run list --repo mount-su/ai-news --workflow daily-news.yml
 Reddit RSS 只承担社区线索发现，不作为事实来源。它串行请求 `new` 和 `top/day` 两条
 合并订阅，间隔 60 秒，并验证最终的可信外部原文、主题和明确发布日期；不保存用户、帖子正文、
 评论或投票数据。该方案不需要 `REDDIT_CLIENT_ID`、`REDDIT_CLIENT_SECRET`、Cookie
-或 Reddit 登录。
+或 Reddit 登录。由于 GitHub Actions 匿名出口已实测返回 `403/429`，该来源目前保留配置但默认
+禁用；不使用密钥、代理或 HTML 抓取绕过限制。
 
 新增或调整来源时：
 

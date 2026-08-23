@@ -116,6 +116,7 @@ sources:
   - id: reddit-ai
     name: Reddit AI 线索
     kind: reddit_rss
+    enabled: false
     communities:
       - LocalLLaMA
       - OpenAI
