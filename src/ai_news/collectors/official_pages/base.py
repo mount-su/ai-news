@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from html import unescape
 from typing import Any
 from urllib.parse import urljoin, urlsplit, urlunsplit
@@ -75,9 +75,10 @@ def require_allowed_https_url(
 
 
 def zoned_date(value: str, timezone_name: str) -> datetime:
-    parsed_date = date.fromisoformat(value.strip())
-    local_midnight = datetime.combine(parsed_date, datetime.min.time(), ZoneInfo(timezone_name))
-    return local_midnight.astimezone(UTC)
+    parsed = parse_datetime(value.strip())
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        parsed = parsed.replace(tzinfo=ZoneInfo(timezone_name))
+    return parsed.astimezone(UTC)
 
 
 def _json_ld_nodes(value: Any) -> list[dict[str, Any]]:
