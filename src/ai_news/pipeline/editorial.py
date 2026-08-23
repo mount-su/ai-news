@@ -15,8 +15,9 @@ _BENCHMARK_MARKERS = re.compile(
     re.IGNORECASE,
 )
 _ALWAYS_LOW_VALUE_TECHNICAL_MARKERS = re.compile(
-    r"(?:泛教程|教程|template|notebook|documentation-only|example notebooks|"
-    r"generic tutorial|no new product facts)",
+    r"(?:泛教程|generic tutorial|documentation-only|no new product facts|"
+    r"how to [^.。]{0,80}template|template[- ]tutorial|tutorial [^.。]{0,80}template|"
+    r"example notebooks?|notebook examples?)",
     re.IGNORECASE,
 )
 _LOW_VALUE_TECHNICAL_MARKERS = re.compile(

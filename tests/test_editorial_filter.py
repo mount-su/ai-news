@@ -135,6 +135,14 @@ def test_editorial_filter_keeps_high_impact_technical_news(
             "Transformers release expands model availability for developers",
             "The release changes access to widely used models across production AI applications.",
         ),
+        (
+            "OpenAI API adds prompt template controls for production teams",
+            "The API controls improve reliability for enterprise production deployments.",
+        ),
+        (
+            "Google NotebookLM expands enterprise availability",
+            "NotebookLM is now available to more enterprise customers with admin controls.",
+        ),
     ],
 )
 def test_editorial_filter_accepts_high_impact_developer_ecosystem_updates(
