@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 
 import httpx
 
-_DEFAULT_USER_AGENT = "mount-su-ai-news/0.1"
+_DEFAULT_USER_AGENT = "mount-su-ai-news/0.1 (+https://github.com/mount-su/ai-news)"
 _MAX_REDIRECTS = 5
 _RESPONSE_TOO_LARGE = "response exceeds byte limit"
 

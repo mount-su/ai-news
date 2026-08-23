@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup, Tag
 
@@ -89,7 +90,8 @@ def parse(payload: bytes, source: SourceSpec) -> list[OfficialEntry]:
             )
         except ValueError:
             continue
-        if "/blog/" not in url or url.rstrip("/") == "https://ai.meta.com/blog":
+        parsed = urlsplit(url)
+        if "/blog/" not in parsed.path or parsed.path.rstrip("/") == "/blog":
             continue
         grouped[url].append(anchor)
     if not grouped:

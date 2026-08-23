@@ -144,6 +144,30 @@ def test_article_excerpt_does_not_invent_a_publication_date() -> None:
     assert article_excerpt(html) == "A concrete release with user impact."
 
 
+def test_article_excerpt_prefers_a_useful_article_paragraph_over_truncated_metadata() -> None:
+    html = b"""<html><head>
+    <meta property="og:description" content="A truncated release summary [...]">
+    </head><body><article><div class="entry-content">
+      <p>This official release gives customers a practical AI product with a clear workflow,
+      broad availability, and concrete guidance for getting started today.</p>
+    </div></article></body></html>"""
+
+    assert article_excerpt(html).startswith(
+        "This official release gives customers a practical AI product"
+    )
+
+
+def test_article_excerpt_reads_the_first_useful_paragraph_after_an_unscoped_heading() -> None:
+    html = b"""<html><body><div><h1>Official model launch</h1>
+    <div><p>The new multimodal model is available today through a public product API,
+    improves everyday agent workflows, and includes clear guidance for customers.</p></div>
+    </div></body></html>"""
+
+    assert article_excerpt(html).startswith(
+        "The new multimodal model is available today through a public product API"
+    )
+
+
 @pytest.mark.parametrize(
     "payload",
     [
@@ -154,6 +178,14 @@ def test_article_excerpt_does_not_invent_a_publication_date() -> None:
 )
 def test_looks_like_challenge_recognizes_block_pages(payload: bytes) -> None:
     assert looks_like_challenge(payload) is True
+
+
+def test_looks_like_challenge_ignores_captcha_code_in_a_normal_page() -> None:
+    payload = b"""<html><head><title>AI at Meta Blog</title>
+    <script>const captchaTelemetry = {enabled: false};</script></head>
+    <body><main><h1>AI at Meta Blog</h1></main></body></html>"""
+
+    assert looks_like_challenge(payload) is False
 
 
 def test_to_raw_item_preserves_source_metadata_and_bounds_excerpt() -> None:

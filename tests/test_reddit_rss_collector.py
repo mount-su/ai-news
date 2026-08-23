@@ -153,8 +153,8 @@ def test_collect_reddit_requests_feeds_sequentially_and_deduplicates_links() -> 
 
     items = asyncio.run(run())
 
-    assert events[:3] == [feed_urls[0], "sleep:20", feed_urls[1]]
-    assert REQUEST_SPACING_SECONDS == 20
+    assert events[:3] == [feed_urls[0], "sleep:60", feed_urls[1]]
+    assert REQUEST_SPACING_SECONDS == 60
     assert [str(item.url) for item in items] == [
         "https://www.anthropic.com/news/claude-product",
         "https://techcrunch.com/2026/08/20/generative-ai-product/",

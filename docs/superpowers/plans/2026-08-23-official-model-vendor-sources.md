@@ -687,7 +687,7 @@ def test_reddit_requests_are_sequential_and_at_least_twenty_seconds_apart() -> N
         )
     )
     assert request_order[:2] == ["new", "top"]
-    assert 20 in sleeps
+    assert 60 in sleeps
     assert items[0].source_name == "Reddit · r/LocalLLaMA"
     assert items[0].source_weight == 5
     assert items[0].is_official_source is False
@@ -715,7 +715,7 @@ TRUSTED_MEDIA_DOMAINS = frozenset(
 )
 MAX_FEED_ENTRIES = 100
 MAX_EXTERNAL_FETCHES = 8
-REQUEST_SPACING_SECONDS = 20
+REQUEST_SPACING_SECONDS = 60
 ```
 
 - URL 只能由配置的社区名构造，不接受配置 URL。
@@ -744,7 +744,7 @@ RawItem(
 )
 ```
 
-原文没有明确日期、主题不匹配、跳转离开允许域名或读取失败时只丢弃该条。RSS 两次请求必须串行，中间 `await sleep(20)`；RSS 自身最终 `403/429` 直接抛出，让 `_collect_one` 将 `reddit-ai` 标为单源失败，不做 HTML 或登录降级。
+原文没有明确日期、主题不匹配、跳转离开允许域名或读取失败时只丢弃该条。RSS 两次请求必须串行，中间 `await sleep(60)`；RSS 自身最终 `403/429` 直接抛出，让 `_collect_one` 将 `reddit-ai` 标为单源失败，不做 HTML 或登录降级。
 
 - [ ] **Step 5: 让流水线动态提供启用官方域名**
 
@@ -771,7 +771,7 @@ async def live_collector(client: httpx.AsyncClient, source: SourceSpec) -> list[
 
 Run: `python -m pytest tests/test_reddit_rss_collector.py tests/test_pipeline_run.py tests/test_http.py -q`
 
-Expected: PASS；测试证明两条 RSS 不并发、间隔 20 秒、外部读取最多 8 次、无密钥、单源失败隔离。
+Expected: PASS；测试证明两条 RSS 不并发、间隔 60 秒、外部读取最多 8 次、无密钥、单源失败隔离。
 
 - [ ] **Step 7: 提交 Reddit RSS 链路**
 
@@ -1116,7 +1116,7 @@ Run: `git push -u origin codex/add-official-model-blogs`
 
 Expected: 推送成功。
 
-Run: `gh pr create --base main --head codex/add-official-model-blogs --title "feat: expand official AI sources and Reddit RSS" --body "新增 10 个大模型厂商官方来源和一个受限 Reddit RSS 线索源；Reddit 无需密钥。包含固定页面适配器、20 秒 RSS 间隔、可信外链与发布日期校验、单源失败隔离，以及完整离线测试。"`
+Run: `gh pr create --base main --head codex/add-official-model-blogs --title "feat: expand official AI sources and Reddit RSS" --body "新增 10 个大模型厂商官方来源和一个受限 Reddit RSS 线索源；Reddit 无需密钥。包含固定页面适配器、60 秒 RSS 间隔、可信外链与发布日期校验、单源失败隔离，以及完整离线测试。"`
 
 Expected: 返回 `mount-su/ai-news` 的 PR URL。
 

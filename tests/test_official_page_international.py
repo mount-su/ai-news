@@ -124,6 +124,20 @@ def test_meta_groups_repeated_links_into_one_article() -> None:
     assert entries[0].url == "https://ai.meta.com/blog/meta-ai-product-launch/"
 
 
+def test_meta_ignores_dated_blog_pagination_link() -> None:
+    payload = fixture("meta.html").replace(
+        b"</main>",
+        b"""<article><a href="/blog/?page=2">Next</a>
+        <p>April 8, 2026</p><p>Older AI stories are available on this page.</p>
+        </article></main>""",
+    )
+
+    entries = meta.parse(payload, META)
+
+    assert len(entries) == 1
+    assert entries[0].url == "https://ai.meta.com/blog/meta-ai-product-launch/"
+
+
 @pytest.mark.parametrize(
     ("adapter", "source"),
     [

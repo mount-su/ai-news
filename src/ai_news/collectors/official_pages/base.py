@@ -168,20 +168,41 @@ def article_metadata(payload: bytes, url: str) -> OfficialEntry | None:
 
 def article_excerpt(payload: bytes) -> str:
     soup = BeautifulSoup(payload, "html.parser")
+    metadata_excerpt = ""
     for key in ("og:description", "description", "twitter:description"):
         excerpt = _meta_content(soup, key)
         if excerpt:
-            return excerpt
+            metadata_excerpt = excerpt
+            if len(excerpt) >= 80:
+                return excerpt
     for article in _article_json_ld(soup):
         excerpt = clean_text(article.get("description"))
-        if excerpt:
+        if len(excerpt) >= 80:
             return excerpt
-    return ""
+        if excerpt and not metadata_excerpt:
+            metadata_excerpt = excerpt
+
+    for selector in ("article .entry-content p", "article p", "main p"):
+        for paragraph in soup.select(selector):
+            excerpt = clean_text(paragraph.get_text(" ", strip=True))
+            if len(excerpt) >= 80:
+                return excerpt
+    heading = soup.find("h1")
+    if heading is not None:
+        for paragraph in heading.find_all_next("p"):
+            excerpt = clean_text(paragraph.get_text(" ", strip=True))
+            if len(excerpt) >= 80:
+                return excerpt
+    return metadata_excerpt
 
 
 def looks_like_challenge(payload: bytes) -> bool:
-    text = payload.decode("utf-8", errors="ignore").casefold()
-    return any(marker in text for marker in _CHALLENGE_MARKERS)
+    raw_text = payload.decode("utf-8", errors="ignore").casefold()
+    if "cf-chl-" in raw_text:
+        return True
+    soup = BeautifulSoup(payload, "html.parser")
+    visible_text = _WHITESPACE.sub(" ", soup.get_text(" ", strip=True)).casefold()
+    return any(marker in visible_text for marker in _CHALLENGE_MARKERS if marker != "cf-chl-")
 
 
 def to_raw_item(

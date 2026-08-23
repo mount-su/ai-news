@@ -192,8 +192,8 @@ gh run list --repo mount-su/ai-news --workflow daily-news.yml
 代码内允许列表中的官方页面适配器；Reddit 只配置固定社区名，不能注入请求 URL、
 选择器或解析规则。
 
-Reddit RSS 只承担社区线索发现，不作为事实来源。它只请求 `new` 和 `top/day` 两条
-合并订阅，并验证最终的可信外部原文、主题和明确发布日期；不保存用户、帖子正文、
+Reddit RSS 只承担社区线索发现，不作为事实来源。它串行请求 `new` 和 `top/day` 两条
+合并订阅，间隔 60 秒，并验证最终的可信外部原文、主题和明确发布日期；不保存用户、帖子正文、
 评论或投票数据。该方案不需要 `REDDIT_CLIENT_ID`、`REDDIT_CLIENT_SECRET`、Cookie
 或 Reddit 登录。
 
