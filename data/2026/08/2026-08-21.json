@@ -1,36 +1,36 @@
 {
-  "candidate_count": 1,
+  "candidate_count": 2,
   "date": "2026-08-21",
-  "degraded": true,
+  "degraded": false,
   "generated_at": "2026-08-21T15:59:59.999999Z",
   "items": [
     {
-      "canonical_url": "https://huggingface.co/blog/LiquidAI/lfm25-dspark",
-      "category": "开源项目",
-      "editorial_lane": "产品与应用",
-      "id": "eab5285cfdebeb65",
+      "canonical_url": "https://openai.com/index/introducing-ai-futures",
+      "category": "大模型",
+      "editorial_lane": "平台与政策",
+      "id": "fc1a9abd82b35a9c",
       "importance": 6,
       "is_official": true,
-      "marketing_risk": "medium",
-      "original_title": "Up to 3.2x Faster Inference with LFM2.5-DSpark",
-      "published_at": "2026-08-20T16:52:57Z",
-      "source": "Hugging Face",
-      "summary": "Hugging Face 上发布的 LFM2.5-DSpark 模型实现了最高 3.2 倍的推理速度提升，可显著降低模型部署的延迟与计算成本。",
+      "marketing_risk": "low",
+      "original_title": "Introducing AI Futures",
+      "published_at": "2026-08-20T07:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 发布新博客栏目 AI Futures，旨在探讨变革性 AI 如何重塑权力、治理、经济和个人自由等社会核心领域。",
       "tags": [
-        "推理优化",
-        "模型加速",
-        "Hugging Face"
+        "AI治理",
+        "社会影响",
+        "OpenAI"
       ],
-      "title": "LFM2.5-DSpark 模型推理速度提升最高 3.2 倍",
-      "tracking_signal": "在 Hugging Face 上关注 LFM2.5-DSpark 模型页面的社区反馈和实际部署案例。",
-      "why_it_matters": "对于使用该模型的企业和开发者，推理速度提升可直接降低 API 调用延迟和硬件成本，加速实时应用落地。"
+      "title": "OpenAI 推出 AI Futures 博客探讨 AI 对社会结构的深远影响",
+      "tracking_signal": "关注 AI Futures 博客首篇实质性文章的内容，特别是其对具体政策或经济模型的建议。",
+      "why_it_matters": "该博客可能预示 OpenAI 将更主动地参与 AI 治理与政策讨论，其观点可能影响公众认知和未来监管方向。"
     }
   ],
   "model": "deepseek-v4-pro",
   "schema_version": "1.2",
   "source_runs": [
     {
-      "elapsed_ms": 524,
+      "elapsed_ms": 986,
       "error_type": null,
       "item_count": 1143,
       "source_id": "openai",
@@ -38,7 +38,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 857,
+      "elapsed_ms": 1146,
       "error_type": null,
       "item_count": 20,
       "source_id": "google-ai",
@@ -46,7 +46,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 949,
+      "elapsed_ms": 1290,
       "error_type": null,
       "item_count": 100,
       "source_id": "deepmind",
@@ -54,7 +54,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 697,
+      "elapsed_ms": 381,
       "error_type": null,
       "item_count": 846,
       "source_id": "hugging-face",
@@ -62,83 +62,83 @@
       "success": true
     },
     {
-      "elapsed_ms": 1074,
-      "error_type": "HttpFetchError",
-      "item_count": 0,
-      "source_id": "github-codex",
-      "source_name": "OpenAI Codex",
-      "success": false
-    },
-    {
-      "elapsed_ms": 703,
+      "elapsed_ms": 407,
       "error_type": null,
-      "item_count": 10,
-      "source_id": "github-claude-code",
-      "source_name": "Claude Code",
+      "item_count": 81,
+      "source_id": "mistral",
+      "source_name": "Mistral",
       "success": true
     },
     {
-      "elapsed_ms": 504,
+      "elapsed_ms": 118,
+      "error_type": null,
+      "item_count": 44,
+      "source_id": "qwen",
+      "source_name": "通义千问 Qwen",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1097,
       "error_type": null,
       "item_count": 1,
-      "source_id": "github-gemini-cli",
-      "source_name": "Gemini CLI",
+      "source_id": "anthropic",
+      "source_name": "Anthropic",
       "success": true
     },
     {
-      "elapsed_ms": 300,
+      "elapsed_ms": 7441,
       "error_type": null,
-      "item_count": 10,
-      "source_id": "github-langchain",
-      "source_name": "LangChain",
+      "item_count": 4,
+      "source_id": "meta-ai",
+      "source_name": "Meta AI",
       "success": true
     },
     {
-      "elapsed_ms": 342,
+      "elapsed_ms": 642,
       "error_type": null,
-      "item_count": 10,
-      "source_id": "github-crewai",
-      "source_name": "CrewAI",
+      "item_count": 1,
+      "source_id": "deepseek",
+      "source_name": "DeepSeek",
       "success": true
     },
     {
-      "elapsed_ms": 437,
+      "elapsed_ms": 1073,
       "error_type": null,
-      "item_count": 10,
-      "source_id": "github-llama-index",
-      "source_name": "LlamaIndex",
+      "item_count": 1,
+      "source_id": "zhipu-glm",
+      "source_name": "智谱 GLM",
       "success": true
     },
     {
-      "elapsed_ms": 380,
+      "elapsed_ms": 9406,
       "error_type": null,
-      "item_count": 10,
-      "source_id": "github-transformers",
-      "source_name": "Transformers",
+      "item_count": 7,
+      "source_id": "minimax",
+      "source_name": "MiniMax",
       "success": true
     },
     {
-      "elapsed_ms": 374,
+      "elapsed_ms": 728,
       "error_type": null,
-      "item_count": 10,
-      "source_id": "github-vllm",
-      "source_name": "vLLM",
+      "item_count": 2,
+      "source_id": "tencent-hunyuan",
+      "source_name": "腾讯混元",
       "success": true
     },
     {
-      "elapsed_ms": 379,
+      "elapsed_ms": 4331,
       "error_type": null,
-      "item_count": 8,
-      "source_id": "github-ollama",
-      "source_name": "Ollama",
+      "item_count": 5,
+      "source_id": "volcengine-doubao",
+      "source_name": "豆包与火山方舟",
       "success": true
     },
     {
-      "elapsed_ms": 337,
+      "elapsed_ms": 3824,
       "error_type": null,
-      "item_count": 10,
-      "source_id": "github-cline",
-      "source_name": "Cline",
+      "item_count": 2,
+      "source_id": "baidu-ernie",
+      "source_name": "百度文心",
       "success": true
     }
   ]
