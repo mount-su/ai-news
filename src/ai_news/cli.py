@@ -57,6 +57,15 @@ def _shanghai_today() -> date:
     return datetime.now(ZoneInfo("Asia/Shanghai")).date()
 
 
+def _historical_cutoff(run_date: date) -> datetime:
+    end_of_day = datetime.combine(
+        run_date,
+        datetime.max.time(),
+        tzinfo=ZoneInfo("Asia/Shanghai"),
+    )
+    return end_of_day.astimezone(UTC)
+
+
 def _safe_error(category: str, error: BaseException) -> None:
     if (
         category == _PIPELINE_ERROR
@@ -149,15 +158,19 @@ def _generate(root: Path, run_date: date | None) -> int:
         _safe_error(_CONFIGURATION_ERROR, error)
         return 2
 
+    today = _shanghai_today()
+    effective_date = run_date or today
+    run_arguments: dict[str, object] = {
+        "root": root,
+        "run_date": effective_date,
+        "source_config": source_config,
+        "settings": settings,
+    }
+    if run_date is not None and run_date < today:
+        run_arguments["now"] = _historical_cutoff(run_date)
+
     try:
-        asyncio.run(
-            run_daily(
-                root=root,
-                run_date=run_date or _shanghai_today(),
-                source_config=source_config,
-                settings=settings,
-            )
-        )
+        asyncio.run(run_daily(**run_arguments))
     except ConfigurationPipelineError as error:
         _safe_error(_CONFIGURATION_ERROR, error)
         return 2
