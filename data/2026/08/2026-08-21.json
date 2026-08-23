@@ -1,36 +1,36 @@
 {
-  "candidate_count": 2,
+  "candidate_count": 3,
   "date": "2026-08-21",
   "degraded": false,
   "generated_at": "2026-08-21T15:59:59.999999Z",
   "items": [
     {
-      "canonical_url": "https://openai.com/index/introducing-ai-futures",
-      "category": "大模型",
-      "editorial_lane": "平台与政策",
-      "id": "fc1a9abd82b35a9c",
+      "canonical_url": "https://openai.com/index/stampli",
+      "category": "AI 工具",
+      "editorial_lane": "产品与应用",
+      "id": "ad89fb510e3c78c2",
       "importance": 6,
       "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Introducing AI Futures",
-      "published_at": "2026-08-20T07:00:00Z",
+      "marketing_risk": "medium",
+      "original_title": "Stampli cuts launch hours by 68% using ChatGPT Work",
+      "published_at": "2026-08-20T00:00:00Z",
       "source": "OpenAI",
-      "summary": "OpenAI 发布新博客栏目 AI Futures，旨在探讨变革性 AI 如何重塑权力、治理、经济和个人自由等社会核心领域。",
+      "summary": "Stampli 在固定截止日期和设计资源受限的情况下，利用 Codex 和 ChatGPT Work 将原本需要数周的上线制作流程压缩至数天，实现 68% 的时间节省。",
       "tags": [
-        "AI治理",
-        "社会影响",
-        "OpenAI"
+        "ChatGPT Work",
+        "Codex",
+        "效率提升"
       ],
-      "title": "OpenAI 推出 AI Futures 博客探讨 AI 对社会结构的深远影响",
-      "tracking_signal": "关注 AI Futures 博客首篇实质性文章的内容，特别是其对具体政策或经济模型的建议。",
-      "why_it_matters": "该博客可能预示 OpenAI 将更主动地参与 AI 治理与政策讨论，其观点可能影响公众认知和未来监管方向。"
+      "title": "Stampli 使用 ChatGPT Work 将上线准备时间压缩 68%",
+      "tracking_signal": "关注 Stampli 后续是否公开具体工作流或数据，以评估该效率提升的可复制性。",
+      "why_it_matters": "为面临资源紧张和严格期限的产品团队提供了可复用的提效方案，证明 AI 工具能直接加速生产级交付。"
     }
   ],
   "model": "deepseek-v4-pro",
   "schema_version": "1.2",
   "source_runs": [
     {
-      "elapsed_ms": 986,
+      "elapsed_ms": 1025,
       "error_type": null,
       "item_count": 1143,
       "source_id": "openai",
@@ -38,7 +38,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1146,
+      "elapsed_ms": 1286,
       "error_type": null,
       "item_count": 20,
       "source_id": "google-ai",
@@ -46,7 +46,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1290,
+      "elapsed_ms": 1335,
       "error_type": null,
       "item_count": 100,
       "source_id": "deepmind",
@@ -54,7 +54,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 381,
+      "elapsed_ms": 416,
       "error_type": null,
       "item_count": 846,
       "source_id": "hugging-face",
@@ -62,7 +62,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 407,
+      "elapsed_ms": 449,
       "error_type": null,
       "item_count": 81,
       "source_id": "mistral",
@@ -70,7 +70,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 118,
+      "elapsed_ms": 160,
       "error_type": null,
       "item_count": 44,
       "source_id": "qwen",
@@ -78,7 +78,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1097,
+      "elapsed_ms": 1085,
       "error_type": null,
       "item_count": 1,
       "source_id": "anthropic",
@@ -86,7 +86,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 7441,
+      "elapsed_ms": 7507,
       "error_type": null,
       "item_count": 4,
       "source_id": "meta-ai",
@@ -94,7 +94,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 642,
+      "elapsed_ms": 681,
       "error_type": null,
       "item_count": 1,
       "source_id": "deepseek",
@@ -102,7 +102,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1073,
+      "elapsed_ms": 933,
       "error_type": null,
       "item_count": 1,
       "source_id": "zhipu-glm",
@@ -110,7 +110,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 9406,
+      "elapsed_ms": 8513,
       "error_type": null,
       "item_count": 7,
       "source_id": "minimax",
@@ -118,7 +118,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 728,
+      "elapsed_ms": 812,
       "error_type": null,
       "item_count": 2,
       "source_id": "tencent-hunyuan",
@@ -126,7 +126,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 4331,
+      "elapsed_ms": 3587,
       "error_type": null,
       "item_count": 5,
       "source_id": "volcengine-doubao",
@@ -134,7 +134,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 3824,
+      "elapsed_ms": 5795,
       "error_type": null,
       "item_count": 2,
       "source_id": "baidu-ernie",
