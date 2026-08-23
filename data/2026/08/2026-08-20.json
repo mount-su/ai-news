@@ -1,0 +1,187 @@
+{
+  "candidate_count": 4,
+  "date": "2026-08-20",
+  "degraded": true,
+  "generated_at": "2026-08-20T15:59:59.999999Z",
+  "items": [
+    {
+      "canonical_url": "https://openai.com/index/stampli",
+      "category": "AI 工具",
+      "editorial_lane": "商业与市场",
+      "id": "ad89fb510e3c78c2",
+      "importance": 8,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "Stampli cuts launch hours by 68% using ChatGPT Work",
+      "published_at": "2026-08-20T00:00:00Z",
+      "source": "OpenAI",
+      "summary": "在资源紧张和固定截止日期下，Stampli 使用 Codex 和 ChatGPT Work 将原本需数周的产品发布生产工作压缩至数天内完成，效率提升 68%。",
+      "tags": [
+        "企业应用",
+        "效率提升",
+        "ChatGPT"
+      ],
+      "title": "Stampli 利用 ChatGPT Work 将产品发布准备时间缩短 68%",
+      "tracking_signal": "查找 Stampli 是否发布详细案例研究或方法论，并观察其他企业是否跟进采用类似工作流。",
+      "why_it_matters": "为面临类似资源限制的企业提供了可复用的 AI 提效案例，展示了非技术团队如何利用现有 AI 工具加速核心业务流程。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/introducing-ai-futures",
+      "category": "大模型",
+      "editorial_lane": "平台与政策",
+      "id": "fc1a9abd82b35a9c",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Introducing AI Futures",
+      "published_at": "2026-08-20T07:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 发布新博客 AI Futures，旨在探讨变革性 AI 如何重塑权力、治理、经济和个人自由等社会基础结构。",
+      "tags": [
+        "AI治理",
+        "社会影响",
+        "OpenAI"
+      ],
+      "title": "OpenAI 推出 AI Futures 博客探讨 AI 对社会结构的深远影响",
+      "tracking_signal": "关注该博客后续是否发布具体政策建议或研究论文，以及是否被主要监管机构引用。",
+      "why_it_matters": "该博客可能影响政策制定者和公众对 AI 治理的讨论框架，为未来监管方向提供信号。"
+    },
+    {
+      "canonical_url": "https://blog.google/products-and-platforms/products/search/back-to-school-study-tools",
+      "category": "AI 工具",
+      "editorial_lane": "产品与应用",
+      "id": "d96b4129d44ca7f6",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "5 new ways to level up your learning with Search",
+      "published_at": "2026-08-19T19:00:00Z",
+      "source": "Google AI",
+      "summary": "Google 搜索推出 5 项新功能以增强学习体验，包括添加笔记本和直接提问等交互方式，将 AI 更深度整合进日常信息获取流程。",
+      "tags": [
+        "Google搜索",
+        "学习工具",
+        "用户体验"
+      ],
+      "title": "Google 搜索新增 5 项 AI 学习功能",
+      "tracking_signal": "在 Google 搜索中测试“Add Notebook”等新功能的具体交互形态，并观察用户反馈和竞品反应。",
+      "why_it_matters": "直接改变数亿用户获取和整理知识的方式，可能提升学习效率并增强 Google 搜索在面对 AI 问答工具竞争时的用户粘性。"
+    }
+  ],
+  "model": "deepseek-v4-pro",
+  "schema_version": "1.2",
+  "source_runs": [
+    {
+      "elapsed_ms": 820,
+      "error_type": null,
+      "item_count": 1143,
+      "source_id": "openai",
+      "source_name": "OpenAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1375,
+      "error_type": null,
+      "item_count": 20,
+      "source_id": "google-ai",
+      "source_name": "Google AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1457,
+      "error_type": null,
+      "item_count": 100,
+      "source_id": "deepmind",
+      "source_name": "DeepMind",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1139,
+      "error_type": null,
+      "item_count": 846,
+      "source_id": "hugging-face",
+      "source_name": "Hugging Face",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1171,
+      "error_type": "HttpFetchError",
+      "item_count": 0,
+      "source_id": "github-codex",
+      "source_name": "OpenAI Codex",
+      "success": false
+    },
+    {
+      "elapsed_ms": 1149,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-claude-code",
+      "source_name": "Claude Code",
+      "success": true
+    },
+    {
+      "elapsed_ms": 697,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "github-gemini-cli",
+      "source_name": "Gemini CLI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 396,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-langchain",
+      "source_name": "LangChain",
+      "success": true
+    },
+    {
+      "elapsed_ms": 366,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-crewai",
+      "source_name": "CrewAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 443,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-llama-index",
+      "source_name": "LlamaIndex",
+      "success": true
+    },
+    {
+      "elapsed_ms": 456,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-transformers",
+      "source_name": "Transformers",
+      "success": true
+    },
+    {
+      "elapsed_ms": 420,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-vllm",
+      "source_name": "vLLM",
+      "success": true
+    },
+    {
+      "elapsed_ms": 394,
+      "error_type": null,
+      "item_count": 8,
+      "source_id": "github-ollama",
+      "source_name": "Ollama",
+      "success": true
+    },
+    {
+      "elapsed_ms": 366,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-cline",
+      "source_name": "Cline",
+      "success": true
+    }
+  ]
+}
