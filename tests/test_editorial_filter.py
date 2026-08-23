@@ -98,6 +98,14 @@ def test_editorial_filter_rejects_github_release_details(title: str) -> None:
             "多模态 benchmark 显示推理性能提升 40%",
             "公开评测显示该提升已在生产部署中得到验证。",
         ),
+        (
+            "Benchmark shows 40% lower inference cost for production API",
+            "The benchmark reports lower latency and cost for teams using the API.",
+        ),
+        (
+            "LangChain major release changes runtime architecture",
+            "The major release introduces migration requirements for production agent systems.",
+        ),
     ],
 )
 def test_editorial_filter_keeps_high_impact_technical_news(
@@ -151,6 +159,10 @@ def test_editorial_filter_accepts_high_impact_developer_ecosystem_updates(
         (
             "Framework repository adds example notebooks",
             "The update is documentation-only and not a major release.",
+        ),
+        (
+            "LangChain v1.0 tutorial for migration",
+            "A prompt-template tutorial with no new product facts.",
         ),
     ],
 )
