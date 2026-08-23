@@ -1,0 +1,187 @@
+{
+  "candidate_count": 9,
+  "date": "2026-08-18",
+  "degraded": true,
+  "generated_at": "2026-08-18T15:59:59.999999Z",
+  "items": [
+    {
+      "canonical_url": "https://openai.com/index/asana",
+      "category": "Coding Agent",
+      "editorial_lane": "商业与市场",
+      "id": "6023038a8912cd08",
+      "importance": 8,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "Asana cleared 5 years of engineering work in 2 weeks with Codex",
+      "published_at": "2026-08-18T07:00:00Z",
+      "source": "OpenAI",
+      "summary": "Asana 使用 OpenAI Codex 在两周内替换了过时的测试系统，完成原本预计需要五年的工程工作，总花费约 1.2 万美元。",
+      "tags": [
+        "企业案例",
+        "效率提升",
+        "遗留系统"
+      ],
+      "title": "Asana 用 OpenAI Codex 两周完成五年工程工作，成本仅 1.2 万美元",
+      "tracking_signal": "关注 Asana 官方技术博客是否发布详细实施过程与 Codex 使用经验。",
+      "why_it_matters": "展示了 AI 编程工具在企业级遗留系统改造中的巨大效率提升和成本节约潜力，为其他企业提供了可参考的投入产出案例。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/chatgpt-for-teens",
+      "category": "大模型",
+      "editorial_lane": "产品与应用",
+      "id": "c3b0ed374d416807",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Introducing ChatGPT for Teens: Built for learning, backed by protections",
+      "published_at": "2026-08-18T11:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 发布 ChatGPT for Teens，面向青少年学习与批判性思维场景，内置更强的安全保护、健康使用功能及家长控制选项。",
+      "tags": [
+        "青少年AI",
+        "安全保护",
+        "家长控制"
+      ],
+      "title": "OpenAI 推出青少年版 ChatGPT，内置更强保护与家长控制",
+      "tracking_signal": "关注 OpenAI 官网及家长控制功能的具体上线地区与使用条款。",
+      "why_it_matters": "为青少年用户提供更安全的 AI 使用环境，家长可获得额外监管工具，直接影响家庭和教育场景下的 AI 采用决策。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/nvidia/chatgpt-work",
+      "category": "AI 工具",
+      "editorial_lane": "商业与市场",
+      "id": "baf07daff59f271b",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "How NVIDIA scales expertise with ChatGPT Work",
+      "published_at": "2026-08-18T00:00:00Z",
+      "source": "OpenAI",
+      "summary": "NVIDIA 团队使用 ChatGPT Work 减少手动任务、连接快速变动的信号，并在全球范围内规模化推广成功的工作流程。",
+      "tags": [
+        "企业采用",
+        "工作流自动化",
+        "NVIDIA"
+      ],
+      "title": "NVIDIA 内部规模化采用 ChatGPT Work 提升全球工作流效率",
+      "tracking_signal": "关注 OpenAI 客户案例页面是否发布 NVIDIA 的详细使用报告。",
+      "why_it_matters": "作为科技巨头，NVIDIA 的内部采用案例为其他大型企业提供了 AI 工具规模化落地的参考，影响企业级 AI 采购决策。"
+    }
+  ],
+  "model": "deepseek-v4-pro",
+  "schema_version": "1.2",
+  "source_runs": [
+    {
+      "elapsed_ms": 1145,
+      "error_type": null,
+      "item_count": 1143,
+      "source_id": "openai",
+      "source_name": "OpenAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1260,
+      "error_type": null,
+      "item_count": 20,
+      "source_id": "google-ai",
+      "source_name": "Google AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1335,
+      "error_type": null,
+      "item_count": 100,
+      "source_id": "deepmind",
+      "source_name": "DeepMind",
+      "success": true
+    },
+    {
+      "elapsed_ms": 429,
+      "error_type": null,
+      "item_count": 846,
+      "source_id": "hugging-face",
+      "source_name": "Hugging Face",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1151,
+      "error_type": "HttpFetchError",
+      "item_count": 0,
+      "source_id": "github-codex",
+      "source_name": "OpenAI Codex",
+      "success": false
+    },
+    {
+      "elapsed_ms": 448,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-claude-code",
+      "source_name": "Claude Code",
+      "success": true
+    },
+    {
+      "elapsed_ms": 987,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "github-gemini-cli",
+      "source_name": "Gemini CLI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 950,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-langchain",
+      "source_name": "LangChain",
+      "success": true
+    },
+    {
+      "elapsed_ms": 243,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-crewai",
+      "source_name": "CrewAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 358,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-llama-index",
+      "source_name": "LlamaIndex",
+      "success": true
+    },
+    {
+      "elapsed_ms": 285,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-transformers",
+      "source_name": "Transformers",
+      "success": true
+    },
+    {
+      "elapsed_ms": 379,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-vllm",
+      "source_name": "vLLM",
+      "success": true
+    },
+    {
+      "elapsed_ms": 241,
+      "error_type": null,
+      "item_count": 8,
+      "source_id": "github-ollama",
+      "source_name": "Ollama",
+      "success": true
+    },
+    {
+      "elapsed_ms": 245,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-cline",
+      "source_name": "Cline",
+      "success": true
+    }
+  ]
+}
