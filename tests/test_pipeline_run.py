@@ -53,6 +53,10 @@ def _source(
     elif kind == "official_page":
         values["url"] = "https://www.anthropic.com/news"
         values["adapter"] = "anthropic_news"
+    elif kind == "reddit_rss":
+        values["communities"] = ["LocalLLaMA", "OpenAI"]
+        values["weight"] = 5
+        values["official"] = False
     else:
         values["repo"] = f"owner/repo-{number}"
     return SourceSpec.model_validate(values)
@@ -261,7 +265,8 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
         _source(1, kind="arxiv"),
         _source(2, kind="github"),
         _source(3, kind="official_page"),
-        _source(4, kind="feed", enabled=False),
+        _source(4, kind="reddit_rss"),
+        _source(5, kind="feed", enabled=False),
     ]
     client = object()
     factory_timeouts: list[int] = []
@@ -307,6 +312,16 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
         seen_clients.append(received_client)
         return [_raw(300 + index, source=source) for index in range(3)]
 
+    async def fake_reddit(
+        received_client: object,
+        source: SourceSpec,
+        *,
+        official_domains: set[str] | frozenset[str],
+    ) -> list[RawItem]:
+        seen_clients.append(received_client)
+        assert official_domains == {"example.com", "www.anthropic.com"}
+        return [_raw(400 + index, source=source) for index in range(3)]
+
     def analyzer_factory(settings: Settings, *, client: object) -> _Analyzer:
         seen_settings.append(settings)
         seen_clients.append(client)
@@ -317,6 +332,7 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     monkeypatch.setattr(run_module, "collect_arxiv", fake_arxiv)
     monkeypatch.setattr(run_module, "collect_github_releases", fake_github)
     monkeypatch.setattr(run_module, "collect_official_page", fake_official_page)
+    monkeypatch.setattr(run_module, "collect_reddit_rss", fake_reddit)
     monkeypatch.setattr(run_module, "create_analyzer", analyzer_factory)
     monkeypatch.setenv("GITHUB_TOKEN", "github-secret")
 
@@ -339,8 +355,8 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     assert seen_settings == [settings]
     assert seen_settings[0].llm_protocol == "openai-chat"
     assert seen_settings[0].llm_model == "live-model"
-    assert seen_clients == [client, client, client, client, client]
-    assert len(report.source_runs) == 4
+    assert seen_clients == [client, client, client, client, client, client]
+    assert len(report.source_runs) == 5
     assert len(analyzer.calls) == 1
 
 

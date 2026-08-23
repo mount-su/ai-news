@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>AI communities: new</title>
+  <entry>
+    <author><name>/u/example-user</name></author>
+    <category term="LocalLLaMA" />
+    <id>t3_valid</id>
+    <published>2026-08-20T01:00:00+00:00</published>
+    <updated>2026-08-20T01:00:00+00:00</updated>
+    <title>Anthropic launches a useful Claude AI product</title>
+    <link href="https://www.reddit.com/r/LocalLLaMA/comments/valid/story/" />
+    <content type="html">&lt;a href="https://www.anthropic.com/news/claude-product"&gt;[link]&lt;/a&gt; &lt;a href="https://www.reddit.com/r/LocalLLaMA/comments/valid/story/"&gt;[comments]&lt;/a&gt;</content>
+  </entry>
+  <entry>
+    <category term="OpenAI" />
+    <id>t3_self</id>
+    <published>2026-08-20T01:01:00+00:00</published>
+    <title>ChatGPT AI discussion</title>
+    <link href="https://www.reddit.com/r/OpenAI/comments/self/post/" />
+    <content type="html">&lt;a href="https://www.reddit.com/r/OpenAI/comments/self/post/"&gt;[link]&lt;/a&gt;</content>
+  </entry>
+  <entry>
+    <category term="StableDiffusion" />
+    <id>t3_image</id>
+    <published>2026-08-20T01:02:00+00:00</published>
+    <title>Stable Diffusion AI image</title>
+    <link href="https://www.reddit.com/r/StableDiffusion/comments/image/post/" />
+    <content type="html">&lt;a href="https://i.redd.it/example.jpg"&gt;[link]&lt;/a&gt;</content>
+  </entry>
+  <entry>
+    <category term="artificial" />
+    <id>t3_short</id>
+    <published>2026-08-20T01:03:00+00:00</published>
+    <title>AI product launch</title>
+    <link href="https://www.reddit.com/r/artificial/comments/short/post/" />
+    <content type="html">&lt;a href="https://bit.ly/ai-product"&gt;[link]&lt;/a&gt;</content>
+  </entry>
+  <entry>
+    <category term="ChatGPT" />
+    <id>t3_help</id>
+    <published>2026-08-20T01:04:00+00:00</published>
+    <title>Help: why is my ChatGPT broken?</title>
+    <link href="https://www.reddit.com/r/ChatGPT/comments/help/post/" />
+    <content type="html">&lt;a href="https://www.anthropic.com/news/help"&gt;[link]&lt;/a&gt;</content>
+  </entry>
+  <entry>
+    <category term="GeminiAI" />
+    <id>t3_rumor</id>
+    <published>2026-08-20T01:05:00+00:00</published>
+    <title>Rumor: Gemini AI secret model</title>
+    <link href="https://www.reddit.com/r/GeminiAI/comments/rumor/post/" />
+    <content type="html">&lt;a href="https://www.anthropic.com/news/rumor"&gt;[link]&lt;/a&gt;</content>
+  </entry>
+  <entry>
+    <category term="aiagents" />
+    <id>t3_promo</id>
+    <published>2026-08-20T01:06:00+00:00</published>
+    <title>I built my app with an AI agent</title>
+    <link href="https://www.reddit.com/r/aiagents/comments/promo/post/" />
+    <content type="html">&lt;a href="https://www.anthropic.com/news/promo"&gt;[link]&lt;/a&gt;</content>
+  </entry>
+</feed>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>AI communities: top</title>
+  <entry>
+    <category term="LocalLLaMA" />
+    <id>t3_duplicate</id>
+    <published>2026-08-20T02:00:00+00:00</published>
+    <title>Anthropic launches a useful Claude AI product</title>
+    <link href="https://www.reddit.com/r/LocalLLaMA/comments/duplicate/story/" />
+    <content type="html">&lt;a href="https://www.anthropic.com/news/claude-product"&gt;[link]&lt;/a&gt;</content>
+  </entry>
+  <entry>
+    <category term="artificial" />
+    <id>t3_media</id>
+    <published>2026-08-20T02:01:00+00:00</published>
+    <title>A major company launches a useful generative AI product</title>
+    <link href="https://www.reddit.com/r/artificial/comments/media/story/" />
+    <content type="html">&lt;a href="https://techcrunch.com/2026/08/20/generative-ai-product/"&gt;[link]&lt;/a&gt;</content>
+  </entry>
+</feed>
