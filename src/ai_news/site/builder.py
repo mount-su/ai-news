@@ -274,11 +274,22 @@ def _build_staging(
         },
     )
 
-    category_items: dict[Category, list[NewsItem]] = defaultdict(list)
-    for _report, item in all_pairs:
-        category_items[_display_category(item.category)].append(item)
-    for category, items in category_items.items():
-        ordered_items = _sort_items(items)
+    category_items: dict[Category, list[tuple[DailyReport, NewsItem]]] = defaultdict(list)
+    for report, item in all_pairs:
+        category_items[_display_category(item.category)].append((report, item))
+    for category, report_items in category_items.items():
+        ordered_entries = [
+            {"report_date": report.date.isoformat(), "item": item}
+            for report, item in sorted(
+                report_items,
+                key=lambda entry: (
+                    -entry[1].importance,
+                    -entry[1].published_at.timestamp(),
+                    entry[1].id,
+                    -entry[0].date.toordinal(),
+                ),
+            )
+        ]
         _render(
             environment,
             staging,
@@ -288,7 +299,7 @@ def _build_staging(
                 **common,
                 "page_title": f"{category.value} 情报",
                 "category_name": category.value,
-                "items": ordered_items,
+                "entries": ordered_entries,
             },
         )
 

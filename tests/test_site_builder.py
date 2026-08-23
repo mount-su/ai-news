@@ -54,6 +54,7 @@ class _DocumentParser(HTMLParser):
         super().__init__()
         self.links: list[dict[str, str]] = []
         self.ids: set[str] = set()
+        self.element_ids: list[str] = []
         self.article_ids: list[str] = []
         self.script_starts = 0
         self._article_depth = 0
@@ -62,6 +63,7 @@ class _DocumentParser(HTMLParser):
         attributes = {key: value or "" for key, value in attrs}
         if element_id := attributes.get("id"):
             self.ids.add(element_id)
+            self.element_ids.append(element_id)
         if tag in {"a", "link", "script"}:
             self.links.append({"tag": tag, **attributes})
         if tag == "article":
@@ -337,6 +339,36 @@ def test_home_uses_latest_report_and_feed_category_order_is_stable(
     assert archive_text.index("2026-07-26") < archive_text.index("2026-07-25")
     assert "最后成功" in (output / "index.html").read_text(encoding="utf-8")
     assert "北京时间" in (output / "index.html").read_text(encoding="utf-8")
+
+
+def test_category_cards_have_unique_dom_ids_when_an_item_spans_multiple_reports(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "workspace"
+    shared = _news_item(
+        "shared-release",
+        category=Category.OPEN_SOURCE,
+        importance=8,
+        published_at=datetime(2026, 8, 21, 8, 0, tzinfo=UTC),
+    )
+    save_report(
+        root,
+        _report(date(2026, 8, 22), 10, [shared], candidate_count=1),
+    )
+    save_report(
+        root,
+        _report(date(2026, 8, 21), 10, [shared], candidate_count=1),
+    )
+
+    output = tmp_path / "dist"
+    build_site(root, output)
+
+    page = _parse(output / "categories/open-source/index.html")
+    card_ids = [
+        element_id for element_id in page.element_ids if element_id.startswith(f"item-{shared.id}")
+    ]
+    assert len(card_ids) == 2
+    assert len(set(card_ids)) == 2
 
 
 def test_brief_pages_render_each_item_once_without_verbose_controls(

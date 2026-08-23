@@ -1,6 +1,6 @@
-{% macro news_card(item) -%}
+{% macro news_card(item, report_date) -%}
   <article
-    id="item-{{ item.id }}"
+    id="item-{{ item.id }}-{{ report_date }}"
     class="news-card"
     data-news-card
     data-item-id="{{ item.id }}"
