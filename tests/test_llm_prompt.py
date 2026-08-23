@@ -128,6 +128,20 @@ def test_prompt_rejects_empty_items() -> None:
         build_analysis_prompt([])
 
 
+def test_prompt_allows_high_quality_technical_items_without_allowing_low_quality_fillers() -> None:
+    prompt = build_analysis_prompt([_candidate("technical")])
+
+    assert "SDK/API、开发框架、代码工具必须排除" not in prompt
+    assert "SDK/API、开发框架、代码工具和小版本修复" not in SYSTEM_PROMPT
+    assert "高质量、可执行、影响明确的技术内容" in prompt
+    assert "高质量、可执行、影响明确的技术内容" in SYSTEM_PROMPT
+    assert "纯学术" in prompt
+    assert "弱 benchmark" in prompt
+    assert "小版本修复" in prompt
+    assert "泛教程" in prompt
+    assert "不合格内容不得凑数" in prompt
+
+
 def test_thirty_six_item_prompt_has_a_conservative_utf8_byte_bound() -> None:
     items = [
         _candidate(
