@@ -1,0 +1,144 @@
+{
+  "candidate_count": 1,
+  "date": "2026-08-25",
+  "degraded": false,
+  "generated_at": "2026-08-25T01:52:30.246545Z",
+  "items": [
+    {
+      "canonical_url": "https://mistral.ai/news/mistral-x-humain",
+      "category": "大模型",
+      "editorial_lane": "商业与市场",
+      "id": "cb7928ba1a13a260",
+      "importance": 3,
+      "is_official": true,
+      "marketing_risk": "high",
+      "original_title": "Mistral x HUMAIN",
+      "published_at": "2026-08-24T16:02:41Z",
+      "source": "Mistral",
+      "summary": "Mistral 宣布与 HUMAIN 建立合作关系，具体合作内容未披露。",
+      "tags": [
+        "Mistral",
+        "商业合作"
+      ],
+      "title": "Mistral 与 HUMAIN 达成合作",
+      "tracking_signal": "等待双方公布合作的具体产品、服务或技术集成细节后再评估实际影响。",
+      "why_it_matters": "Mistral 作为欧洲主要大模型厂商，其商业合作动向可能影响企业级 AI 市场格局，但缺乏具体细节导致影响尚不明确。"
+    }
+  ],
+  "model": "deepseek-v4-pro",
+  "schema_version": "1.2",
+  "source_runs": [
+    {
+      "elapsed_ms": 853,
+      "error_type": null,
+      "item_count": 1144,
+      "source_id": "openai",
+      "source_name": "OpenAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1474,
+      "error_type": null,
+      "item_count": 20,
+      "source_id": "google-ai",
+      "source_name": "Google AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1280,
+      "error_type": null,
+      "item_count": 100,
+      "source_id": "deepmind",
+      "source_name": "DeepMind",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1218,
+      "error_type": null,
+      "item_count": 846,
+      "source_id": "hugging-face",
+      "source_name": "Hugging Face",
+      "success": true
+    },
+    {
+      "elapsed_ms": 894,
+      "error_type": null,
+      "item_count": 82,
+      "source_id": "mistral",
+      "source_name": "Mistral",
+      "success": true
+    },
+    {
+      "elapsed_ms": 78,
+      "error_type": null,
+      "item_count": 44,
+      "source_id": "qwen",
+      "source_name": "通义千问 Qwen",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1243,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "anthropic",
+      "source_name": "Anthropic",
+      "success": true
+    },
+    {
+      "elapsed_ms": 7903,
+      "error_type": null,
+      "item_count": 4,
+      "source_id": "meta-ai",
+      "source_name": "Meta AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 217,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "deepseek",
+      "source_name": "DeepSeek",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1600,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "zhipu-glm",
+      "source_name": "智谱 GLM",
+      "success": true
+    },
+    {
+      "elapsed_ms": 8239,
+      "error_type": null,
+      "item_count": 7,
+      "source_id": "minimax",
+      "source_name": "MiniMax",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1135,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "tencent-hunyuan",
+      "source_name": "腾讯混元",
+      "success": true
+    },
+    {
+      "elapsed_ms": 5409,
+      "error_type": null,
+      "item_count": 5,
+      "source_id": "volcengine-doubao",
+      "source_name": "豆包与火山方舟",
+      "success": true
+    },
+    {
+      "elapsed_ms": 2216,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "baidu-ernie",
+      "source_name": "百度文心",
+      "success": true
+    }
+  ]
+}
