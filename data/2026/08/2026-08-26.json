@@ -1,0 +1,166 @@
+{
+  "candidate_count": 5,
+  "date": "2026-08-26",
+  "degraded": false,
+  "generated_at": "2026-08-26T01:58:18.495074Z",
+  "items": [
+    {
+      "canonical_url": "https://openai.com/index/jalapeno-first-results",
+      "category": "大模型",
+      "editorial_lane": "产品与应用",
+      "id": "b9406ae170bd9133",
+      "importance": 8,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "Jalapeño’s first results show industry-leading speed and efficiency in AI inference",
+      "published_at": "2026-08-25T07:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 自研推理芯片 Jalapeño 首次披露结果，宣称在 AI 推理速度、能效、吞吐量和延迟方面均达到行业领先水平。",
+      "tags": [
+        "推理芯片",
+        "Jalapeño",
+        "基础设施"
+      ],
+      "title": "OpenAI 公布自研推理芯片 Jalapeño 首批性能数据",
+      "tracking_signal": "等待 OpenAI 公布 Jalapeño 的具体规格、量产时间表及 API 价格调整计划。",
+      "why_it_matters": "自研芯片若量产部署，将显著降低 OpenAI API 的推理成本与延迟，直接影响开发者使用成本和终端用户体验。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/introducing-admin-plugin",
+      "category": "大模型",
+      "editorial_lane": "产品与应用",
+      "id": "33eae878317d27dc",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Introducing the Admin plugin for ChatGPT Work and Codex",
+      "published_at": "2026-08-25T00:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 发布 Admin 插件，允许管理员在 ChatGPT Work 和 Codex 中分析工作区使用情况、管理成员与权限、调整限额并处理管理请求。",
+      "tags": [
+        "ChatGPT",
+        "企业管理",
+        "插件"
+      ],
+      "title": "OpenAI 为 ChatGPT Work 和 Codex 推出管理控制台插件",
+      "tracking_signal": "关注企业版 ChatGPT 后台是否出现 Admin 插件入口，并检查成员权限与用量报表功能。",
+      "why_it_matters": "企业管理员可直接在对话界面内完成团队治理，降低 ChatGPT Work 和 Codex 的运维门槛，推动企业级采用。"
+    }
+  ],
+  "model": "deepseek-v4-pro",
+  "schema_version": "1.2",
+  "source_runs": [
+    {
+      "elapsed_ms": 1133,
+      "error_type": null,
+      "item_count": 1148,
+      "source_id": "openai",
+      "source_name": "OpenAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1233,
+      "error_type": null,
+      "item_count": 20,
+      "source_id": "google-ai",
+      "source_name": "Google AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 529,
+      "error_type": null,
+      "item_count": 100,
+      "source_id": "deepmind",
+      "source_name": "DeepMind",
+      "success": true
+    },
+    {
+      "elapsed_ms": 469,
+      "error_type": null,
+      "item_count": 850,
+      "source_id": "hugging-face",
+      "source_name": "Hugging Face",
+      "success": true
+    },
+    {
+      "elapsed_ms": 177,
+      "error_type": null,
+      "item_count": 82,
+      "source_id": "mistral",
+      "source_name": "Mistral",
+      "success": true
+    },
+    {
+      "elapsed_ms": 135,
+      "error_type": null,
+      "item_count": 44,
+      "source_id": "qwen",
+      "source_name": "通义千问 Qwen",
+      "success": true
+    },
+    {
+      "elapsed_ms": 431,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "anthropic",
+      "source_name": "Anthropic",
+      "success": true
+    },
+    {
+      "elapsed_ms": 7607,
+      "error_type": null,
+      "item_count": 4,
+      "source_id": "meta-ai",
+      "source_name": "Meta AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 735,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "deepseek",
+      "source_name": "DeepSeek",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1616,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "zhipu-glm",
+      "source_name": "智谱 GLM",
+      "success": true
+    },
+    {
+      "elapsed_ms": 9965,
+      "error_type": null,
+      "item_count": 7,
+      "source_id": "minimax",
+      "source_name": "MiniMax",
+      "success": true
+    },
+    {
+      "elapsed_ms": 976,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "tencent-hunyuan",
+      "source_name": "腾讯混元",
+      "success": true
+    },
+    {
+      "elapsed_ms": 4301,
+      "error_type": null,
+      "item_count": 5,
+      "source_id": "volcengine-doubao",
+      "source_name": "豆包与火山方舟",
+      "success": true
+    },
+    {
+      "elapsed_ms": 4264,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "baidu-ernie",
+      "source_name": "百度文心",
+      "success": true
+    }
+  ]
+}
