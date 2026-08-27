@@ -1,0 +1,187 @@
+{
+  "candidate_count": 7,
+  "date": "2026-08-27",
+  "degraded": false,
+  "generated_at": "2026-08-27T09:48:52.391975Z",
+  "items": [
+    {
+      "canonical_url": "https://openai.com/index/hugging-face-incident-and-the-road-ahead",
+      "category": "大模型",
+      "editorial_lane": "平台与政策",
+      "id": "34e62ff4c7cf4def",
+      "importance": 8,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "The Hugging Face incident and the road ahead",
+      "published_at": "2026-08-26T00:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 公布 Hugging Face 安全事件的调查结果，并说明正在加强 AI 模型安全、监控和对齐的措施。",
+      "tags": [
+        "安全事件",
+        "Hugging Face",
+        "模型安全"
+      ],
+      "title": "OpenAI 披露 Hugging Face 安全事件与后续措施",
+      "tracking_signal": "查看 OpenAI 披露的技术细节，确认受影响模型范围及建议用户采取的补救步骤。",
+      "why_it_matters": "模型供应链安全事件可能影响依赖 Hugging Face 模型的企业和开发者，OpenAI 的处置与加固措施为 AI 平台安全提供可执行参考。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/bringing-chatgpt-for-teachers-to-more-us-school-districts",
+      "category": "大模型",
+      "editorial_lane": "产品与应用",
+      "id": "fa2791fbc9af008f",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "Bringing ChatGPT for Teachers to more U.S. school districts",
+      "published_at": "2026-08-26T10:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 将 ChatGPT for Teachers 扩展到 55 个美国学校系统，为超过 10 万名教育工作者和工作人员提供安全 AI 工具、培训与支持。",
+      "tags": [
+        "ChatGPT",
+        "教育",
+        "OpenAI"
+      ],
+      "title": "ChatGPT for Teachers 扩展至 55 个美国学区",
+      "tracking_signal": "关注 OpenAI 是否公布 55 个学区的名单、使用数据或后续扩展计划。",
+      "why_it_matters": "美国 K-12 教育工作者可直接获得官方 ChatGPT 工具与培训，降低学校引入 AI 的门槛，并可能推动更多学区跟进采用。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/disrupting-malicious-uses-of-ai-influence-campaign-russia",
+      "category": "大模型",
+      "editorial_lane": "平台与政策",
+      "id": "62003111f3b592c5",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Disrupting a new covert influence campaign from Russia",
+      "published_at": "2026-08-25T00:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 封禁了来自俄罗斯的账号，这些账号利用 AI 推广一个虚假的以色列智库和赞扬俄罗斯、批评西方的“主权”指数。",
+      "tags": [
+        "AI滥用",
+        "影响力行动",
+        "平台治理"
+      ],
+      "title": "OpenAI 封禁俄罗斯隐蔽影响力行动账号",
+      "tracking_signal": "关注 OpenAI 后续是否发布更完整的威胁情报报告或与安全机构合作细节。",
+      "why_it_matters": "AI 被用于跨国舆论操纵，平台封禁行动显示生成式 AI 在信息战中的滥用风险正在被头部厂商主动处置。"
+    }
+  ],
+  "model": "deepseek-v4-pro",
+  "schema_version": "1.2",
+  "source_runs": [
+    {
+      "elapsed_ms": 852,
+      "error_type": null,
+      "item_count": 1153,
+      "source_id": "openai",
+      "source_name": "OpenAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1515,
+      "error_type": null,
+      "item_count": 20,
+      "source_id": "google-ai",
+      "source_name": "Google AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1580,
+      "error_type": null,
+      "item_count": 100,
+      "source_id": "deepmind",
+      "source_name": "DeepMind",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1246,
+      "error_type": null,
+      "item_count": 851,
+      "source_id": "hugging-face",
+      "source_name": "Hugging Face",
+      "success": true
+    },
+    {
+      "elapsed_ms": 888,
+      "error_type": null,
+      "item_count": 82,
+      "source_id": "mistral",
+      "source_name": "Mistral",
+      "success": true
+    },
+    {
+      "elapsed_ms": 921,
+      "error_type": null,
+      "item_count": 44,
+      "source_id": "qwen",
+      "source_name": "通义千问 Qwen",
+      "success": true
+    },
+    {
+      "elapsed_ms": 779,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "anthropic",
+      "source_name": "Anthropic",
+      "success": true
+    },
+    {
+      "elapsed_ms": 6584,
+      "error_type": null,
+      "item_count": 4,
+      "source_id": "meta-ai",
+      "source_name": "Meta AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 232,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "deepseek",
+      "source_name": "DeepSeek",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1021,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "zhipu-glm",
+      "source_name": "智谱 GLM",
+      "success": true
+    },
+    {
+      "elapsed_ms": 8239,
+      "error_type": null,
+      "item_count": 7,
+      "source_id": "minimax",
+      "source_name": "MiniMax",
+      "success": true
+    },
+    {
+      "elapsed_ms": 2107,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "tencent-hunyuan",
+      "source_name": "腾讯混元",
+      "success": true
+    },
+    {
+      "elapsed_ms": 4104,
+      "error_type": null,
+      "item_count": 5,
+      "source_id": "volcengine-doubao",
+      "source_name": "豆包与火山方舟",
+      "success": true
+    },
+    {
+      "elapsed_ms": 2226,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "baidu-ernie",
+      "source_name": "百度文心",
+      "success": true
+    }
+  ]
+}
