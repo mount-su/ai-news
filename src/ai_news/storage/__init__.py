@@ -1,4 +1,5 @@
 from ai_news.storage.repository import (
+    active_reports,
     load_history_urls,
     load_reports,
     load_run_records,
@@ -8,6 +9,7 @@ from ai_news.storage.repository import (
 )
 
 __all__ = [
+    "active_reports",
     "load_history_urls",
     "load_reports",
     "load_run_records",

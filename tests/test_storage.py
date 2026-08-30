@@ -26,11 +26,13 @@ from ai_news.models import (
 )
 from ai_news.pipeline.normalize import to_candidate
 from ai_news.storage import (
+    active_reports,
     load_history_urls,
     load_reports,
     load_run_records,
     save_publication,
     save_report,
+    save_run_record,
 )
 from ai_news.storage import repository as storage_repository
 
@@ -914,6 +916,47 @@ def test_history_urls_uses_prior_calendar_day_window_and_rejects_invalid_days(
     assert load_history_urls(tmp_path / "missing", run_date) == set()
     with pytest.raises(ValueError, match="days"):
         load_history_urls(tmp_path, run_date, days=0)
+
+
+def test_no_eligible_run_shadows_old_report_for_active_history_and_dedupe(
+    tmp_path: Path,
+) -> None:
+    run_date = date(2026, 7, 31)
+    retained = _report(run_date - timedelta(days=3), slugs=("retained",))
+    shadowed = _report(run_date - timedelta(days=2), slugs=("shadowed",))
+    failed_retry = _report(run_date - timedelta(days=1), slugs=("failed-retry",))
+    for report in (retained, shadowed, failed_retry):
+        save_report(tmp_path, report)
+    save_run_record(
+        tmp_path,
+        RunRecord(
+            date=shadowed.date,
+            cutoff_at=shadowed.generated_at,
+            status=RunStatus.NO_ELIGIBLE_CONTENT,
+            source_runs=[],
+            safe_error_code="no_eligible_candidates",
+        ),
+    )
+    save_run_record(
+        tmp_path,
+        RunRecord(
+            date=failed_retry.date,
+            cutoff_at=failed_retry.generated_at,
+            status=RunStatus.FAILED_BEFORE_PUBLISH,
+            source_runs=[],
+            safe_error_code="analysis_failed",
+        ),
+    )
+
+    records = load_run_records(tmp_path)
+    assert [report.date for report in active_reports(load_reports(tmp_path), records)] == [
+        failed_retry.date,
+        retained.date,
+    ]
+    assert load_history_urls(tmp_path, run_date) == {
+        "https://example.com/news/failed-retry",
+        "https://example.com/news/retained",
+    }
 
 
 def test_load_reports_returns_index_order_and_rejects_date_or_count_mismatch(

@@ -11,7 +11,7 @@ import re
 import stat
 import tempfile
 import threading
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -21,7 +21,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from ai_news.models import DailyReport, NewsItem, RunRecord
+from ai_news.models import DailyReport, NewsItem, RunRecord, RunStatus
 
 _MARKDOWN_CONTROL_PATTERN = re.compile(r"([\\`*_[\]{}()#+.!|>\-])")
 _REPORT_TARGET_PATTERN = re.compile(
@@ -946,6 +946,48 @@ def save_run_record(root: Path, record: RunRecord) -> None:
         )
 
 
+def _load_run_records_locked(root: Path, root_boundary: Path) -> list[RunRecord]:
+    records_root = _require_storage_target(root_boundary, root / "data/runs")
+    if not records_root.exists():
+        return []
+    if not records_root.is_dir():
+        raise ValueError("run records path must be a directory")
+
+    records: list[RunRecord] = []
+    for year_directory in sorted(records_root.iterdir()):
+        if year_directory.is_symlink() or not year_directory.is_dir():
+            raise ValueError("run record year path must be a regular directory")
+        if re.fullmatch(r"[0-9]{4}", year_directory.name) is None:
+            raise ValueError("run record year path is invalid")
+        _require_within_root(root_boundary, year_directory)
+        for month_directory in sorted(year_directory.iterdir()):
+            if month_directory.is_symlink() or not month_directory.is_dir():
+                raise ValueError("run record month path must be a regular directory")
+            if re.fullmatch(r"[0-9]{2}", month_directory.name) is None:
+                raise ValueError("run record month path is invalid")
+            _require_within_root(root_boundary, month_directory)
+            for path in sorted(month_directory.iterdir()):
+                relative_path = path.relative_to(root).as_posix()
+                match = _RUN_RECORD_TARGET_PATTERN.fullmatch(relative_path)
+                if match is None or path.is_symlink() or not path.is_file():
+                    raise ValueError("run record path is invalid")
+                _require_within_root(root_boundary, path)
+                try:
+                    path_date = date.fromisoformat(match.group("date"))
+                except ValueError as error:
+                    raise ValueError("run record path date is invalid") from error
+                if (
+                    match.group("year") != f"{path_date:%Y}"
+                    or match.group("month") != f"{path_date:%m}"
+                ):
+                    raise ValueError("run record path does not match its date")
+                record = RunRecord.model_validate_json(path.read_bytes())
+                if record.date != path_date:
+                    raise ValueError("run record path does not match record date")
+                records.append(record)
+    return sorted(records, key=lambda record: record.date, reverse=True)
+
+
 def load_run_records(root: Path) -> list[RunRecord]:
     root = Path(root)
     root_boundary = _root_boundary(root)
@@ -953,45 +995,23 @@ def load_run_records(root: Path) -> list[RunRecord]:
         if _root_boundary(root) != root_boundary:
             raise ValueError("storage root changed while acquiring its lock")
         _recover_pending_transaction(root, root_boundary)
-        records_root = _require_storage_target(root_boundary, root / "data/runs")
-        if not records_root.exists():
-            return []
-        if not records_root.is_dir():
-            raise ValueError("run records path must be a directory")
+        return _load_run_records_locked(root, root_boundary)
 
-        records: list[RunRecord] = []
-        for year_directory in sorted(records_root.iterdir()):
-            if year_directory.is_symlink() or not year_directory.is_dir():
-                raise ValueError("run record year path must be a regular directory")
-            if re.fullmatch(r"[0-9]{4}", year_directory.name) is None:
-                raise ValueError("run record year path is invalid")
-            _require_within_root(root_boundary, year_directory)
-            for month_directory in sorted(year_directory.iterdir()):
-                if month_directory.is_symlink() or not month_directory.is_dir():
-                    raise ValueError("run record month path must be a regular directory")
-                if re.fullmatch(r"[0-9]{2}", month_directory.name) is None:
-                    raise ValueError("run record month path is invalid")
-                _require_within_root(root_boundary, month_directory)
-                for path in sorted(month_directory.iterdir()):
-                    relative_path = path.relative_to(root).as_posix()
-                    match = _RUN_RECORD_TARGET_PATTERN.fullmatch(relative_path)
-                    if match is None or path.is_symlink() or not path.is_file():
-                        raise ValueError("run record path is invalid")
-                    _require_within_root(root_boundary, path)
-                    try:
-                        path_date = date.fromisoformat(match.group("date"))
-                    except ValueError as error:
-                        raise ValueError("run record path date is invalid") from error
-                    if (
-                        match.group("year") != f"{path_date:%Y}"
-                        or match.group("month") != f"{path_date:%m}"
-                    ):
-                        raise ValueError("run record path does not match its date")
-                    record = RunRecord.model_validate_json(path.read_bytes())
-                    if record.date != path_date:
-                        raise ValueError("run record path does not match record date")
-                    records.append(record)
-        return sorted(records, key=lambda record: record.date, reverse=True)
+
+def active_reports(
+    reports: Sequence[DailyReport],
+    run_records: Sequence[RunRecord],
+) -> list[DailyReport]:
+    report_dates = [report.date for report in reports]
+    record_by_date = {record.date: record for record in run_records}
+    if len(report_dates) != len(set(report_dates)) or len(record_by_date) != len(run_records):
+        raise ValueError("active report inputs must contain unique dates")
+    return [
+        report
+        for report in reports
+        if record_by_date.get(report.date) is None
+        or record_by_date[report.date].status is not RunStatus.NO_ELIGIBLE_CONTENT
+    ]
 
 
 def load_reports(root: Path) -> list[DailyReport]:
@@ -1024,4 +1044,5 @@ def load_history_urls(
         window_start = run_date - timedelta(days=days)
         entries = [entry for entry in index.reports if window_start <= entry.date < run_date]
         reports = [_load_entry_report(root, root_boundary, entry) for entry in entries]
+        reports = active_reports(reports, _load_run_records_locked(root, root_boundary))
         return {str(item.canonical_url) for report in reports for item in report.items}

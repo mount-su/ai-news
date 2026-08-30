@@ -23,7 +23,6 @@ from ai_news.models import (
     DailyReport,
     NewsItem,
     RunRecord,
-    RunStatus,
     SourceRole,
     SourceSpec,
 )
@@ -38,7 +37,7 @@ from ai_news.site.presentation import (
     paginate,
     source_statuses,
 )
-from ai_news.storage import load_reports, load_run_records
+from ai_news.storage import active_reports, load_reports, load_run_records
 
 _SITE_DIRECTORY = Path(__file__).parent
 _TEMPLATE_DIRECTORY = _SITE_DIRECTORY / "templates"
@@ -779,13 +778,7 @@ def build_site(
     if not archive_reports:
         raise ValueError("at least one report is required to build the site")
     run_records = load_run_records(root_path)
-    record_by_date = {record.date: record for record in run_records}
-    reports = [
-        report
-        for report in archive_reports
-        if record_by_date.get(report.date) is None
-        or record_by_date[report.date].status is not RunStatus.NO_ELIGIBLE_CONTENT
-    ]
+    reports = active_reports(archive_reports, run_records)
     if not reports:
         raise ValueError("at least one published report is required to build the site")
     source_specs = _load_source_specs(root_path, archive_reports, run_records)
