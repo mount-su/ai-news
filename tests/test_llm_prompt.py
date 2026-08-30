@@ -155,5 +155,6 @@ def test_thirty_six_item_prompt_has_a_conservative_utf8_byte_bound() -> None:
 
     prompt = build_analysis_prompt(items)
 
-    assert "从全部候选中选择 1 至 9 条" in prompt
+    assert "候选不少于 5 条时" in prompt
+    assert "必须选择 5 至 9 条" in prompt
     assert len(prompt.encode("utf-8")) < 250_000

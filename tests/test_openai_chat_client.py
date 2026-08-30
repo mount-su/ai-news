@@ -217,13 +217,13 @@ def test_one_editorial_request_selects_nine_from_twelve_candidates() -> None:
     assert len(requests) == 1
     assert list(result) == [candidate.id for candidate in candidates[:9]]
     prompt = json.loads(requests[0].content)["messages"][1]["content"]
-    assert "从全部候选中选择 1 至 9 条" in prompt
+    assert "候选不少于 5 条时，必须选择 5 至 9 条" in prompt
     assert "恰好" not in prompt
 
 
-def test_editorial_request_accepts_a_high_quality_subset_without_repair() -> None:
+def test_editorial_request_accepts_a_high_quality_minimum_subset_without_repair() -> None:
     candidates = [_candidate(f"subset-{index}") for index in range(12)]
-    rows = _editorial_rows(candidates)[:3]
+    rows = _editorial_rows(candidates)[:5]
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -233,7 +233,23 @@ def test_editorial_request_accepts_a_high_quality_subset_without_repair() -> Non
     result = _run_analyze(handler, candidates)
 
     assert len(requests) == 1
-    assert list(result) == [candidate.id for candidate in candidates[:3]]
+    assert list(result) == [candidate.id for candidate in candidates[:5]]
+
+
+def test_editorial_request_repairs_undersized_selection_when_candidates_are_plentiful() -> None:
+    candidates = [_candidate(f"undersized-{index}") for index in range(9)]
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        rows = _editorial_rows(candidates)[:1] if attempts == 1 else _editorial_rows(candidates)[:5]
+        return httpx.Response(200, content=_openai_response(rows))
+
+    result = _run_analyze(handler, candidates)
+
+    assert attempts == 2
+    assert list(result) == [candidate.id for candidate in candidates[:5]]
 
 
 @pytest.mark.parametrize(

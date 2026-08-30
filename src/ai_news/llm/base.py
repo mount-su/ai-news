@@ -225,6 +225,7 @@ def _parse_analysis(
         return None, "schema"
 
     selection_count = min(9, len(candidates))
+    minimum_selection_count = 5 if len(candidates) >= 5 else 1
     row_ids = [row.id for row in parsed_rows]
     if len(row_ids) != len(set(row_ids)):
         return None, "duplicate"
@@ -233,6 +234,8 @@ def _parse_analysis(
         return None, "unknown"
     if not row_ids:
         return None, "missing"
+    if len(row_ids) < minimum_selection_count:
+        return None, "count"
     if len(row_ids) > selection_count:
         return None, "count"
     if selection_count == 9:
