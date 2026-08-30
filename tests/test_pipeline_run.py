@@ -18,6 +18,7 @@ from ai_news.models import (
     RawItem,
     Settings,
     SourceConfig,
+    SourceRun,
     SourceSpec,
 )
 from ai_news.pipeline.run import (
@@ -432,6 +433,36 @@ def test_source_diagnostics_record_successful_empty_collection_as_zero() -> None
         "selected_count": 0,
         "latest_published_at": None,
     }
+
+
+def test_prepared_candidate_diagnostics_are_deeply_immutable() -> None:
+    from ai_news.pipeline import run as run_module
+
+    source = _source(0)
+    source_run = SourceRun.succeeded(
+        source_id=source.id,
+        source_name=source.name,
+        item_count=1,
+        elapsed_ms=0,
+    )
+
+    prepared = run_module._prepare_collected_candidates(
+        [(source_run, [_raw(4_100, source=source)])],
+        set(),
+        NOW,
+    )
+
+    assert isinstance(prepared.selected, tuple)
+    with pytest.raises(TypeError):
+        prepared.latest_by_source[source.id] = NOW
+    with pytest.raises(TypeError):
+        prepared.recent_counts[source.id] = 0
+    with pytest.raises(TypeError):
+        prepared.new_counts[source.id] = 0
+    with pytest.raises(TypeError):
+        prepared.eligible_counts[source.id] = 0
+    with pytest.raises(TypeError):
+        prepared.candidate_counts[source.id] = 0
 
 
 def test_source_collection_concurrency_never_exceeds_six() -> None:

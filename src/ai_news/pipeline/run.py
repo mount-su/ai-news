@@ -12,6 +12,7 @@ from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from types import MappingProxyType
 from typing import Protocol
 from urllib.parse import urlsplit
 
@@ -64,12 +65,12 @@ _EXACT_STATE_TARGET = _DEDUPLICATION_LIMIT * 4
 
 @dataclass(frozen=True)
 class _PreparedCandidates:
-    selected: list[Candidate]
-    latest_by_source: dict[str, datetime]
-    recent_counts: Counter[str]
-    new_counts: Counter[str]
-    eligible_counts: Counter[str]
-    candidate_counts: Counter[str]
+    selected: tuple[Candidate, ...]
+    latest_by_source: Mapping[str, datetime]
+    recent_counts: Mapping[str, int]
+    new_counts: Mapping[str, int]
+    eligible_counts: Mapping[str, int]
+    candidate_counts: Mapping[str, int]
 
 
 class PipelineError(RuntimeError):
@@ -414,12 +415,14 @@ def _prepare_collected_candidates(
 
     selected = _prepare_candidates(accumulator.selected(), historical, now)
     return _PreparedCandidates(
-        selected=selected,
-        latest_by_source=latest_by_source,
-        recent_counts=recent_counts,
-        new_counts=new_counts,
-        eligible_counts=eligible_counts,
-        candidate_counts=Counter(candidate.raw.source_id for candidate in selected),
+        selected=tuple(selected),
+        latest_by_source=MappingProxyType(dict(latest_by_source)),
+        recent_counts=MappingProxyType(dict(recent_counts)),
+        new_counts=MappingProxyType(dict(new_counts)),
+        eligible_counts=MappingProxyType(dict(eligible_counts)),
+        candidate_counts=MappingProxyType(
+            dict(Counter(candidate.raw.source_id for candidate in selected))
+        ),
     )
 
 
@@ -568,7 +571,7 @@ async def _run_with_client(
     except Exception:
         raise DataPipelineError("candidate preparation failed") from None
 
-    selected = prepared.selected
+    selected = list(prepared.selected)
     if not selected:
         raise PublicationThresholdError("no eligible candidates")
 
@@ -602,10 +605,10 @@ async def _run_with_client(
     selected_counts = Counter(candidate_by_id[item.id].raw.source_id for item in items)
     source_runs = [
         source_run.with_diagnostics(
-            recent_count=prepared.recent_counts[source_run.source_id],
-            new_count=prepared.new_counts[source_run.source_id],
-            eligible_count=prepared.eligible_counts[source_run.source_id],
-            candidate_count=prepared.candidate_counts[source_run.source_id],
+            recent_count=prepared.recent_counts.get(source_run.source_id, 0),
+            new_count=prepared.new_counts.get(source_run.source_id, 0),
+            eligible_count=prepared.eligible_counts.get(source_run.source_id, 0),
+            candidate_count=prepared.candidate_counts.get(source_run.source_id, 0),
             selected_count=selected_counts[source_run.source_id],
             latest_published_at=prepared.latest_by_source.get(source_run.source_id),
         )
