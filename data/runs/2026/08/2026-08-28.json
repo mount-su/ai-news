@@ -1,132 +1,7 @@
 {
-  "candidate_count": 20,
+  "cutoff_at": "2026-08-28T15:59:59.999999Z",
   "date": "2026-08-28",
-  "degraded": false,
-  "generated_at": "2026-08-28T15:59:59.999999Z",
-  "items": [
-    {
-      "canonical_url": "https://techcrunch.com/2026/08/28/anthropic-gets-its-first-court-win-over-the-pentagons-supply-chain-risk-label",
-      "category": "AI 工具",
-      "discovery_verified": false,
-      "editorial_lane": "平台与政策",
-      "id": "0c24a3ca3dcbcabd",
-      "importance": 8,
-      "is_official": false,
-      "marketing_risk": "low",
-      "original_title": "Anthropic gets its first court win over the Pentagon’s supply-chain risk label",
-      "published_at": "2026-08-28T12:46:12Z",
-      "source": "TechCrunch AI",
-      "source_id": "techcrunch-ai",
-      "source_role": "trusted_media",
-      "summary": "联邦法官裁定特朗普政府非法将Anthropic列为供应链风险，这是Anthropic在与五角大楼的诉讼中获得的首次法院胜利，其第二起诉讼仍在华盛顿继续。",
-      "tags": [
-        "Anthropic",
-        "政策监管",
-        "供应链"
-      ],
-      "title": "法院裁定五角大楼非法将Anthropic列为供应链风险",
-      "tracking_signal": "关注Anthropic第二起五角大楼诉讼的进展，以及是否有其他AI公司援引此判例挑战政府标签。",
-      "why_it_matters": "该裁决直接影响Anthropic与国防部门的合作资格，可能为其他被列入风险名单的AI公司提供法律先例，并削弱政府以行政手段限制AI企业的空间。"
-    },
-    {
-      "canonical_url": "https://techcrunch.com/2026/08/27/googles-ai-mode-can-now-track-flight-prices-help-book-hotels-and-more",
-      "category": "AI 工具",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "8375ac96f2829122",
-      "importance": 7,
-      "is_official": false,
-      "marketing_risk": "medium",
-      "original_title": "Google’s AI Mode can now track flight prices, help book hotels, and more",
-      "published_at": "2026-08-27T16:00:00Z",
-      "source": "TechCrunch AI",
-      "source_id": "techcrunch-ai",
-      "source_role": "trusted_media",
-      "summary": "Google AI Mode在搜索中新增航班价格追踪、酒店预订等旅行功能，从单纯信息查找转向实际处理行程规划和预订环节，定位为AI旅行代理。",
-      "tags": [
-        "Google",
-        "AI旅行",
-        "搜索"
-      ],
-      "title": "Google AI Mode新增机票价格追踪和酒店预订功能",
-      "tracking_signal": "观察AI Mode旅行功能的实际覆盖范围和预订完成率，以及OTA平台的应对策略。",
-      "why_it_matters": "普通用户可直接在Google搜索中完成比价和预订，减少跳转多个平台的成本；对在线旅行社和旅行比价网站构成直接竞争压力。"
-    },
-    {
-      "canonical_url": "https://www.theverge.com/tech/985567/google-gemini-notebook-expert-sources-books",
-      "category": "AI 工具",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "e056252ba19a5071",
-      "importance": 6,
-      "is_official": false,
-      "marketing_risk": "medium",
-      "original_title": "Google’s AI note-taking app now allows you to interact with books",
-      "published_at": "2026-08-27T19:30:00Z",
-      "source": "The Verge AI",
-      "source_id": "the-verge-ai",
-      "source_role": "trusted_media",
-      "summary": "Google的AI笔记应用Gemini Notebook新增Expert Intelligence功能，可将Google Play Books中的已购书籍导入，支持提问、生成计划、信息图和AI播客。",
-      "tags": [
-        "Gemini",
-        "笔记应用",
-        "Google Play Books"
-      ],
-      "title": "Gemini Notebook新增书籍交互功能",
-      "tracking_signal": "关注该功能对书籍版权和内容使用的限制，以及用户对AI生成书籍衍生内容的接受度。",
-      "why_it_matters": "已购买Google Play Books的用户可直接在笔记应用中深度处理书籍内容，提升阅读和学习效率；该功能将AI笔记从通用工具推向垂直内容场景。"
-    },
-    {
-      "canonical_url": "https://sourcegraph.com/blog/a-smarter-way-to-run-code-migrations-with-less-llm-context",
-      "category": "Coding Agent",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "fa89676c2ca9be77",
-      "importance": 5,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "A smarter way to run code migrations with less LLM context",
-      "published_at": "2026-08-28T00:00:00Z",
-      "source": "Sourcegraph Blog",
-      "source_id": "sourcegraph-blog",
-      "source_role": "primary",
-      "summary": "Sourcegraph的Deep Search在沙箱中围绕Sourcegraph搜索API运行脚本，使迁移审计返回CSV清单而非数千文件的token，减少LLM上下文消耗。",
-      "tags": [
-        "Sourcegraph",
-        "代码迁移",
-        "LLM成本"
-      ],
-      "title": "Sourcegraph推出减少LLM上下文消耗的代码迁移方案",
-      "tracking_signal": "关注Deep Search在真实迁移项目中的token节省比例和审计准确性，评估是否适合企业级代码库。",
-      "why_it_matters": "开发团队进行大规模代码迁移时可显著降低LLM调用成本和上下文窗口压力，使审计结果更结构化、可执行，适合生产环境中的批量代码变更。"
-    },
-    {
-      "canonical_url": "https://openai.com/index/disrupting-malicious-uses-of-ai-influence-campaign-russia",
-      "category": "大模型",
-      "discovery_verified": false,
-      "editorial_lane": "平台与政策",
-      "id": "62003111f3b592c5",
-      "importance": 5,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Disrupting a new covert influence campaign from Russia",
-      "published_at": "2026-08-25T00:00:00Z",
-      "source": "OpenAI",
-      "source_id": "openai",
-      "source_role": "primary",
-      "summary": "OpenAI封禁了来自俄罗斯的账号，这些账号使用AI推广一个虚假的以色列智库和赞扬俄罗斯、批评西方的所谓主权指数。",
-      "tags": [
-        "OpenAI",
-        "信息战",
-        "内容审核"
-      ],
-      "title": "OpenAI封禁俄罗斯隐蔽影响力行动账号",
-      "tracking_signal": "关注OpenAI后续披露的账号规模和行动细节，以及是否有其他平台跟进类似封禁。",
-      "why_it_matters": "显示AI平台正成为地缘政治信息战的工具，OpenAI的主动封禁为其他模型平台提供了内容审核和溯源处置的参考，也提示用户对AI生成的政治内容保持警惕。"
-    }
-  ],
-  "model": "deepseek-v4-pro",
-  "schema_version": "1.3",
+  "safe_error_code": "none",
   "source_runs": [
     {
       "candidate_count": 6,
@@ -464,5 +339,6 @@
       "source_name": "GitHub Blog AI",
       "success": true
     }
-  ]
+  ],
+  "status": "published"
 }
