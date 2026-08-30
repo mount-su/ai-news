@@ -5,7 +5,7 @@
   "source_runs": [
     {
       "candidate_count": 6,
-      "elapsed_ms": 782,
+      "elapsed_ms": 1215,
       "eligible_count": 8,
       "error_type": null,
       "item_count": 1157,
@@ -19,7 +19,7 @@
     },
     {
       "candidate_count": 1,
-      "elapsed_ms": 945,
+      "elapsed_ms": 1341,
       "eligible_count": 1,
       "error_type": null,
       "item_count": 20,
@@ -33,7 +33,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 819,
+      "elapsed_ms": 1605,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 100,
@@ -47,7 +47,7 @@
     },
     {
       "candidate_count": 4,
-      "elapsed_ms": 317,
+      "elapsed_ms": 493,
       "eligible_count": 4,
       "error_type": null,
       "item_count": 852,
@@ -61,7 +61,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 344,
+      "elapsed_ms": 1313,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 82,
@@ -75,7 +75,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 104,
+      "elapsed_ms": 150,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 44,
@@ -89,7 +89,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 1008,
+      "elapsed_ms": 1305,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 1,
@@ -103,7 +103,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 6266,
+      "elapsed_ms": 6745,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 4,
@@ -117,7 +117,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 553,
+      "elapsed_ms": 333,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 1,
@@ -131,7 +131,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 1158,
+      "elapsed_ms": 1028,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 1,
@@ -145,7 +145,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 8531,
+      "elapsed_ms": 9545,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 7,
@@ -159,7 +159,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 803,
+      "elapsed_ms": 835,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 2,
@@ -173,7 +173,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 3839,
+      "elapsed_ms": 3908,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 5,
@@ -187,7 +187,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 2299,
+      "elapsed_ms": 4080,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 2,
@@ -201,7 +201,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 55,
+      "elapsed_ms": 77,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 19,
@@ -215,7 +215,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 149,
+      "elapsed_ms": 250,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 7,
@@ -229,11 +229,11 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 102,
+      "elapsed_ms": 109,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 10,
-      "latest_published_at": "2026-08-30T15:35:10Z",
+      "latest_published_at": "2026-08-29T18:19:53Z",
       "new_count": 0,
       "recent_count": 0,
       "selected_count": null,
@@ -243,7 +243,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 1433,
+      "elapsed_ms": 1260,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 10,
@@ -257,7 +257,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 63331,
+      "elapsed_ms": 63103,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 0,
@@ -271,7 +271,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 458,
+      "elapsed_ms": 491,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 30,
@@ -285,7 +285,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 165,
+      "elapsed_ms": 286,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 50,
@@ -299,7 +299,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 116,
+      "elapsed_ms": 237,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 57,
@@ -313,7 +313,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 262,
+      "elapsed_ms": 189,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 50,
@@ -327,7 +327,7 @@
     },
     {
       "candidate_count": 0,
-      "elapsed_ms": 394,
+      "elapsed_ms": 125,
       "eligible_count": 0,
       "error_type": null,
       "item_count": 10,
