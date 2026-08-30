@@ -101,6 +101,33 @@ def test_readme_documents_automation_recovery_and_safety_boundaries() -> None:
         assert fragment in readme
 
 
+def test_readme_documents_v2_editorial_site_and_operating_contract() -> None:
+    readme = _readme()
+
+    required_fragments = [
+        "质量优先，可只发布 1–2 条",  # noqa: RUF001
+        "不生成当期日报",
+        "primary",
+        "trusted_media",
+        "discovery",
+        "可访问",
+        "有近期内容",
+        "候选贡献",
+        "北京时间 07:17",
+        "唯一必需的 Secret 是 `LLM_API_KEY`",
+        "必须按日期从旧到新串行执行",
+        "`/search/`",
+        "`/sources/`",
+        "`/feed.xml`",
+        "`/sitemap.xml`",
+        "`/robots.txt`",
+        "`/404.html`",
+    ]
+
+    for fragment in required_fragments:
+        assert fragment in readme
+
+
 def test_readme_links_the_design_and_implementation_plan() -> None:
     readme = _readme()
 
