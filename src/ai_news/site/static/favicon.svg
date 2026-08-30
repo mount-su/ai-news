@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AI 情报日报">
+  <rect width="64" height="64" rx="8" fill="#f3efe6"/>
+  <path d="M8 8h48v48H8z" fill="none" stroke="#191713" stroke-width="3"/>
+  <path d="M13 15h38M13 49h38" stroke="#9f2f2a" stroke-width="3"/>
+  <text x="32" y="41" fill="#191713" font-family="Georgia,serif" font-size="27" font-weight="700" text-anchor="middle">AI</text>
+</svg>

@@ -297,6 +297,7 @@ def test_package_data_configuration_covers_all_site_templates_and_static_assets(
         "templates/*.html",
         "static/*.css",
         "static/*.js",
+        "static/*.svg",
     }
 
     site_directory = repository / "src/ai_news/site"

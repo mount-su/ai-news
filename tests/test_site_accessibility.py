@@ -166,7 +166,7 @@ def test_search_controls_are_labelled_and_day_archive_navigation_is_explicit(
     assert all(label in archive_text for label in ("条收录", "条候选"))
 
 
-def test_styles_define_visual_system_responsive_layout_and_accessibility_contract(
+def test_styles_define_warm_responsive_newspaper_and_accessibility_contract(
     accessibility_report_root: tuple[Path, object],
     tmp_path: Path,
 ) -> None:
@@ -176,29 +176,37 @@ def test_styles_define_visual_system_responsive_layout_and_accessibility_contrac
     css = (output / "assets/styles.css").read_text(encoding="utf-8")
 
     required_variables = {
-        "--ink": "#07111f",
-        "--panel": "#0c1b2d",
-        "--panel-strong": "#10253d",
-        "--line": "#23415d",
-        "--text": "#edf8ff",
-        "--muted": "#9ab3c7",
-        "--signal": "#52e3ff",
-        "--amber": "#ffbd59",
-        "--danger": "#ff7d8a",
-        "--max-width": "1240px",
+        "--paper": "#f3efe6",
+        "--paper-deep": "#e8e0d2",
+        "--ink": "#191713",
+        "--muted": "#69635a",
+        "--rule": "#b8afa0",
+        "--editorial-red": "#9f2f2a",
+        "--max-width": "1180px",
     }
     for name, value in required_variables.items():
         assert f"{name}: {value}" in css
     assert ":focus-visible" in css
+    assert "font-size: 15px" in css
+    assert ".story-meta" in css and "font-size: 12px" in css
     assert "min-height: 44px" in css
-    assert "@media (min-width: 900px)" in css
-    assert "@media (max-width: 719px)" in css
-    assert "@media (max-width: 600px)" in css
-    assert "grid-template-columns: repeat(2" in css
+    assert "@media (max-width: 820px)" in css
+    assert ".primary-nav::after" in css
+    assert ":target" in css
+    assert "scroll-margin-top" in css
     assert "@media (prefers-reduced-motion: reduce)" in css
     assert "animation: none" in css
     assert "transition: none" in css
     assert "scroll-behavior: auto" in css
+    assert "linear-gradient" not in css
+    assert "radial-gradient" not in css
+    assert "box-shadow" not in css
+    assert "text-shadow" not in css
+    assert ".news-grid" not in css
+
+    assert (output / "assets/favicon.svg").is_file()
+    homepage = (output / "index.html").read_text(encoding="utf-8")
+    assert f"{BASE_PATH}assets/favicon.svg" in homepage
 
 
 def test_javascript_is_safe_progressive_enhancement_without_content_mutation(
