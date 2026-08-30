@@ -11,6 +11,7 @@ __all__ = ["AnalysisError", "OpenAIChatAnalyzer"]
 
 class OpenAIChatAnalyzer(BaseAnalyzer):
     endpoint_suffix = "chat/completions"
+    normalize_provider_drift = True
 
     def _headers(self) -> dict[str, str]:
         return {

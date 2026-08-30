@@ -74,11 +74,14 @@ def select_balanced_candidates(
     *,
     limit: int = 36,
     per_source: int = 6,
+    unofficial_per_source: int | None = None,
 ) -> list[Candidate]:
     if limit < 0:
         raise ValueError("limit must not be negative")
     if per_source <= 0:
         raise ValueError("per-source limit must be positive")
+    if unofficial_per_source is not None and unofficial_per_source <= 0:
+        raise ValueError("unofficial per-source limit must be positive")
     if limit == 0:
         return []
 
@@ -86,7 +89,12 @@ def select_balanced_candidates(
     selected: list[Candidate] = []
     for item in _ranked_candidates(items, now):
         source_id = item.raw.source_id
-        if counts[source_id] >= per_source:
+        source_limit = (
+            unofficial_per_source
+            if unofficial_per_source is not None and not item.raw.is_official_source
+            else per_source
+        )
+        if counts[source_id] >= source_limit:
             continue
         counts[source_id] += 1
         selected.append(item)

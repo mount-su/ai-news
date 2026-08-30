@@ -11,7 +11,12 @@ from ai_news.pipeline.editorial import is_editorially_eligible
 from ai_news.pipeline.normalize import to_candidate
 
 
-def _candidate(title: str, excerpt: str = "", source_id: str = "source-test"):
+def _candidate(
+    title: str,
+    excerpt: str = "",
+    source_id: str = "source-test",
+    category: Category = Category.MODEL,
+):
     return to_candidate(
         RawItem(
             source_id=source_id,
@@ -21,7 +26,7 @@ def _candidate(title: str, excerpt: str = "", source_id: str = "source-test"):
             url="https://example.com/editorial",
             published_at=datetime(2026, 8, 1, 8, tzinfo=UTC),
             excerpt=excerpt,
-            category_hint=Category.MODEL,
+            category_hint=category,
             is_official_source=True,
         )
     )
@@ -150,6 +155,38 @@ def test_editorial_filter_accepts_high_impact_developer_ecosystem_updates(
     excerpt: str,
 ) -> None:
     assert is_editorially_eligible(_candidate(title, excerpt, source_id="github-langchain")) is True
+
+
+@pytest.mark.parametrize(
+    "title,excerpt",
+    [
+        (
+            "Claude Desktop support with Ollama",
+            "Claude Desktop can now be configured to work with Ollama as a "
+            "third-party gateway provider, making it possible to use open models in Claude.",
+        ),
+        (
+            "Open model gateway expands local deployment compatibility",
+            "The release makes open models available through a third-party gateway "
+            "for production teams.",
+        ),
+    ],
+)
+def test_editorial_filter_accepts_high_impact_open_source_availability(
+    title: str,
+    excerpt: str,
+) -> None:
+    assert (
+        is_editorially_eligible(
+            _candidate(
+                title,
+                excerpt,
+                source_id="ollama-blog",
+                category=Category.OPEN_SOURCE,
+            )
+        )
+        is True
+    )
 
 
 @pytest.mark.parametrize(

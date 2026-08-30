@@ -452,11 +452,11 @@ def test_analyzer_factory_failure_does_not_expose_or_retain_sensitive_state(
         assert secret not in f"{value!s} {value!r}"
 
 
-def test_time_window_includes_seventy_two_hour_boundaries_and_excludes_future() -> None:
+def test_time_window_includes_one_hundred_twenty_hour_boundaries_and_excludes_future() -> None:
     timestamps = [
-        NOW - timedelta(hours=72),
+        NOW - timedelta(hours=120),
         NOW,
-        NOW - timedelta(hours=72, microseconds=1),
+        NOW - timedelta(hours=120, microseconds=1),
         NOW + timedelta(microseconds=1),
     ]
     analyzer = _Analyzer()

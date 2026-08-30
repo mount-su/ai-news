@@ -116,7 +116,7 @@ sources:
   - id: reddit-ai
     name: Reddit AI 线索
     kind: reddit_rss
-    enabled: false
+    enabled: true
     communities:
       - LocalLLaMA
       - OpenAI
@@ -130,3 +130,38 @@ sources:
     category: AI 工具
     weight: 5
     official: false
+  - id: sourcegraph-blog
+    name: Sourcegraph Blog
+    kind: feed
+    url: https://sourcegraph.com/blog/rss.xml
+    category: Agent
+    weight: 7
+    official: true
+  - id: cursor-changelog
+    name: Cursor Changelog
+    kind: feed
+    url: https://cursor.com/changelog/rss.xml
+    category: Agent
+    weight: 7
+    official: true
+  - id: ollama-blog
+    name: Ollama Blog
+    kind: feed
+    url: https://ollama.com/blog/rss.xml
+    category: 开源项目
+    weight: 7
+    official: true
+  - id: producthunt-ai
+    name: Product Hunt AI
+    kind: feed
+    url: https://www.producthunt.com/feed?category=artificial-intelligence
+    category: AI 工具
+    weight: 5
+    official: false
+  - id: github-blog-ai
+    name: GitHub Blog AI
+    kind: feed
+    url: https://github.blog/tag/ai/feed/
+    category: AI 工具
+    weight: 6
+    official: true

@@ -17,11 +17,15 @@ NEW_OFFICIAL_SOURCE_IDS = frozenset(
     {
         "anthropic",
         "baidu-ernie",
+        "cursor-changelog",
         "deepseek",
+        "github-blog-ai",
         "meta-ai",
         "minimax",
         "mistral",
+        "ollama-blog",
         "qwen",
+        "sourcegraph-blog",
         "tencent-hunyuan",
         "volcengine-doubao",
         "zhipu-glm",
@@ -140,9 +144,22 @@ def format_health_result(result: SourceHealthResult) -> str:
     return f"{result.source_id} {status} {result.item_count} {latest_date} {error_type}"
 
 
+def source_health_succeeded(results: list[SourceHealthResult]) -> bool:
+    """Return whether health results should pass CI.
+
+    Reddit is an optional anonymous signal source; it remains visible in the
+    output but should not block verified official source checks.
+    """
+
+    return bool(results) and all(
+        result.healthy or result.source_id == "reddit-ai" for result in results
+    )
+
+
 __all__ = [
     "NEW_OFFICIAL_SOURCE_IDS",
     "SourceHealthResult",
     "check_source_health",
     "format_health_result",
+    "source_health_succeeded",
 ]

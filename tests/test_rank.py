@@ -168,6 +168,38 @@ def test_select_balanced_candidates_caps_each_source_and_total_deterministically
     )
 
 
+def test_select_balanced_candidates_can_use_lower_unofficial_source_cap() -> None:
+    unofficial = [
+        _candidate(
+            f"unofficial-{index}",
+            "Launch",
+            official=False,
+            source_id="source-unofficial",
+        )
+        for index in range(8)
+    ]
+    official = [
+        _candidate(
+            f"official-{index}",
+            "Launch",
+            official=True,
+            source_id="source-official",
+        )
+        for index in range(8)
+    ]
+
+    selected = rank_module.select_balanced_candidates(
+        unofficial + official,
+        NOW,
+        limit=12,
+        per_source=6,
+        unofficial_per_source=3,
+    )
+
+    counts = Counter(item.raw.source_id for item in selected)
+    assert counts == {"source-official": 6, "source-unofficial": 3}
+
+
 def test_select_balanced_candidates_validates_limits_without_mutating_input() -> None:
     items = [_candidate(f"item-{index}", "Routine update") for index in range(4)]
     snapshot = [item.model_dump() for item in items]

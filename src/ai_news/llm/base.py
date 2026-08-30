@@ -120,21 +120,107 @@ def _remove_outer_fence(text: str) -> str:
     return match.group(1) if match else stripped
 
 
+def _json_payload(text: str) -> object:
+    stripped = _remove_outer_fence(text)
+    decoder = json.JSONDecoder()
+    try:
+        payload, _ = decoder.raw_decode(stripped)
+        return payload
+    except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
+        pass
+
+    for index, character in enumerate(stripped):
+        if character not in "[{":
+            continue
+        try:
+            payload, _ = decoder.raw_decode(stripped[index:])
+        except json.JSONDecodeError:
+            continue
+        return payload
+    raise json.JSONDecodeError("no JSON payload", stripped, 0)
+
+
+def _analysis_rows(payload: object) -> list[object] | None:
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, Mapping):
+        for key in ("items", "rows", "analyses", "analysis", "data"):
+            rows = payload.get(key)
+            if isinstance(rows, list):
+                return rows
+    return None
+
+
+def _trim_text(value: object, *, max_length: int) -> object:
+    if not isinstance(value, str):
+        return value
+    return value.strip()[:max_length]
+
+
+def _normalize_tags(value: object) -> object:
+    if not isinstance(value, list):
+        return value
+    tags: list[str] = []
+    for raw_tag in value:
+        if not isinstance(raw_tag, str):
+            return value
+        tag = raw_tag.strip()
+        if len(tag) > 50:
+            continue
+        if tag and tag not in tags:
+            tags.append(tag)
+        if len(tags) == 3:
+            break
+    return tags
+
+
+def _normalize_analysis_row(raw_row: object) -> object:
+    if not isinstance(raw_row, Mapping):
+        return raw_row
+    row = dict(raw_row)
+    text_limits = {
+        "title": 80,
+        "summary": 160,
+        "why_it_matters": 100,
+        "tracking_signal": 80,
+    }
+    for field_name, max_length in text_limits.items():
+        if field_name in row:
+            row[field_name] = _trim_text(row[field_name], max_length=max_length)
+    if isinstance(row.get("importance"), str):
+        stripped = row["importance"].strip()
+        if stripped.isdigit():
+            row["importance"] = int(stripped)
+    if isinstance(row.get("is_official"), str):
+        match row["is_official"].strip().casefold():
+            case "true":
+                row["is_official"] = True
+            case "false":
+                row["is_official"] = False
+    if "tags" in row:
+        row["tags"] = _normalize_tags(row["tags"])
+    return row
+
+
 def _parse_analysis(
     text: str,
     candidates: list[Candidate],
+    *,
+    normalize_provider_drift: bool = False,
 ) -> tuple[dict[str, Analysis] | None, str | None]:
     try:
-        payload = json.loads(_remove_outer_fence(text))
+        payload = _json_payload(text)
     except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
         return None, "json"
-    if not isinstance(payload, list):
+    rows = _analysis_rows(payload)
+    if rows is None:
         return None, "schema"
 
     parsed_rows: list[_AnalysisRow] = []
     try:
-        for raw_row in payload:
-            parsed_rows.append(_AnalysisRow.model_validate(raw_row))
+        for raw_row in rows:
+            row = _normalize_analysis_row(raw_row) if normalize_provider_drift else raw_row
+            parsed_rows.append(_AnalysisRow.model_validate(row))
     except (ValidationError, TypeError, ValueError):
         return None, "schema"
 
@@ -212,6 +298,7 @@ def _repair_prompt(
 
 class BaseAnalyzer(ABC):
     endpoint_suffix: str
+    normalize_provider_drift = False
 
     def __init__(
         self,
@@ -312,7 +399,11 @@ class BaseAnalyzer(ABC):
         items: list[Candidate],
     ) -> dict[str, Analysis]:
         first_text = await self._request(client, build_analysis_prompt(items))
-        parsed, error_kind = _parse_analysis(first_text, items)
+        parsed, error_kind = _parse_analysis(
+            first_text,
+            items,
+            normalize_provider_drift=self.normalize_provider_drift,
+        )
         if parsed is not None:
             if _contains_sensitive_data(parsed, self._token):
                 raise AnalysisError(
@@ -323,7 +414,11 @@ class BaseAnalyzer(ABC):
 
         repair = _repair_prompt(items, first_text, error_kind or "schema", self._token)
         repaired_text = await self._request(client, repair)
-        repaired, _ = _parse_analysis(repaired_text, items)
+        repaired, _ = _parse_analysis(
+            repaired_text,
+            items,
+            normalize_provider_drift=self.normalize_provider_drift,
+        )
         if repaired is None:
             raise AnalysisError(
                 "invalid LLM analysis after repair",
