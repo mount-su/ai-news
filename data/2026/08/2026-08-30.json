@@ -1,0 +1,193 @@
+{
+  "candidate_count": 8,
+  "date": "2026-08-30",
+  "degraded": false,
+  "generated_at": "2026-08-30T10:39:05.962261Z",
+  "items": [
+    {
+      "canonical_url": "https://www.producthunt.com/products/omlx",
+      "category": "AI 工具",
+      "editorial_lane": "产品与应用",
+      "id": "4fde41f07a3a7fa0",
+      "importance": 6,
+      "is_official": false,
+      "marketing_risk": "medium",
+      "original_title": "oMLX",
+      "published_at": "2026-08-29T20:17:05Z",
+      "source": "Product Hunt AI",
+      "summary": "oMLX 是一款 Mac LLM 服务器，宣称可将 Agent 等待时间从 90 秒缩短至 5 秒，直接改善本地推理响应速度。",
+      "tags": [
+        "本地推理",
+        "Mac",
+        "Agent"
+      ],
+      "title": "oMLX Mac LLM 服务器将 Agent 等待时间从 90 秒降至 5 秒",
+      "tracking_signal": "关注其是否发布可复现的基准测试、支持模型范围及安装方式，并在实际 Mac 环境验证延迟改善。",
+      "why_it_matters": "对在 Mac 上运行本地大模型和 Agent 的开发者，等待时间大幅下降可提升交互效率与可用性，降低对云端推理的依赖。"
+    }
+  ],
+  "model": "deepseek-v4-pro",
+  "schema_version": "1.2",
+  "source_runs": [
+    {
+      "elapsed_ms": 600,
+      "error_type": null,
+      "item_count": 1157,
+      "source_id": "openai",
+      "source_name": "OpenAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1094,
+      "error_type": null,
+      "item_count": 20,
+      "source_id": "google-ai",
+      "source_name": "Google AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1156,
+      "error_type": null,
+      "item_count": 100,
+      "source_id": "deepmind",
+      "source_name": "DeepMind",
+      "success": true
+    },
+    {
+      "elapsed_ms": 844,
+      "error_type": null,
+      "item_count": 852,
+      "source_id": "hugging-face",
+      "source_name": "Hugging Face",
+      "success": true
+    },
+    {
+      "elapsed_ms": 624,
+      "error_type": null,
+      "item_count": 82,
+      "source_id": "mistral",
+      "source_name": "Mistral",
+      "success": true
+    },
+    {
+      "elapsed_ms": 111,
+      "error_type": null,
+      "item_count": 44,
+      "source_id": "qwen",
+      "source_name": "通义千问 Qwen",
+      "success": true
+    },
+    {
+      "elapsed_ms": 928,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "anthropic",
+      "source_name": "Anthropic",
+      "success": true
+    },
+    {
+      "elapsed_ms": 5138,
+      "error_type": null,
+      "item_count": 4,
+      "source_id": "meta-ai",
+      "source_name": "Meta AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 231,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "deepseek",
+      "source_name": "DeepSeek",
+      "success": true
+    },
+    {
+      "elapsed_ms": 961,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "zhipu-glm",
+      "source_name": "智谱 GLM",
+      "success": true
+    },
+    {
+      "elapsed_ms": 7987,
+      "error_type": null,
+      "item_count": 7,
+      "source_id": "minimax",
+      "source_name": "MiniMax",
+      "success": true
+    },
+    {
+      "elapsed_ms": 884,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "tencent-hunyuan",
+      "source_name": "腾讯混元",
+      "success": true
+    },
+    {
+      "elapsed_ms": 4105,
+      "error_type": null,
+      "item_count": 5,
+      "source_id": "volcengine-doubao",
+      "source_name": "豆包与火山方舟",
+      "success": true
+    },
+    {
+      "elapsed_ms": 2247,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "baidu-ernie",
+      "source_name": "百度文心",
+      "success": true
+    },
+    {
+      "elapsed_ms": 63196,
+      "error_type": null,
+      "item_count": 0,
+      "source_id": "reddit-ai",
+      "source_name": "Reddit AI 线索",
+      "success": true
+    },
+    {
+      "elapsed_ms": 369,
+      "error_type": null,
+      "item_count": 30,
+      "source_id": "sourcegraph-blog",
+      "source_name": "Sourcegraph Blog",
+      "success": true
+    },
+    {
+      "elapsed_ms": 208,
+      "error_type": null,
+      "item_count": 50,
+      "source_id": "cursor-changelog",
+      "source_name": "Cursor Changelog",
+      "success": true
+    },
+    {
+      "elapsed_ms": 138,
+      "error_type": null,
+      "item_count": 57,
+      "source_id": "ollama-blog",
+      "source_name": "Ollama Blog",
+      "success": true
+    },
+    {
+      "elapsed_ms": 290,
+      "error_type": null,
+      "item_count": 50,
+      "source_id": "producthunt-ai",
+      "source_name": "Product Hunt AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 390,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-blog-ai",
+      "source_name": "GitHub Blog AI",
+      "success": true
+    }
+  ]
+}
