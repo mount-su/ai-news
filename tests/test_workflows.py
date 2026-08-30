@@ -269,7 +269,7 @@ def test_daily_generate_captures_exit_then_persists_safe_data_before_propagating
     assert 'python -m ai_news generate "${args[@]}"' in command
     assert "set +e" in command
     assert 'generation_exit_code="$?"' in command
-    assert 'exit_code=$generation_exit_code' in command
+    assert "exit_code=$generation_exit_code" in command
     assert "$GITHUB_OUTPUT" in command
 
     commit_index = next(
@@ -283,9 +283,7 @@ def test_daily_generate_captures_exit_then_persists_safe_data_before_propagating
     assert commit_index < propagate_index
     propagate = steps[propagate_index]
     assert propagate["if"] == "${{ always() }}"
-    assert propagate["env"] == {
-        "GENERATION_EXIT_CODE": "${{ steps.generation.outputs.exit_code }}"
-    }
+    assert propagate["env"] == {"GENERATION_EXIT_CODE": "${{ steps.generation.outputs.exit_code }}"}
     assert 'exit "$GENERATION_EXIT_CODE"' in str(propagate["run"])
 
 
