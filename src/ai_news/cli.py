@@ -17,6 +17,8 @@ from ai_news.models import (
     EditorialLane,
     NewsItem,
     RawItem,
+    RunRecord,
+    RunStatus,
     SourceRun,
 )
 from ai_news.pipeline.normalize import to_candidate
@@ -27,7 +29,7 @@ from ai_news.pipeline.run import (
     PublicationThresholdError,
     run_daily,
 )
-from ai_news.storage import save_report
+from ai_news.storage import save_report, save_run_record
 
 _CONFIGURATION_ERROR = "configuration_error"
 _PIPELINE_ERROR = "pipeline_error"
@@ -55,6 +57,10 @@ def _parse_iso_date(value: str) -> date:
 
 def _shanghai_today() -> date:
     return datetime.now(ZoneInfo("Asia/Shanghai")).date()
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 def _historical_cutoff(run_date: date) -> datetime:
@@ -151,15 +157,32 @@ def _demo_report() -> DailyReport:
 
 
 def _generate(root: Path, run_date: date | None) -> int:
+    today = _shanghai_today()
+    effective_date = run_date or today
+    cutoff_at = (
+        _historical_cutoff(run_date) if run_date is not None and run_date < today else _utc_now()
+    )
     try:
         source_config = load_source_config(root / "sources/feeds.yaml")
         settings = load_settings()
     except Exception as error:
+        try:
+            save_run_record(
+                root,
+                RunRecord(
+                    date=effective_date,
+                    cutoff_at=cutoff_at,
+                    status=RunStatus.FAILED_BEFORE_PUBLISH,
+                    source_runs=[],
+                    safe_error_code="configuration_failed",
+                ),
+            )
+        except Exception as persistence_error:
+            _safe_error(_PIPELINE_ERROR, persistence_error)
+            return 4
         _safe_error(_CONFIGURATION_ERROR, error)
         return 2
 
-    today = _shanghai_today()
-    effective_date = run_date or today
     run_arguments: dict[str, object] = {
         "root": root,
         "run_date": effective_date,

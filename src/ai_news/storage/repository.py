@@ -21,17 +21,28 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from ai_news.models import DailyReport, NewsItem
+from ai_news.models import DailyReport, NewsItem, RunRecord
 
 _MARKDOWN_CONTROL_PATTERN = re.compile(r"([\\`*_[\]{}()#+.!|>\-])")
 _REPORT_TARGET_PATTERN = re.compile(
     r"^data/(?P<year>[0-9]{4})/(?P<month>[0-9]{2})/"
     r"(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2})\.json$"
 )
+_RUN_RECORD_TARGET_PATTERN = re.compile(
+    r"^data/runs/(?P<year>[0-9]{4})/(?P<month>[0-9]{2})/"
+    r"(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2})\.json$"
+)
 _TRANSACTION_JOURNAL_NAME = ".ai-news-transaction.json"
 _TRANSACTION_ID_FRAGMENT = r"(?P<transaction_id>[0-9a-f]{32})"
 _ARTIFACT_SUFFIX_FRAGMENT = r"(?P<suffix>tmp|bak|recover\.tmp)"
 _REPORT_ARTIFACT_PATTERN = re.compile(
+    r"^\.(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2})\.json\."
+    + _TRANSACTION_ID_FRAGMENT
+    + r"\."
+    + _ARTIFACT_SUFFIX_FRAGMENT
+    + r"$"
+)
+_RUN_RECORD_ARTIFACT_PATTERN = re.compile(
     r"^\.(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2})\.json\."
     + _TRANSACTION_ID_FRAGMENT
     + r"\."
@@ -88,9 +99,9 @@ class _JournalEntry(BaseModel):
 class _TransactionJournal(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    version: Literal["1.0"] = "1.0"
+    version: Literal["1.0", "2.0"] = "1.0"
     transaction_id: str = Field(pattern=r"^[0-9a-f]{32}$")
-    entries: list[_JournalEntry] = Field(min_length=3, max_length=3)
+    entries: list[_JournalEntry] = Field(min_length=3, max_length=4)
 
     @model_validator(mode="after")
     def require_fixed_transaction_paths(self) -> _TransactionJournal:
@@ -121,6 +132,8 @@ class _TransactionJournal(BaseModel):
             f"content/{report_date.isoformat()}.md",
             "data/index.json",
         ]
+        if self.version == "2.0":
+            expected_targets.append(_run_record_relative_path(report_date))
         if targets != expected_targets:
             raise ValueError("transaction targets must use the fixed storage paths")
 
@@ -156,6 +169,14 @@ def _report_relative_path(run_date: date) -> str:
 
 def _report_path(root: Path, run_date: date) -> Path:
     return root / _report_relative_path(run_date)
+
+
+def _run_record_relative_path(run_date: date) -> str:
+    return f"data/runs/{run_date:%Y/%m}/{run_date.isoformat()}.json"
+
+
+def _run_record_path(root: Path, run_date: date) -> Path:
+    return root / _run_record_relative_path(run_date)
 
 
 def _markdown_path(root: Path, run_date: date) -> Path:
@@ -422,6 +443,36 @@ def _write_artifact(root_boundary: Path, path: Path, content: bytes) -> None:
         raise
 
 
+def _write_private_atomic(root_boundary: Path, target: Path, content: bytes) -> None:
+    _require_storage_target(root_boundary, target)
+    _ensure_directory(root_boundary, target.parent)
+    _require_storage_target(root_boundary, target)
+    temporary = target.parent / f".{target.name}.{uuid4().hex}.tmp"
+    _require_within_root(root_boundary, temporary)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(temporary, flags, 0o600)
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "wb") as handle:
+            descriptor = None
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        _require_storage_target(root_boundary, target)
+        temporary.replace(target)
+        _fsync_directories(root_boundary, {target.parent})
+    except BaseException:
+        if descriptor is not None:
+            os.close(descriptor)
+        if temporary.is_file() and not temporary.is_symlink():
+            temporary.unlink(missing_ok=True)
+            _fsync_directories(root_boundary, {temporary.parent})
+        raise
+
+
 def _fsync_directories(root_boundary: Path, paths: set[Path]) -> None:
     for path in sorted(paths, key=str):
         _require_within_root(root_boundary, path)
@@ -505,6 +556,22 @@ def _collect_orphan_artifacts(root_boundary: Path) -> list[Path]:
                 continue
             for entry in _scan_directory(root_boundary, month_entry):
                 match = _REPORT_ARTIFACT_PATTERN.fullmatch(entry.name)
+                if match and _valid_artifact_date(
+                    match.group("date"),
+                    year=year_entry.name,
+                    month=month_entry.name,
+                ):
+                    candidates.append(_require_regular_orphan(root_boundary, entry))
+
+    run_records_directory = data_directory / "runs"
+    for year_entry in _scan_directory(root_boundary, run_records_directory):
+        if re.fullmatch(r"[0-9]{4}", year_entry.name) is None:
+            continue
+        for month_entry in _scan_directory(root_boundary, year_entry):
+            if re.fullmatch(r"[0-9]{2}", month_entry.name) is None:
+                continue
+            for entry in _scan_directory(root_boundary, month_entry):
+                match = _RUN_RECORD_ARTIFACT_PATTERN.fullmatch(entry.name)
                 if match and _valid_artifact_date(
                     match.group("date"),
                     year=year_entry.name,
@@ -683,6 +750,8 @@ def _commit_files(
     root: Path,
     root_boundary: Path,
     target_contents: list[tuple[Path, bytes]],
+    *,
+    journal_version: Literal["1.0", "2.0"] = "1.0",
 ) -> None:
     transaction_id = uuid4().hex
     prepared_writes: list[_PreparedWrite] = []
@@ -721,6 +790,7 @@ def _commit_files(
 
         _fsync_directories(root_boundary, directories)
         journal = _TransactionJournal(
+            version=journal_version,
             transaction_id=transaction_id,
             entries=[
                 _JournalEntry(
@@ -777,11 +847,17 @@ def _save_report_locked(
     root: Path,
     root_boundary: Path,
     report: DailyReport,
+    published_record: RunRecord | None = None,
 ) -> None:
     report_target = _report_path(root, report.date)
     markdown_target = _markdown_path(root, report.date)
     index_target = _index_path(root)
-    for target in (report_target, markdown_target, index_target):
+    run_record_target = (
+        _run_record_path(root, report.date) if published_record is not None else None
+    )
+    for target in (report_target, markdown_target, index_target, run_record_target):
+        if target is None:
+            continue
         _require_storage_target(root_boundary, target)
 
     _recover_pending_transaction(root, root_boundary)
@@ -806,14 +882,23 @@ def _save_report_locked(
     report_content = _json_text(report.model_dump(mode="json")).encode("utf-8")
     markdown_content = _render_markdown(report).encode("utf-8")
     index_content = _json_text(index.model_dump(mode="json")).encode("utf-8")
+    target_contents = [
+        (report_target, report_content),
+        (markdown_target, markdown_content),
+        (index_target, index_content),
+    ]
+    if published_record is not None and run_record_target is not None:
+        target_contents.append(
+            (
+                run_record_target,
+                _json_text(published_record.model_dump(mode="json")).encode("utf-8"),
+            )
+        )
     _commit_files(
         root,
         root_boundary,
-        [
-            (report_target, report_content),
-            (markdown_target, markdown_content),
-            (index_target, index_content),
-        ],
+        target_contents,
+        journal_version="2.0" if published_record is not None else "1.0",
     )
 
 
@@ -825,6 +910,88 @@ def save_report(root: Path, report: DailyReport) -> None:
         if _root_boundary(root) != root_boundary:
             raise ValueError("storage root changed while acquiring its lock")
         _save_report_locked(root, root_boundary, report)
+
+
+def save_publication(root: Path, report: DailyReport, record: RunRecord) -> None:
+    root = Path(root)
+    report = DailyReport.model_validate_json(report.model_dump_json())
+    record = RunRecord.model_validate_json(record.model_dump_json())
+    if record.date != report.date:
+        raise ValueError("published run record date must match report date")
+    if record.status.value != "published":
+        raise ValueError("publication requires a published run record")
+    if record.source_runs != report.source_runs:
+        raise ValueError("published run record source_runs must match report source_runs")
+
+    root_boundary = _root_boundary(root)
+    with _repository_lock(root_boundary):
+        if _root_boundary(root) != root_boundary:
+            raise ValueError("storage root changed while acquiring its lock")
+        _save_report_locked(root, root_boundary, report, published_record=record)
+
+
+def save_run_record(root: Path, record: RunRecord) -> None:
+    root = Path(root)
+    record = RunRecord.model_validate_json(record.model_dump_json())
+    root_boundary = _root_boundary(root)
+    with _repository_lock(root_boundary):
+        if _root_boundary(root) != root_boundary:
+            raise ValueError("storage root changed while acquiring its lock")
+        _recover_pending_transaction(root, root_boundary)
+        target = _run_record_path(root, record.date)
+        _write_private_atomic(
+            root_boundary,
+            target,
+            _json_text(record.model_dump(mode="json")).encode("utf-8"),
+        )
+
+
+def load_run_records(root: Path) -> list[RunRecord]:
+    root = Path(root)
+    root_boundary = _root_boundary(root)
+    with _repository_lock(root_boundary):
+        if _root_boundary(root) != root_boundary:
+            raise ValueError("storage root changed while acquiring its lock")
+        _recover_pending_transaction(root, root_boundary)
+        records_root = _require_storage_target(root_boundary, root / "data/runs")
+        if not records_root.exists():
+            return []
+        if not records_root.is_dir():
+            raise ValueError("run records path must be a directory")
+
+        records: list[RunRecord] = []
+        for year_directory in sorted(records_root.iterdir()):
+            if year_directory.is_symlink() or not year_directory.is_dir():
+                raise ValueError("run record year path must be a regular directory")
+            if re.fullmatch(r"[0-9]{4}", year_directory.name) is None:
+                raise ValueError("run record year path is invalid")
+            _require_within_root(root_boundary, year_directory)
+            for month_directory in sorted(year_directory.iterdir()):
+                if month_directory.is_symlink() or not month_directory.is_dir():
+                    raise ValueError("run record month path must be a regular directory")
+                if re.fullmatch(r"[0-9]{2}", month_directory.name) is None:
+                    raise ValueError("run record month path is invalid")
+                _require_within_root(root_boundary, month_directory)
+                for path in sorted(month_directory.iterdir()):
+                    relative_path = path.relative_to(root).as_posix()
+                    match = _RUN_RECORD_TARGET_PATTERN.fullmatch(relative_path)
+                    if match is None or path.is_symlink() or not path.is_file():
+                        raise ValueError("run record path is invalid")
+                    _require_within_root(root_boundary, path)
+                    try:
+                        path_date = date.fromisoformat(match.group("date"))
+                    except ValueError as error:
+                        raise ValueError("run record path date is invalid") from error
+                    if (
+                        match.group("year") != f"{path_date:%Y}"
+                        or match.group("month") != f"{path_date:%m}"
+                    ):
+                        raise ValueError("run record path does not match its date")
+                    record = RunRecord.model_validate_json(path.read_bytes())
+                    if record.date != path_date:
+                        raise ValueError("run record path does not match record date")
+                    records.append(record)
+        return sorted(records, key=lambda record: record.date, reverse=True)
 
 
 def load_reports(root: Path) -> list[DailyReport]:

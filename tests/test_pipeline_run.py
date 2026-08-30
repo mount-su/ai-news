@@ -16,6 +16,8 @@ from ai_news.models import (
     DailyReport,
     EditorialLane,
     RawItem,
+    RunRecord,
+    RunStatus,
     Settings,
     SourceConfig,
     SourceRun,
@@ -24,11 +26,11 @@ from ai_news.models import (
 from ai_news.pipeline.run import (
     AnalysisPipelineError,
     CollectionPipelineError,
+    PersistencePipelineError,
     PublicationThresholdError,
     ReportValidationError,
     run_daily,
 )
-from ai_news.storage import save_report
 
 RUN_DATE = date(2026, 7, 26)
 NOW = datetime(2026, 7, 26, 12, tzinfo=UTC)
@@ -199,7 +201,8 @@ def _run(**kwargs: Any) -> DailyReport:
         "now": NOW,
         "model": "test-model",
         "history_loader": lambda _root, _date, _days: set(),
-        "report_saver": lambda _root, _report: None,
+        "publication_saver": lambda _root, _report, _record: None,
+        "run_record_saver": lambda _root, _record: None,
     }
     defaults.update(kwargs)
     return asyncio.run(run_daily(**defaults))
@@ -847,7 +850,11 @@ def test_seven_valid_items_build_and_persist_schema_1_3_report(tmp_path: Path) -
     report_path = tmp_path / "data/2026/07/2026-07-26.json"
     markdown_path = tmp_path / "content/2026-07-26.md"
     index_path = tmp_path / "data/index.json"
+    run_record_path = tmp_path / "data/runs/2026/07/2026-07-26.json"
     assert DailyReport.model_validate_json(report_path.read_bytes()) == report
+    stored_record = RunRecord.model_validate_json(run_record_path.read_bytes())
+    assert stored_record.status is RunStatus.PUBLISHED
+    assert stored_record.source_runs == report.source_runs
     assert report.schema_version == "1.3"
     assert len(report.items) == 7
     assert all(item.source_id is not None for item in report.items)
@@ -939,10 +946,221 @@ def test_empty_model_selection_publishes_no_report() -> None:
             source_config=SourceConfig(sources=[source]),
             collector=_collector({source.id: items}),
             analyzer=_Analyzer(lambda _candidates: {}),
-            report_saver=lambda _root, report: saves.append(report),
+            publication_saver=lambda _root, report, _record: saves.append(report),
         )
 
     assert saves == []
+
+
+def test_published_run_uses_one_atomic_publication_saver_with_matching_record(
+    tmp_path: Path,
+) -> None:
+    source = _source(0)
+    source_config, collector = _with_filler_sources(
+        source,
+        [_raw(index, source=source) for index in range(3)],
+    )
+    publications: list[tuple[DailyReport, RunRecord]] = []
+    standalone_records: list[RunRecord] = []
+
+    report = asyncio.run(
+        run_daily(
+            root=tmp_path,
+            run_date=RUN_DATE,
+            source_config=source_config,
+            collector=collector,
+            analyzer=_Analyzer(),
+            now=NOW,
+            model="test-model",
+            history_loader=lambda _root, _date, _days: set(),
+            publication_saver=(
+                lambda _root, saved_report, record: publications.append((saved_report, record))
+            ),
+            run_record_saver=lambda _root, record: standalone_records.append(record),
+        )
+    )
+
+    assert len(publications) == 1
+    saved_report, record = publications[0]
+    assert saved_report == report
+    assert record == RunRecord(
+        date=RUN_DATE,
+        cutoff_at=NOW,
+        status=RunStatus.PUBLISHED,
+        source_runs=report.source_runs,
+        safe_error_code="none",
+    )
+    assert standalone_records == []
+
+
+def test_no_candidates_persist_diagnostics_with_zero_selected_before_threshold(
+    tmp_path: Path,
+) -> None:
+    source = _source(0)
+    records: list[RunRecord] = []
+
+    with pytest.raises(PublicationThresholdError, match="no eligible candidates"):
+        asyncio.run(
+            run_daily(
+                root=tmp_path,
+                run_date=RUN_DATE,
+                source_config=SourceConfig(sources=[source]),
+                collector=_collector(
+                    {
+                        source.id: [
+                            _raw(
+                                1,
+                                source=source,
+                                published_at=NOW - timedelta(hours=121),
+                            )
+                        ]
+                    }
+                ),
+                analyzer=_Analyzer(lambda _items: pytest.fail("analyzer must not run")),
+                now=NOW,
+                model="test-model",
+                history_loader=lambda _root, _date, _days: set(),
+                publication_saver=lambda *_args: pytest.fail("must not publish"),
+                run_record_saver=lambda _root, record: records.append(record),
+            )
+        )
+
+    assert len(records) == 1
+    record = records[0]
+    assert record.status is RunStatus.NO_ELIGIBLE_CONTENT
+    assert record.safe_error_code == "no_eligible_candidates"
+    assert record.source_runs[0].recent_count == 0
+    assert record.source_runs[0].candidate_count == 0
+    assert record.source_runs[0].selected_count == 0
+
+
+def test_analysis_failure_persists_candidates_but_leaves_selected_unknown(
+    tmp_path: Path,
+) -> None:
+    source = _source(0)
+    source_config, collector = _with_filler_sources(
+        source,
+        [_raw(index, source=source) for index in range(3)],
+    )
+    records: list[RunRecord] = []
+
+    class _BrokenAnalyzer:
+        async def analyze(self, _items: list[Any]) -> dict[str, Analysis]:
+            raise RuntimeError("secret analyzer response")
+
+    with pytest.raises(AnalysisPipelineError):
+        asyncio.run(
+            run_daily(
+                root=tmp_path,
+                run_date=RUN_DATE,
+                source_config=source_config,
+                collector=collector,
+                analyzer=_BrokenAnalyzer(),
+                now=NOW,
+                model="test-model",
+                history_loader=lambda _root, _date, _days: set(),
+                publication_saver=lambda *_args: pytest.fail("must not publish"),
+                run_record_saver=lambda _root, record: records.append(record),
+            )
+        )
+
+    assert len(records) == 1
+    record = records[0]
+    assert record.status is RunStatus.FAILED_BEFORE_PUBLISH
+    assert record.safe_error_code == "analysis_failed"
+    assert sum(run.candidate_count or 0 for run in record.source_runs) > 0
+    assert all(run.selected_count is None for run in record.source_runs)
+
+
+def test_empty_validated_analysis_records_zero_selected_not_unknown(tmp_path: Path) -> None:
+    source = _source(0)
+    source_config, collector = _with_filler_sources(
+        source,
+        [_raw(index, source=source) for index in range(3)],
+    )
+    records: list[RunRecord] = []
+
+    with pytest.raises(PublicationThresholdError, match="no valid editorial items"):
+        asyncio.run(
+            run_daily(
+                root=tmp_path,
+                run_date=RUN_DATE,
+                source_config=source_config,
+                collector=collector,
+                analyzer=_Analyzer(lambda _items: {}),
+                now=NOW,
+                model="test-model",
+                history_loader=lambda _root, _date, _days: set(),
+                publication_saver=lambda *_args: pytest.fail("must not publish"),
+                run_record_saver=lambda _root, record: records.append(record),
+            )
+        )
+
+    assert records[0].status is RunStatus.NO_ELIGIBLE_CONTENT
+    assert all(run.selected_count == 0 for run in records[0].source_runs)
+
+
+def test_publication_failure_persists_safe_failure_record_then_raises(
+    tmp_path: Path,
+) -> None:
+    source = _source(0)
+    source_config, collector = _with_filler_sources(
+        source,
+        [_raw(index, source=source) for index in range(3)],
+    )
+    records: list[RunRecord] = []
+
+    def broken_publication_saver(
+        _root: Path,
+        _report: DailyReport,
+        _record: RunRecord,
+    ) -> None:
+        raise OSError("secret persistence path")
+
+    with pytest.raises(PersistencePipelineError, match="report persistence failed"):
+        asyncio.run(
+            run_daily(
+                root=tmp_path,
+                run_date=RUN_DATE,
+                source_config=source_config,
+                collector=collector,
+                analyzer=_Analyzer(),
+                now=NOW,
+                model="test-model",
+                history_loader=lambda _root, _date, _days: set(),
+                publication_saver=broken_publication_saver,
+                run_record_saver=lambda _root, record: records.append(record),
+            )
+        )
+
+    assert len(records) == 1
+    assert records[0].status is RunStatus.FAILED_BEFORE_PUBLISH
+    assert records[0].safe_error_code == "persistence_failed"
+
+
+def test_run_record_persistence_failure_overrides_no_content_success_exit(
+    tmp_path: Path,
+) -> None:
+    source = _source(0)
+
+    def broken_record_saver(_root: Path, _record: RunRecord) -> None:
+        raise OSError("secret record path")
+
+    with pytest.raises(PersistencePipelineError, match="run record persistence failed"):
+        asyncio.run(
+            run_daily(
+                root=tmp_path,
+                run_date=RUN_DATE,
+                source_config=SourceConfig(sources=[source]),
+                collector=_collector({source.id: []}),
+                analyzer=_Analyzer(),
+                now=NOW,
+                model="test-model",
+                history_loader=lambda _root, _date, _days: set(),
+                publication_saver=lambda *_args: pytest.fail("must not publish"),
+                run_record_saver=broken_record_saver,
+            )
+        )
 
 
 def test_final_seven_items_are_stably_sorted() -> None:
@@ -1135,7 +1353,7 @@ def test_non_strict_analysis_payloads_are_discarded_without_saving(
             source_config=source_config,
             collector=collector,
             analyzer=_Analyzer(result),
-            report_saver=lambda _root, report: saves.append(report),
+            publication_saver=lambda _root, report, _record: saves.append(report),
         )
 
     assert saves == []
@@ -1157,7 +1375,7 @@ def test_unknown_analysis_id_fails_the_whole_run_without_saving() -> None:
             source_config=source_config,
             collector=collector,
             analyzer=_Analyzer(result),
-            report_saver=lambda _root, report: saves.append(report),
+            publication_saver=lambda _root, report, _record: saves.append(report),
         )
 
     assert saves == []
@@ -1201,7 +1419,7 @@ def test_report_validation_failure_happens_before_save() -> None:
             collector=collector,
             analyzer=_Analyzer(),
             model=" ",
-            report_saver=lambda _root, report: saves.append(report),
+            publication_saver=lambda _root, report, _record: saves.append(report),
         )
 
     assert saves == []
@@ -1666,11 +1884,12 @@ def test_more_than_1500_unique_items_stay_bounded_and_order_independent(
     ]
 
 
-def test_client_exit_failure_is_safe_and_prevents_all_persistence(
+def test_client_exit_failure_is_safe_and_persists_only_failure_record(
     tmp_path: Path,
 ) -> None:
     source = _source(0)
-    saves: list[DailyReport] = []
+    publications: list[DailyReport] = []
+    records: list[RunRecord] = []
 
     class _FailingExitContext:
         async def __aenter__(self) -> object:
@@ -1679,9 +1898,8 @@ def test_client_exit_failure_is_safe_and_prevents_all_persistence(
         async def __aexit__(self, *_args: object) -> None:
             raise RuntimeError("client-exit-secret?token=value")
 
-    def saver(root: Path, report: DailyReport) -> None:
-        saves.append(report)
-        save_report(root, report)
+    def saver(_root: Path, report: DailyReport, _record: RunRecord) -> None:
+        publications.append(report)
 
     source_config, collector = _with_filler_sources(
         source,
@@ -1694,12 +1912,16 @@ def test_client_exit_failure_is_safe_and_prevents_all_persistence(
             collector=collector,
             analyzer=_Analyzer(),
             client_factory=lambda *, timeout: _FailingExitContext(),
-            report_saver=saver,
+            publication_saver=saver,
+            run_record_saver=lambda _root, record: records.append(record),
         )
 
     assert str(exit_error.value) == "client initialization failed"
     assert "secret" not in str(exit_error.value)
-    assert saves == []
+    assert publications == []
+    assert len(records) == 1
+    assert records[0].status is RunStatus.FAILED_BEFORE_PUBLISH
+    assert records[0].safe_error_code == "collection_failed"
     assert not (tmp_path / "data/2026/07/2026-07-26.json").exists()
     assert not (tmp_path / "content/2026-07-26.md").exists()
     assert not (tmp_path / "data/index.json").exists()
@@ -1709,6 +1931,7 @@ def test_report_is_saved_once_only_after_normal_client_exit(tmp_path: Path) -> N
     source = _source(0)
     events: list[str] = []
     saves: list[DailyReport] = []
+    records: list[RunRecord] = []
 
     class _SuccessfulContext:
         async def __aenter__(self) -> object:
@@ -1718,9 +1941,10 @@ def test_report_is_saved_once_only_after_normal_client_exit(tmp_path: Path) -> N
         async def __aexit__(self, *_args: object) -> None:
             events.append("exit")
 
-    def saver(_root: Path, report: DailyReport) -> None:
+    def saver(_root: Path, report: DailyReport, record: RunRecord) -> None:
         events.append("save")
         saves.append(report)
+        records.append(record)
 
     source_config, collector = _with_filler_sources(
         source,
@@ -1732,8 +1956,9 @@ def test_report_is_saved_once_only_after_normal_client_exit(tmp_path: Path) -> N
         collector=collector,
         analyzer=_Analyzer(),
         client_factory=lambda *, timeout: _SuccessfulContext(),
-        report_saver=saver,
+        publication_saver=saver,
     )
 
     assert events == ["enter", "exit", "save"]
     assert saves == [report]
+    assert records[0].status is RunStatus.PUBLISHED

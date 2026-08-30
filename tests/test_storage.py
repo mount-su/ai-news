@@ -20,10 +20,18 @@ from ai_news.models import (
     DailyReport,
     NewsItem,
     RawItem,
+    RunRecord,
+    RunStatus,
     SourceRun,
 )
 from ai_news.pipeline.normalize import to_candidate
-from ai_news.storage import load_history_urls, load_reports, save_report
+from ai_news.storage import (
+    load_history_urls,
+    load_reports,
+    load_run_records,
+    save_publication,
+    save_report,
+)
 from ai_news.storage import repository as storage_repository
 
 RUN_DATE = date(2026, 7, 26)
@@ -60,6 +68,53 @@ def _run_crashing_save(root: Path, report: DailyReport) -> None:
         process.join(timeout=5)
         pytest.fail("crashing save process did not exit")
     assert process.exitcode == 91
+
+
+def _crash_after_publication_replace(
+    root_text: str,
+    report_json: str,
+    record_json: str,
+    crash_after: int,
+) -> None:
+    root = Path(root_text)
+    report = DailyReport.model_validate_json(report_json)
+    record = RunRecord.model_validate_json(record_json)
+    targets = set(_publication_target_paths(root, report.date))
+    original_replace = Path.replace
+    replacement_count = 0
+
+    def crash_after_selected_replace(self: Path, target: Path) -> Path:
+        nonlocal replacement_count
+        result = original_replace(self, target)
+        if target in targets:
+            replacement_count += 1
+            if replacement_count == crash_after:
+                os._exit(95)
+        return result
+
+    Path.replace = crash_after_selected_replace
+    save_publication(root, report, record)
+
+
+def _run_crashing_publication(
+    root: Path,
+    report: DailyReport,
+    record: RunRecord,
+    crash_after: int,
+) -> None:
+    context = multiprocessing.get_context("fork")
+    process = context.Process(
+        target=_crash_after_publication_replace,
+        args=(
+            str(root),
+            report.model_dump_json(),
+            record.model_dump_json(),
+            crash_after,
+        ),
+    )
+    process.start()
+    _join_process(process)
+    assert process.exitcode == 95
 
 
 def _coordinated_process_save(
@@ -217,6 +272,26 @@ def _target_paths(root: Path, run_date: date = RUN_DATE) -> tuple[Path, Path, Pa
         root / f"data/{run_date:%Y/%m}/{run_date.isoformat()}.json",
         root / f"content/{run_date.isoformat()}.md",
         root / "data/index.json",
+    )
+
+
+def _publication_target_paths(
+    root: Path,
+    run_date: date = RUN_DATE,
+) -> tuple[Path, Path, Path, Path]:
+    return (
+        *_target_paths(root, run_date),
+        root / f"data/runs/{run_date:%Y/%m}/{run_date.isoformat()}.json",
+    )
+
+
+def _published_record(report: DailyReport) -> RunRecord:
+    return RunRecord(
+        date=report.date,
+        cutoff_at=report.generated_at,
+        status=RunStatus.PUBLISHED,
+        source_runs=report.source_runs,
+        safe_error_code="none",
     )
 
 
@@ -609,6 +684,97 @@ def test_save_report_writes_utf8_valid_json_markdown_and_index(tmp_path: Path) -
             }
         ]
     }
+    assert not _repository_artifacts(tmp_path)
+
+
+def test_save_publication_atomically_writes_report_markdown_index_and_run_record(
+    tmp_path: Path,
+) -> None:
+    report = _report()
+    record = _published_record(report)
+
+    save_publication(tmp_path, report, record)
+
+    report_path, markdown_path, index_path, record_path = _publication_target_paths(tmp_path)
+    assert DailyReport.model_validate_json(report_path.read_bytes()) == report
+    assert markdown_path.is_file()
+    assert json.loads(index_path.read_text(encoding="utf-8"))["reports"][0]["item_count"] == 4
+    assert RunRecord.model_validate_json(record_path.read_bytes()) == record
+    assert load_reports(tmp_path) == [report]
+    assert load_run_records(tmp_path) == [record]
+    assert not _repository_artifacts(tmp_path)
+
+
+def test_save_publication_rejects_mismatched_or_non_published_record(tmp_path: Path) -> None:
+    report = _report()
+    mismatched = _published_record(_report(date(2026, 7, 25)))
+    failed = RunRecord(
+        date=report.date,
+        cutoff_at=report.generated_at,
+        status=RunStatus.FAILED_BEFORE_PUBLISH,
+        source_runs=report.source_runs,
+        safe_error_code="analysis_failed",
+    )
+
+    with pytest.raises(ValueError, match="date"):
+        save_publication(tmp_path, report, mismatched)
+    with pytest.raises(ValueError, match="published"):
+        save_publication(tmp_path, report, failed)
+
+    assert all(not path.exists() for path in _publication_target_paths(tmp_path))
+
+
+@pytest.mark.parametrize("failure_number", [1, 2, 3, 4])
+def test_save_publication_rolls_back_all_four_targets_when_replace_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_number: int,
+) -> None:
+    old_report = _report(slugs=("old",), model="old-model")
+    old_record = _published_record(old_report)
+    save_publication(tmp_path, old_report, old_record)
+    targets = _publication_target_paths(tmp_path)
+    old_bytes = {path: path.read_bytes() for path in targets}
+    new_report = _report(slugs=("new", "items"), model="new-model")
+    new_record = _published_record(new_report)
+    original_replace = Path.replace
+    replacement_count = 0
+
+    def fail_selected_replace(self: Path, target: Path) -> Path:
+        nonlocal replacement_count
+        if target in targets:
+            replacement_count += 1
+            if replacement_count == failure_number:
+                raise OSError("simulated publication failure")
+        return original_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", fail_selected_replace)
+
+    with pytest.raises(OSError, match="simulated publication failure"):
+        save_publication(tmp_path, new_report, new_record)
+
+    assert {path: path.read_bytes() for path in targets} == old_bytes
+    assert not _repository_artifacts(tmp_path)
+
+
+@pytest.mark.parametrize("crash_after", [1, 2, 3, 4])
+def test_load_recovers_version_two_publication_crash_across_all_four_replacements(
+    tmp_path: Path,
+    crash_after: int,
+) -> None:
+    old_report = _report(slugs=("old",), model="old-model")
+    old_record = _published_record(old_report)
+    save_publication(tmp_path, old_report, old_record)
+    old_bytes = {path: path.read_bytes() for path in _publication_target_paths(tmp_path)}
+    crashing_report = _report(slugs=("crash",), model="crash-model")
+    crashing_record = _published_record(crashing_report)
+
+    _run_crashing_publication(tmp_path, crashing_report, crashing_record, crash_after)
+
+    assert (tmp_path / TRANSACTION_JOURNAL).is_file()
+    assert load_reports(tmp_path) == [old_report]
+    assert load_run_records(tmp_path) == [old_record]
+    assert {path: path.read_bytes() for path in _publication_target_paths(tmp_path)} == old_bytes
     assert not _repository_artifacts(tmp_path)
 
 

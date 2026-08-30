@@ -38,6 +38,8 @@ from ai_news.models import (
     DailyReport,
     NewsItem,
     RawItem,
+    RunRecord,
+    RunStatus,
     Settings,
     SourceConfig,
     SourceRole,
@@ -51,7 +53,11 @@ from ai_news.pipeline.rank import (
     select_balanced_candidates,
     select_diversity_preserving_candidates,
 )
-from ai_news.storage import load_history_urls, save_report
+from ai_news.storage import (
+    load_history_urls,
+    save_publication,
+    save_run_record,
+)
 
 _COLLECTION_CONCURRENCY = 6
 _DEDUPLICATION_LIMIT = 500
@@ -73,6 +79,35 @@ class _PreparedCandidates:
     new_counts: Mapping[str, int]
     eligible_counts: Mapping[str, int]
     candidate_counts: Mapping[str, int]
+
+
+@dataclass
+class _RunState:
+    source_runs: tuple[SourceRun, ...] = ()
+    prepared: _PreparedCandidates | None = None
+    selected_counts: Mapping[str, int] | None = None
+
+    def source_run_snapshot(self) -> list[SourceRun]:
+        if self.prepared is None:
+            return list(self.source_runs)
+        selected_counts = self.selected_counts
+        return [
+            source_run.with_diagnostics(
+                recent_count=self.prepared.recent_counts.get(source_run.source_id, 0),
+                new_count=self.prepared.new_counts.get(source_run.source_id, 0),
+                eligible_count=self.prepared.eligible_counts.get(source_run.source_id, 0),
+                candidate_count=self.prepared.candidate_counts.get(source_run.source_id, 0),
+                selected_count=(
+                    selected_counts.get(source_run.source_id, 0)
+                    if selected_counts is not None
+                    else None
+                ),
+                latest_published_at=self.prepared.latest_by_source.get(source_run.source_id),
+            )
+            if source_run.success
+            else source_run
+            for source_run in self.source_runs
+        ]
 
 
 class PipelineError(RuntimeError):
@@ -140,7 +175,8 @@ class ClientFactory(Protocol):
 
 
 HistoryLoader = Callable[[Path, date, int], set[str]]
-ReportSaver = Callable[[Path, DailyReport], None]
+PublicationSaver = Callable[[Path, DailyReport, RunRecord], None]
+RunRecordSaver = Callable[[Path, RunRecord], None]
 
 
 def _utc_now() -> datetime:
@@ -503,6 +539,24 @@ def _validate_editorial_distribution(
         raise ReportValidationError("editorial distribution invalid")
 
 
+def _safe_run_error_code(error: PipelineError) -> str:
+    if isinstance(error, PublicationThresholdError):
+        return "no_eligible_candidates"
+    if isinstance(error, ConfigurationPipelineError):
+        return "configuration_failed"
+    if isinstance(error, CollectionPipelineError):
+        return "no_healthy_sources" if str(error) == "no healthy sources" else "collection_failed"
+    if isinstance(error, DataPipelineError):
+        return "candidate_preparation_failed"
+    if isinstance(error, AnalysisPipelineError):
+        return "analysis_failed"
+    if isinstance(error, ReportValidationError):
+        return "report_validation_failed"
+    if isinstance(error, PersistencePipelineError):
+        return "persistence_failed"
+    return "collection_failed"
+
+
 async def _run_with_client(
     *,
     client: httpx.AsyncClient,
@@ -516,6 +570,7 @@ async def _run_with_client(
     model: str,
     monotonic: Callable[[], float],
     history_loader: HistoryLoader,
+    state: _RunState,
 ) -> DailyReport:
     if collector is None:
         reddit_allowed_domains = frozenset(
@@ -555,17 +610,20 @@ async def _run_with_client(
         )
     )
     source_runs = [source_run for source_run, _ in collection_results]
+    state.source_runs = tuple(source_runs)
     if not any(source_run.success for source_run in source_runs):
         raise CollectionPipelineError("no healthy sources")
 
     try:
         historical_urls = history_loader(root, run_date, 30)
         prepared = _prepare_collected_candidates(collection_results, historical_urls, now)
+        state.prepared = prepared
     except Exception:
         raise DataPipelineError("candidate preparation failed") from None
 
     selected = list(prepared.selected)
     if not selected:
+        state.selected_counts = MappingProxyType({})
         raise PublicationThresholdError("no eligible candidates")
 
     selected_analyzer = analyzer
@@ -593,22 +651,11 @@ async def _run_with_client(
         raise AnalysisPipelineError("analysis failed") from None
     analyses = _validated_analyses(raw_analyses, selected)
     items = _build_items(selected, analyses)
-    _validate_editorial_distribution(items, selected)
     candidate_by_id = {candidate.id: candidate for candidate in selected}
     selected_counts = Counter(candidate_by_id[item.id].raw.source_id for item in items)
-    source_runs = [
-        source_run.with_diagnostics(
-            recent_count=prepared.recent_counts.get(source_run.source_id, 0),
-            new_count=prepared.new_counts.get(source_run.source_id, 0),
-            eligible_count=prepared.eligible_counts.get(source_run.source_id, 0),
-            candidate_count=prepared.candidate_counts.get(source_run.source_id, 0),
-            selected_count=selected_counts[source_run.source_id],
-            latest_published_at=prepared.latest_by_source.get(source_run.source_id),
-        )
-        if source_run.success
-        else source_run
-        for source_run in source_runs
-    ]
+    state.selected_counts = MappingProxyType(dict(selected_counts))
+    _validate_editorial_distribution(items, selected)
+    source_runs = state.source_run_snapshot()
 
     try:
         report = DailyReport(
@@ -641,9 +688,11 @@ async def run_daily(
     client_factory: ClientFactory | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     history_loader: HistoryLoader = load_history_urls,
-    report_saver: ReportSaver = save_report,
+    publication_saver: PublicationSaver = save_publication,
+    run_record_saver: RunRecordSaver = save_run_record,
 ) -> DailyReport:
-    """Collect, analyze, validate, and atomically persist one daily report."""
+    """Collect, analyze, and atomically persist a report with its run outcome."""
+    state = _RunState()
     try:
         normalized_now = ensure_utc(now if now is not None else clock())
         validated_config = SourceConfig.model_validate(source_config)
@@ -671,15 +720,57 @@ async def run_daily(
                 model=selected_model,
                 monotonic=monotonic,
                 history_loader=history_loader,
+                state=state,
             )
-    except PipelineError:
-        raise
+    except PipelineError as error:
+        pipeline_error = error
     except Exception:
-        raise CollectionPipelineError("client initialization failed") from None
+        pipeline_error = CollectionPipelineError("client initialization failed")
+    else:
+        pipeline_error = None
+
+    if pipeline_error is not None:
+        safe_error_code = _safe_run_error_code(pipeline_error)
+        status = (
+            RunStatus.NO_ELIGIBLE_CONTENT
+            if isinstance(pipeline_error, PublicationThresholdError)
+            else RunStatus.FAILED_BEFORE_PUBLISH
+        )
+        record = RunRecord(
+            date=run_date,
+            cutoff_at=normalized_now,
+            status=status,
+            source_runs=state.source_run_snapshot(),
+            safe_error_code=safe_error_code,
+        )
+        try:
+            run_record_saver(Path(root), record)
+        except Exception:
+            raise PersistencePipelineError("run record persistence failed") from None
+        raise pipeline_error
+
+    published_record = RunRecord(
+        date=run_date,
+        cutoff_at=normalized_now,
+        status=RunStatus.PUBLISHED,
+        source_runs=report.source_runs,
+        safe_error_code="none",
+    )
 
     try:
-        report_saver(Path(root), report)
+        publication_saver(Path(root), report, published_record)
     except Exception:
+        failed_record = RunRecord(
+            date=run_date,
+            cutoff_at=normalized_now,
+            status=RunStatus.FAILED_BEFORE_PUBLISH,
+            source_runs=state.source_run_snapshot(),
+            safe_error_code="persistence_failed",
+        )
+        try:
+            run_record_saver(Path(root), failed_record)
+        except Exception:
+            raise PersistencePipelineError("run record persistence failed") from None
         raise PersistencePipelineError("report persistence failed") from None
     return report
 

@@ -11,9 +11,9 @@ from typing import Any
 import pytest
 
 from ai_news import cli
-from ai_news.models import Category, Settings, SourceConfig, SourceSpec
+from ai_news.models import Category, RunStatus, Settings, SourceConfig, SourceSpec
 from ai_news.pipeline.run import AnalysisPipelineError, PublicationThresholdError
-from ai_news.storage import load_reports
+from ai_news.storage import load_reports, load_run_records
 
 RUN_DATE = date(2026, 7, 26)
 
@@ -125,6 +125,64 @@ def test_generate_does_not_override_collection_clock_for_current_date(
 
     assert cli.main(["generate", "--date", RUN_DATE.isoformat(), "--root", str(tmp_path)]) == 0
     assert "now" not in run_arguments[0]
+
+
+def test_generate_configuration_failure_persists_safe_historical_run_record(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "_shanghai_today", lambda: date(2026, 8, 30))
+    monkeypatch.setattr(
+        cli,
+        "load_source_config",
+        lambda _path: (_ for _ in ()).throw(ValueError("secret source config")),
+    )
+
+    result = cli.main(["generate", "--date", RUN_DATE.isoformat(), "--root", str(tmp_path)])
+
+    assert result == 2
+    assert capsys.readouterr().err == "configuration_error: Error\n"
+    records = load_run_records(tmp_path)
+    assert len(records) == 1
+    assert records[0].date == RUN_DATE
+    assert records[0].cutoff_at == datetime(
+        2026,
+        7,
+        26,
+        15,
+        59,
+        59,
+        999999,
+        tzinfo=UTC,
+    )
+    assert records[0].status is RunStatus.FAILED_BEFORE_PUBLISH
+    assert records[0].safe_error_code == "configuration_failed"
+    assert records[0].source_runs == []
+
+
+def test_generate_configuration_record_failure_returns_safe_pipeline_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "_shanghai_today", lambda: RUN_DATE)
+    monkeypatch.setattr(cli, "_utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(
+        cli,
+        "load_settings",
+        lambda: (_ for _ in ()).throw(ValueError("secret settings")),
+    )
+    monkeypatch.setattr(
+        cli,
+        "save_run_record",
+        lambda *_args: (_ for _ in ()).throw(OSError("secret storage")),
+    )
+
+    result = cli.main(["generate", "--root", str(tmp_path)])
+
+    assert result == 4
+    assert capsys.readouterr().err == "pipeline_error: Error\n"
 
 
 def test_invalid_iso_date_is_rejected_by_argparse_without_echoing_value(

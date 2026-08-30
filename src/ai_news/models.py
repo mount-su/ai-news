@@ -61,6 +61,12 @@ class SourceRole(StrEnum):
     DISCOVERY = "discovery"
 
 
+class RunStatus(StrEnum):
+    PUBLISHED = "published"
+    NO_ELIGIBLE_CONTENT = "no_eligible_content"
+    FAILED_BEFORE_PUBLISH = "failed_before_publish"
+
+
 class EditorialLane(StrEnum):
     PRODUCT_APPLICATION = "产品与应用"
     BUSINESS_MARKET = "商业与市场"
@@ -564,6 +570,53 @@ class SourceRun(BaseModel):
 
     def with_diagnostics(self, **values: object) -> SourceRun:
         return SourceRun.model_validate({**self.model_dump(), **values})
+
+
+class RunRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    date: date
+    cutoff_at: datetime
+    status: RunStatus
+    source_runs: list[SourceRun]
+    safe_error_code: Literal[
+        "none",
+        "no_healthy_sources",
+        "no_eligible_candidates",
+        "configuration_failed",
+        "collection_failed",
+        "candidate_preparation_failed",
+        "analysis_failed",
+        "report_validation_failed",
+        "persistence_failed",
+    ] = "none"
+
+    @field_validator("cutoff_at")
+    @classmethod
+    def require_aware_cutoff_at(cls, value: datetime) -> datetime:
+        return _require_aware_datetime(value)
+
+    @model_validator(mode="after")
+    def require_consistent_status(self) -> RunRecord:
+        source_ids = [source_run.source_id for source_run in self.source_runs]
+        if len(source_ids) != len(set(source_ids)):
+            raise ValueError("source_runs must contain unique source ids")
+
+        if self.status is RunStatus.PUBLISHED and self.safe_error_code != "none":
+            raise ValueError("published run safe_error_code must be none")
+        if (
+            self.status is RunStatus.NO_ELIGIBLE_CONTENT
+            and self.safe_error_code != "no_eligible_candidates"
+        ):
+            raise ValueError(
+                "no_eligible_content run safe_error_code must be no_eligible_candidates"
+            )
+        if self.status is RunStatus.FAILED_BEFORE_PUBLISH and self.safe_error_code in {
+            "none",
+            "no_eligible_candidates",
+        }:
+            raise ValueError("failed run requires a failure safe_error_code")
+        return self
 
 
 class DailyReport(BaseModel):
