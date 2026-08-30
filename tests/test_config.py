@@ -7,6 +7,7 @@ from types import MappingProxyType
 import pytest
 from pydantic import SecretStr, ValidationError
 
+import ai_news.models as models
 from ai_news.config import load_settings, load_source_config
 from ai_news.models import Analysis, Category, RawItem, Settings, SourceSpec
 
@@ -642,11 +643,77 @@ def test_source_spec_accepts_unique_reddit_communities() -> None:
         category=Category.TOOL,
         weight=5,
         official=False,
+        role="discovery",
     )
 
     assert source.communities == ["LocalLLaMA", "OpenAI"]
     assert source.url is None
     assert source.adapter is None
+
+
+def test_source_spec_defaults_official_source_to_primary_without_mutating_input() -> None:
+    values = {
+        "id": "official-source",
+        "name": "Official Source",
+        "kind": "feed",
+        "url": "https://example.com/feed.xml",
+        "category": Category.MODEL,
+    }
+
+    source = SourceSpec.model_validate(values)
+
+    assert source.role is models.SourceRole.PRIMARY
+    assert "role" not in values
+
+
+def test_source_spec_defaults_unofficial_source_to_trusted_media() -> None:
+    source = SourceSpec(
+        id="media-source",
+        name="Media Source",
+        kind="feed",
+        url="https://example.com/feed.xml",
+        category=Category.TOOL,
+        official=False,
+    )
+
+    assert source.role is models.SourceRole.TRUSTED_MEDIA
+
+
+@pytest.mark.parametrize(
+    ("values", "message"),
+    [
+        (
+            {
+                "id": "official-discovery",
+                "name": "Official Discovery",
+                "kind": "feed",
+                "url": "https://example.com/feed.xml",
+                "category": Category.MODEL,
+                "official": True,
+                "role": "discovery",
+            },
+            "official sources must use primary role",
+        ),
+        (
+            {
+                "id": "reddit-ai",
+                "name": "Reddit AI",
+                "kind": "reddit_rss",
+                "communities": ["LocalLLaMA"],
+                "category": Category.TOOL,
+                "official": False,
+                "role": "trusted_media",
+            },
+            "reddit_rss sources must use discovery role",
+        ),
+    ],
+)
+def test_source_spec_rejects_illegal_source_role_combinations(
+    values: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        SourceSpec.model_validate(values)
 
 
 @pytest.mark.parametrize(
@@ -940,6 +1007,58 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
             True,
         ),
         (
+            "techcrunch-ai",
+            "TechCrunch AI",
+            "feed",
+            "https://techcrunch.com/category/artificial-intelligence/feed/",
+            None,
+            None,
+            (),
+            7,
+            "AI 工具",
+            False,
+            True,
+        ),
+        (
+            "venturebeat-ai",
+            "VentureBeat AI",
+            "feed",
+            "https://venturebeat.com/category/ai/feed",
+            None,
+            None,
+            (),
+            7,
+            "AI 工具",
+            False,
+            True,
+        ),
+        (
+            "the-verge-ai",
+            "The Verge AI",
+            "feed",
+            "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+            None,
+            None,
+            (),
+            7,
+            "AI 工具",
+            False,
+            True,
+        ),
+        (
+            "the-decoder",
+            "The Decoder",
+            "feed",
+            "https://the-decoder.com/feed/",
+            None,
+            None,
+            (),
+            7,
+            "AI 工具",
+            False,
+            True,
+        ),
+        (
             "reddit-ai",
             "Reddit AI 线索",
             "reddit_rss",
@@ -1029,6 +1148,7 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
         ),
     }
     source_ids = [source.id for source in config.sources]
+    source_by_id = {source.id: source for source in config.sources}
 
     assert len(config.sources) == len(expected)
     assert len(source_ids) == len(set(source_ids))
@@ -1037,6 +1157,31 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
     ]
     assert config.sources[-1].id == "github-blog-ai"
     assert actual == expected
+    assert {
+        source_id: (str(source_by_id[source_id].url), source_by_id[source_id].role.value)
+        for source_id in (
+            "techcrunch-ai",
+            "venturebeat-ai",
+            "the-verge-ai",
+            "the-decoder",
+        )
+    } == {
+        "techcrunch-ai": (
+            "https://techcrunch.com/category/artificial-intelligence/feed/",
+            "trusted_media",
+        ),
+        "venturebeat-ai": (
+            "https://venturebeat.com/category/ai/feed",
+            "trusted_media",
+        ),
+        "the-verge-ai": (
+            "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+            "trusted_media",
+        ),
+        "the-decoder": ("https://the-decoder.com/feed/", "trusted_media"),
+    }
+    assert source_by_id["producthunt-ai"].role is models.SourceRole.DISCOVERY
+    assert source_by_id["reddit-ai"].role is models.SourceRole.DISCOVERY
 
 
 def test_public_item_models_accept_valid_pipeline_data() -> None:
@@ -1063,7 +1208,25 @@ def test_public_item_models_accept_valid_pipeline_data() -> None:
     )
 
     assert raw_item.excerpt == ""
+    assert raw_item.source_role is models.SourceRole.PRIMARY
+    assert raw_item.discovery_verified is False
     assert analysis.importance == 9
+
+
+def test_raw_item_defaults_legacy_unofficial_source_role_to_trusted_media() -> None:
+    raw_item = RawItem(
+        source_id="media",
+        source_name="Media",
+        source_weight=7,
+        title="A useful AI product report",
+        url="https://example.com/report",
+        published_at=datetime(2026, 7, 26, tzinfo=UTC),
+        category_hint=Category.TOOL,
+        is_official_source=False,
+    )
+
+    assert raw_item.source_role is models.SourceRole.TRUSTED_MEDIA
+    assert raw_item.source_role is not None
 
 
 @pytest.mark.parametrize("source_weight", [0, 11])

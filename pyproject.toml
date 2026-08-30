@@ -36,6 +36,7 @@ where = ["src"]
     "templates/*.html",
     "static/*.css",
     "static/*.js",
+    "static/*.svg",
 ]
 
 [tool.pytest.ini_options]

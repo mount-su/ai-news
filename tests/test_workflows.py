@@ -137,6 +137,7 @@ def test_ci_runs_all_quality_and_offline_validation_commands() -> None:
         'python -m pip install ".[dev]"',
         "ruff check .",
         "ruff format --check .",
+        "node --test tests/site-search.test.cjs",
         "pytest --cov=ai_news",
         "--cov-fail-under=85",
         "python scripts/check_no_secrets.py",
@@ -144,6 +145,9 @@ def test_ci_runs_all_quality_and_offline_validation_commands() -> None:
         "python scripts/validate_site.py .demo/dist --base-path /ai-news/",
     ):
         assert command in commands
+    assert commands.index("node --test tests/site-search.test.cjs") < commands.index(
+        "pytest --cov=ai_news"
+    )
 
 
 def test_ci_actionlint_is_pinned_and_only_ignores_the_known_timezone_schema_gap() -> None:
@@ -176,6 +180,7 @@ def test_source_health_workflow_is_read_only_bounded_and_uses_no_secrets() -> No
                 ".github/workflows/source-health.yml",
             ]
         },
+        "schedule": [{"cron": "17 7 * * *", "timezone": "Asia/Shanghai"}],
         "workflow_dispatch": {},
     }
     assert workflow["permissions"] == {"contents": "read"}
@@ -201,6 +206,7 @@ def test_daily_triggers_manual_date_and_concurrency_contract() -> None:
     assert isinstance(triggers, dict)
 
     assert workflow["permissions"] == {"contents": "read"}
+    assert workflow["run-name"] == "Daily AI news / ${{ inputs.date || 'today' }}"
     assert triggers["push"] == {"branches": ["main"]}
     assert triggers["schedule"] == [{"cron": "17 8 * * *", "timezone": "Asia/Shanghai"}]
     assert triggers["workflow_dispatch"] == {
@@ -249,25 +255,36 @@ def test_daily_generate_is_write_scoped_conditional_and_maps_exact_environment()
     }
 
 
-def test_daily_generate_preflights_then_handles_optional_date_without_interpolation() -> None:
+def test_daily_generate_captures_exit_then_persists_safe_data_before_propagating() -> None:
     workflow = _load_workflow(DAILY_PATH)
     steps = _steps(workflow, "generate")
     generate_step = next(step for step in steps if step.get("name") == "Generate daily report")
     command = str(generate_step["run"])
 
-    command_lines = command.splitlines()
-    assert command_lines[:2] == ["set -euo pipefail", "python -m ai_news check-config"]
+    assert generate_step["id"] == "generation"
+    assert "python -m ai_news check-config" not in command
     assert "${{ inputs.date }}" not in command
     assert 'run_date="${INPUT_DATE:-}"' in command
     assert 'args+=(--date "$run_date")' in command
     assert 'python -m ai_news generate "${args[@]}"' in command
-    assert command.index("python -m ai_news check-config") < command.index(
-        'run_date="${INPUT_DATE:-}"'
+    assert "set +e" in command
+    assert 'generation_exit_code="$?"' in command
+    assert "exit_code=$generation_exit_code" in command
+    assert "$GITHUB_OUTPUT" in command
+
+    commit_index = next(
+        index for index, step in enumerate(steps) if step.get("name") == "Commit generated data"
     )
-    assert command.index("python -m ai_news check-config") < command.index(
-        'python -m ai_news generate "${args[@]}"'
+    propagate_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.get("name") == "Propagate generation result"
     )
-    assert sum("python -m ai_news check-config" in str(step.get("run", "")) for step in steps) == 1
+    assert commit_index < propagate_index
+    propagate = steps[propagate_index]
+    assert propagate["if"] == "${{ always() }}"
+    assert propagate["env"] == {"GENERATION_EXIT_CODE": "${{ steps.generation.outputs.exit_code }}"}
+    assert 'exit "$GENERATION_EXIT_CODE"' in str(propagate["run"])
 
 
 def test_daily_generate_never_logs_environment_or_credential_values() -> None:
@@ -281,10 +298,9 @@ def test_daily_generate_never_logs_environment_or_credential_values() -> None:
         r"(?m)^\s*set\s+-[^#\n]*x",
         r"(?m)^\s*printenv(?:\s|$)",
         r"(?m)^\s*env(?:\s*(?:\||$))",
-        r"(?m)^\s*echo\s+.*\$(?:\{|\w)",
-        r"(?m)^\s*printf\s+.*\$(?:\{|\w)",
     )
     assert all(re.search(pattern, command) is None for pattern in forbidden_patterns)
+    assert all(name not in command for name in ("LLM_API_KEY", "LLM_BASE_URL", "GITHUB_TOKEN"))
 
 
 def test_daily_workflow_has_no_legacy_model_configuration_or_coding_endpoint() -> None:
@@ -434,6 +450,14 @@ def test_daily_build_reads_fresh_main_after_generate_success_or_skip() -> None:
     commands = _run_commands(steps)
     assert "python -m ai_news build --root . --output dist" in commands
     assert "python scripts/validate_site.py dist --base-path /ai-news/" in commands
+    provenance_step = next(step for step in steps if step.get("name") == "Record build provenance")
+    provenance_command = str(provenance_step["run"])
+    assert 'build_sha="$(git rev-parse HEAD)"' in provenance_command
+    assert "AI_NEWS_BUILD_SHA" in provenance_command
+    assert "AI_NEWS_BUILD_RUN_ID" in provenance_command
+    assert "$GITHUB_ENV" in provenance_command
+    assert "$GITHUB_STEP_SUMMARY" in provenance_command
+    assert "Build SHA: %s" in provenance_command
     upload = next(
         step
         for step in steps
@@ -451,6 +475,7 @@ def test_daily_deploy_has_minimal_pages_permissions_and_environment() -> None:
     assert isinstance(deploy, dict)
 
     assert deploy["needs"] == "build"
+    assert deploy["if"] == "${{ always() && needs.build.result == 'success' }}"
     assert deploy["permissions"] == {
         "pages": "write",
         "id-token": "write",

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block page_scripts %}<script src="{{ asset_url('search-core.js') }}" defer></script>{% endblock %}
+
+{% block main %}
+  <main id="main-content" class="page-shell" data-search-page data-index-url="{{ page_url() }}search.json">
+    <header class="channel-header">
+      <p class="eyebrow">SEARCH THE EDITIONS</p>
+      <h1>搜索情报</h1>
+      <p>检索近 180 天的标题、摘要、影响判断、标签和来源。</p>
+    </header>
+    <section class="search-shell" aria-labelledby="search-controls-title">
+      <h2 id="search-controls-title" class="visually-hidden">搜索条件</h2>
+      <form id="search-form" class="search-form" role="search">
+        <div class="search-form__query">
+          <label for="search-query">关键词</label>
+          <input id="search-query" name="q" type="search" autocomplete="off" placeholder="例如：Gemini、企业部署、AI 浏览器">
+        </div>
+        <div>
+          <label for="search-channel">频道</label>
+          <select id="search-channel" name="channel">
+            <option value="">全部频道</option>
+            {% for category in categories %}<option value="{{ category.name }}">{{ category.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="search-source">来源</label>
+          <select id="search-source" name="source"><option value="">全部来源</option></select>
+        </div>
+        <div>
+          <label for="search-start">开始日期</label>
+          <input id="search-start" name="start" type="date">
+        </div>
+        <div>
+          <label for="search-end">结束日期</label>
+          <input id="search-end" name="end" type="date">
+        </div>
+        <div class="search-form__actions">
+          <button type="submit">搜索</button>
+          <button id="search-clear" type="button" class="button-secondary">清除</button>
+        </div>
+      </form>
+      <p id="search-status" class="search-status" role="status" aria-live="polite">正在准备搜索索引…</p>
+      <ol id="search-results" class="search-results"></ol>
+    </section>
+  </main>
+{% endblock %}

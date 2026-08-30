@@ -2,27 +2,42 @@
 
 {% block main %}
   <main id="main-content" class="page-shell">
-    <section class="edition-heading" aria-labelledby="archive-title">
-      <p class="eyebrow">INTELLIGENCE ARCHIVE</p>
-      <h1 id="archive-title">日期归档</h1>
-      <p>按日期倒序查阅每一期完整情报记录。</p>
-    </section>
+    <header class="channel-header">
+      <p class="eyebrow">EDITION ARCHIVE</p>
+      <h1>日期归档</h1>
+      <p>发布、空刊、失败和未运行日期都明确保留，避免把数据缺口误认为“当天没有新闻”。</p>
+    </header>
     <section class="archive-ledger" aria-labelledby="ledger-title">
-      <div class="section-heading">
+      <header class="section-heading">
         <p>DAILY LEDGER</p>
-        <h2 id="ledger-title">全部日期</h2>
-      </div>
+        <h2 id="ledger-title">全部期次</h2>
+      </header>
       <ol>
-        {% for report in reports %}
+        {% for entry in entries %}
           <li>
-            <article>
-              <a href="{{ page_url('days/' ~ report.date) }}">
-                <time datetime="{{ report.date }}">{{ report.date }}</time>
-                <span>{{ report.included_count }} 条收录</span>
-                <span>{{ report.candidate_count }} 条候选</span>
-                <strong>打开档案 <span aria-hidden="true">→</span></strong>
-              </a>
-            </article>
+            {% if entry.status == 'published' %}
+              <article class="archive-row archive-row--published">
+                <time datetime="{{ entry.date.isoformat() }}">{{ entry.date.isoformat() }}</time>
+                <span class="archive-row__status">已发布</span>
+                <span class="archive-row__metric"><strong>{{ entry.report.items|length }}</strong> 条收录</span>
+                <span class="archive-row__metric"><strong>{{ entry.report.candidate_count }}</strong> 条候选</span>
+                <a href="{{ page_url('days/' ~ entry.date.isoformat()) }}">打开本期 <span aria-hidden="true">→</span></a>
+              </article>
+            {% else %}
+              <article class="archive-row archive-row--{{ entry.status }}">
+                <time datetime="{{ entry.date.isoformat() }}">{{ entry.date.isoformat() }}</time>
+                {% if entry.status == 'no_eligible_content' %}
+                  <strong class="archive-row__status">无合格内容</strong>
+                  <p>候选未达到发布标准，本期不为数量凑稿。</p>
+                {% elif entry.status == 'failed_before_publish' %}
+                  <strong class="archive-row__status">生成失败</strong>
+                  <p>流水线在发布前失败，线上仍保留上一期内容。</p>
+                {% else %}
+                  <strong class="archive-row__status">未运行</strong>
+                  <p>这一天没有可核验的运行记录。</p>
+                {% endif %}
+              </article>
+            {% endif %}
           </li>
         {% endfor %}
       </ol>

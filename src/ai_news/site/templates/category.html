@@ -1,23 +1,30 @@
 {% extends "base.html" %}
-{% from "_card.html" import news_card %}
+{% from "_story.html" import timeline_story %}
+{% from "_pagination.html" import pagination_nav %}
 
 {% block main %}
   <main id="main-content" class="page-shell">
-    <section class="edition-heading" aria-labelledby="category-title">
-      <p class="eyebrow">CATEGORY INTELLIGENCE</p>
-      <h1 id="category-title">{{ category_name }}</h1>
-      <p>跨日期聚合的 {{ category_name }} 编辑精选。</p>
-    </section>
-    <section class="brief-shell" aria-labelledby="feed-title">
-      <div class="section-heading section-heading--brief">
-        <p>CATEGORY SELECTION</p>
-        <h2 id="feed-title">{{ category_name }} 情报</h2>
-      </div>
-      <ol class="news-list">
-        {% for entry in entries %}
-          <li>{{ news_card(entry.item, entry.report_date) }}</li>
-        {% endfor %}
-      </ol>
+    <header class="channel-header">
+      <p class="eyebrow">CHANNEL / {{ category_name }}</p>
+      <h1>{{ category_name }}</h1>
+      <p>按发布时间倒序整理的跨期精选；每页最多 20 条，方便快速浏览。</p>
+    </header>
+    <section class="timeline-section timeline-section--channel" aria-labelledby="channel-feed-title">
+      <header class="section-heading">
+        <p>LATEST FIRST</p>
+        <h2 id="channel-feed-title">最新内容</h2>
+      </header>
+      {% if entries %}
+        <ol class="timeline-list">
+          {% for entry in entries %}<li>{{ timeline_story(entry) }}</li>{% endfor %}
+        </ol>
+      {% else %}
+        <div class="empty-state">
+          <h3>这个频道暂时没有合格内容</h3>
+          <p>页面会保留，但不会用低质量条目填充。</p>
+        </div>
+      {% endif %}
+      {{ pagination_nav(pagination) }}
     </section>
   </main>
 {% endblock %}

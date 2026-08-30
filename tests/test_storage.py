@@ -20,10 +20,20 @@ from ai_news.models import (
     DailyReport,
     NewsItem,
     RawItem,
+    RunRecord,
+    RunStatus,
     SourceRun,
 )
 from ai_news.pipeline.normalize import to_candidate
-from ai_news.storage import load_history_urls, load_reports, save_report
+from ai_news.storage import (
+    active_reports,
+    load_history_urls,
+    load_reports,
+    load_run_records,
+    save_publication,
+    save_report,
+    save_run_record,
+)
 from ai_news.storage import repository as storage_repository
 
 RUN_DATE = date(2026, 7, 26)
@@ -60,6 +70,53 @@ def _run_crashing_save(root: Path, report: DailyReport) -> None:
         process.join(timeout=5)
         pytest.fail("crashing save process did not exit")
     assert process.exitcode == 91
+
+
+def _crash_after_publication_replace(
+    root_text: str,
+    report_json: str,
+    record_json: str,
+    crash_after: int,
+) -> None:
+    root = Path(root_text)
+    report = DailyReport.model_validate_json(report_json)
+    record = RunRecord.model_validate_json(record_json)
+    targets = set(_publication_target_paths(root, report.date))
+    original_replace = Path.replace
+    replacement_count = 0
+
+    def crash_after_selected_replace(self: Path, target: Path) -> Path:
+        nonlocal replacement_count
+        result = original_replace(self, target)
+        if target in targets:
+            replacement_count += 1
+            if replacement_count == crash_after:
+                os._exit(95)
+        return result
+
+    Path.replace = crash_after_selected_replace
+    save_publication(root, report, record)
+
+
+def _run_crashing_publication(
+    root: Path,
+    report: DailyReport,
+    record: RunRecord,
+    crash_after: int,
+) -> None:
+    context = multiprocessing.get_context("fork")
+    process = context.Process(
+        target=_crash_after_publication_replace,
+        args=(
+            str(root),
+            report.model_dump_json(),
+            record.model_dump_json(),
+            crash_after,
+        ),
+    )
+    process.start()
+    _join_process(process)
+    assert process.exitcode == 95
 
 
 def _coordinated_process_save(
@@ -220,6 +277,26 @@ def _target_paths(root: Path, run_date: date = RUN_DATE) -> tuple[Path, Path, Pa
     )
 
 
+def _publication_target_paths(
+    root: Path,
+    run_date: date = RUN_DATE,
+) -> tuple[Path, Path, Path, Path]:
+    return (
+        *_target_paths(root, run_date),
+        root / f"data/runs/{run_date:%Y/%m}/{run_date.isoformat()}.json",
+    )
+
+
+def _published_record(report: DailyReport) -> RunRecord:
+    return RunRecord(
+        date=report.date,
+        cutoff_at=report.generated_at,
+        status=RunStatus.PUBLISHED,
+        source_runs=report.source_runs,
+        safe_error_code="none",
+    )
+
+
 def _repository_artifacts(root: Path) -> list[Path]:
     return [
         path
@@ -245,6 +322,9 @@ def test_news_item_factory_is_flat_json_safe_and_preserves_public_fields() -> No
         "canonical_url": str(candidate.canonical_url),
         "original_title": candidate.raw.title,
         "source": candidate.raw.source_name,
+        "source_id": candidate.raw.source_id,
+        "source_role": "primary",
+        "discovery_verified": False,
         "published_at": "2026-07-26T08:30:00Z",
         "title": analysis.title,
         "category": Category.MODEL.value,
@@ -270,6 +350,28 @@ def test_news_item_infers_legacy_editorial_lane_from_category() -> None:
     item = NewsItem.model_validate(payload)
 
     assert item.editorial_lane.value == "前沿研究"
+
+
+def test_legacy_news_item_without_source_provenance_remains_loadable() -> None:
+    payload = _item("legacy-provenance").model_dump(mode="json")
+    for field_name in ("source_id", "source_role", "discovery_verified"):
+        payload.pop(field_name, None)
+
+    item = NewsItem.model_validate(payload)
+
+    assert item.source_id is None
+    assert item.source_role is None
+    assert item.discovery_verified is None
+
+
+@pytest.mark.parametrize("missing_field", ["source_id", "source_role", "discovery_verified"])
+def test_schema_1_3_report_requires_complete_item_provenance(missing_field: str) -> None:
+    payload = _report(slugs=("v13",)).model_dump(mode="json")
+    payload["schema_version"] = "1.3"
+    payload["items"][0].pop(missing_field, None)
+
+    with pytest.raises(ValidationError, match="provenance"):
+        DailyReport.model_validate(payload)
 
 
 def test_new_daily_report_serializes_schema_1_1() -> None:
@@ -367,11 +469,25 @@ def test_source_run_factories_enforce_safe_error_metadata() -> None:
         "source_id": "official-feed",
         "source_name": "Official Feed",
         "success": False,
-        "item_count": 0,
+        "item_count": None,
         "elapsed_ms": 12,
         "error_type": "RuntimeError",
+        "recent_count": None,
+        "new_count": None,
+        "eligible_count": None,
+        "candidate_count": None,
+        "selected_count": None,
+        "latest_published_at": None,
     }
     assert "do-not-copy" not in failure.model_dump_json()
+    with pytest.raises(TypeError, match="item_count"):
+        SourceRun.failed(
+            source_id="official-feed",
+            source_name="Official Feed",
+            elapsed_ms=12,
+            error=RuntimeError("safe"),
+            item_count=0,
+        )
     with pytest.raises(ValidationError):
         SourceRun(
             source_id="official-feed",
@@ -390,6 +506,151 @@ def test_source_run_factories_enforce_safe_error_metadata() -> None:
             elapsed_ms=10,
             error_type="RuntimeError: token=secret",
         )
+
+
+@pytest.mark.parametrize("item_count", [None, "missing"])
+def test_successful_source_run_requires_an_item_count(item_count: object) -> None:
+    payload = {
+        "source_id": "official-feed",
+        "source_name": "Official Feed",
+        "success": True,
+        "elapsed_ms": 10,
+        "error_type": None,
+    }
+    if item_count != "missing":
+        payload["item_count"] = item_count
+
+    with pytest.raises(ValidationError, match="successful source runs require an item_count"):
+        SourceRun.model_validate(payload)
+
+
+def test_legacy_source_run_payloads_default_new_diagnostics_to_none() -> None:
+    source_run = SourceRun.model_validate(
+        {
+            "source_id": "official-feed",
+            "source_name": "Official Feed",
+            "success": True,
+            "item_count": 3,
+            "elapsed_ms": 10,
+            "error_type": None,
+        }
+    )
+    failed_source_run = SourceRun.model_validate(
+        {
+            "source_id": "legacy-failure",
+            "source_name": "Legacy Failure",
+            "success": False,
+            "item_count": 0,
+            "elapsed_ms": 12,
+            "error_type": "RuntimeError",
+        }
+    )
+
+    assert source_run.item_count == 3
+    assert source_run.recent_count is None
+    assert source_run.new_count is None
+    assert source_run.eligible_count is None
+    assert source_run.candidate_count is None
+    assert source_run.selected_count is None
+    assert source_run.latest_published_at is None
+    assert failed_source_run.item_count == 0
+    assert failed_source_run.recent_count is None
+    assert failed_source_run.new_count is None
+    assert failed_source_run.eligible_count is None
+    assert failed_source_run.candidate_count is None
+    assert failed_source_run.selected_count is None
+    assert failed_source_run.latest_published_at is None
+
+
+def test_source_run_with_diagnostics_returns_a_validated_immutable_copy() -> None:
+    source_run = SourceRun.succeeded(
+        source_id="official-feed",
+        source_name="Official Feed",
+        item_count=4,
+        elapsed_ms=10,
+    )
+    latest = datetime(2026, 8, 30, 1, tzinfo=UTC)
+
+    enriched = source_run.with_diagnostics(
+        recent_count=3,
+        new_count=2,
+        eligible_count=1,
+        candidate_count=1,
+        selected_count=1,
+        latest_published_at=latest,
+    )
+
+    assert source_run.recent_count is None
+    assert source_run.latest_published_at is None
+    assert enriched.model_dump(mode="json") == {
+        "source_id": "official-feed",
+        "source_name": "Official Feed",
+        "success": True,
+        "item_count": 4,
+        "elapsed_ms": 10,
+        "error_type": None,
+        "recent_count": 3,
+        "new_count": 2,
+        "eligible_count": 1,
+        "candidate_count": 1,
+        "selected_count": 1,
+        "latest_published_at": "2026-08-30T01:00:00Z",
+    }
+    with pytest.raises(ValidationError, match="frozen"):
+        enriched.recent_count = 2
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        source_run.with_diagnostics(unknown_count=1)
+    with pytest.raises(ValidationError, match="greater than or equal to 0"):
+        source_run.with_diagnostics(recent_count=-1)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "item_count",
+        "recent_count",
+        "new_count",
+        "eligible_count",
+        "candidate_count",
+        "selected_count",
+    ],
+)
+def test_source_run_rejects_negative_diagnostic_counts(field_name: str) -> None:
+    payload = {
+        "source_id": "official-feed",
+        "source_name": "Official Feed",
+        "success": True,
+        "item_count": 1,
+        "elapsed_ms": 10,
+        "error_type": None,
+        field_name: -1,
+    }
+
+    with pytest.raises(ValidationError, match="greater than or equal to 0"):
+        SourceRun.model_validate(payload)
+
+
+def test_source_run_rejects_naive_latest_published_at_on_create_and_copy() -> None:
+    payload = {
+        "source_id": "official-feed",
+        "source_name": "Official Feed",
+        "success": True,
+        "item_count": 1,
+        "elapsed_ms": 10,
+        "error_type": None,
+        "latest_published_at": datetime(2026, 8, 30, 1),
+    }
+    source_run = SourceRun.succeeded(
+        source_id="official-feed",
+        source_name="Official Feed",
+        item_count=1,
+        elapsed_ms=10,
+    )
+
+    with pytest.raises(ValidationError, match="timezone"):
+        SourceRun.model_validate(payload)
+    with pytest.raises(ValidationError, match="timezone"):
+        source_run.with_diagnostics(latest_published_at=datetime(2026, 8, 30, 1))
 
 
 def test_save_report_writes_utf8_valid_json_markdown_and_index(tmp_path: Path) -> None:
@@ -425,6 +686,97 @@ def test_save_report_writes_utf8_valid_json_markdown_and_index(tmp_path: Path) -
             }
         ]
     }
+    assert not _repository_artifacts(tmp_path)
+
+
+def test_save_publication_atomically_writes_report_markdown_index_and_run_record(
+    tmp_path: Path,
+) -> None:
+    report = _report()
+    record = _published_record(report)
+
+    save_publication(tmp_path, report, record)
+
+    report_path, markdown_path, index_path, record_path = _publication_target_paths(tmp_path)
+    assert DailyReport.model_validate_json(report_path.read_bytes()) == report
+    assert markdown_path.is_file()
+    assert json.loads(index_path.read_text(encoding="utf-8"))["reports"][0]["item_count"] == 4
+    assert RunRecord.model_validate_json(record_path.read_bytes()) == record
+    assert load_reports(tmp_path) == [report]
+    assert load_run_records(tmp_path) == [record]
+    assert not _repository_artifacts(tmp_path)
+
+
+def test_save_publication_rejects_mismatched_or_non_published_record(tmp_path: Path) -> None:
+    report = _report()
+    mismatched = _published_record(_report(date(2026, 7, 25)))
+    failed = RunRecord(
+        date=report.date,
+        cutoff_at=report.generated_at,
+        status=RunStatus.FAILED_BEFORE_PUBLISH,
+        source_runs=report.source_runs,
+        safe_error_code="analysis_failed",
+    )
+
+    with pytest.raises(ValueError, match="date"):
+        save_publication(tmp_path, report, mismatched)
+    with pytest.raises(ValueError, match="published"):
+        save_publication(tmp_path, report, failed)
+
+    assert all(not path.exists() for path in _publication_target_paths(tmp_path))
+
+
+@pytest.mark.parametrize("failure_number", [1, 2, 3, 4])
+def test_save_publication_rolls_back_all_four_targets_when_replace_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_number: int,
+) -> None:
+    old_report = _report(slugs=("old",), model="old-model")
+    old_record = _published_record(old_report)
+    save_publication(tmp_path, old_report, old_record)
+    targets = _publication_target_paths(tmp_path)
+    old_bytes = {path: path.read_bytes() for path in targets}
+    new_report = _report(slugs=("new", "items"), model="new-model")
+    new_record = _published_record(new_report)
+    original_replace = Path.replace
+    replacement_count = 0
+
+    def fail_selected_replace(self: Path, target: Path) -> Path:
+        nonlocal replacement_count
+        if target in targets:
+            replacement_count += 1
+            if replacement_count == failure_number:
+                raise OSError("simulated publication failure")
+        return original_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", fail_selected_replace)
+
+    with pytest.raises(OSError, match="simulated publication failure"):
+        save_publication(tmp_path, new_report, new_record)
+
+    assert {path: path.read_bytes() for path in targets} == old_bytes
+    assert not _repository_artifacts(tmp_path)
+
+
+@pytest.mark.parametrize("crash_after", [1, 2, 3, 4])
+def test_load_recovers_version_two_publication_crash_across_all_four_replacements(
+    tmp_path: Path,
+    crash_after: int,
+) -> None:
+    old_report = _report(slugs=("old",), model="old-model")
+    old_record = _published_record(old_report)
+    save_publication(tmp_path, old_report, old_record)
+    old_bytes = {path: path.read_bytes() for path in _publication_target_paths(tmp_path)}
+    crashing_report = _report(slugs=("crash",), model="crash-model")
+    crashing_record = _published_record(crashing_report)
+
+    _run_crashing_publication(tmp_path, crashing_report, crashing_record, crash_after)
+
+    assert (tmp_path / TRANSACTION_JOURNAL).is_file()
+    assert load_reports(tmp_path) == [old_report]
+    assert load_run_records(tmp_path) == [old_record]
+    assert {path: path.read_bytes() for path in _publication_target_paths(tmp_path)} == old_bytes
     assert not _repository_artifacts(tmp_path)
 
 
@@ -564,6 +916,47 @@ def test_history_urls_uses_prior_calendar_day_window_and_rejects_invalid_days(
     assert load_history_urls(tmp_path / "missing", run_date) == set()
     with pytest.raises(ValueError, match="days"):
         load_history_urls(tmp_path, run_date, days=0)
+
+
+def test_no_eligible_run_shadows_old_report_for_active_history_and_dedupe(
+    tmp_path: Path,
+) -> None:
+    run_date = date(2026, 7, 31)
+    retained = _report(run_date - timedelta(days=3), slugs=("retained",))
+    shadowed = _report(run_date - timedelta(days=2), slugs=("shadowed",))
+    failed_retry = _report(run_date - timedelta(days=1), slugs=("failed-retry",))
+    for report in (retained, shadowed, failed_retry):
+        save_report(tmp_path, report)
+    save_run_record(
+        tmp_path,
+        RunRecord(
+            date=shadowed.date,
+            cutoff_at=shadowed.generated_at,
+            status=RunStatus.NO_ELIGIBLE_CONTENT,
+            source_runs=[],
+            safe_error_code="no_eligible_candidates",
+        ),
+    )
+    save_run_record(
+        tmp_path,
+        RunRecord(
+            date=failed_retry.date,
+            cutoff_at=failed_retry.generated_at,
+            status=RunStatus.FAILED_BEFORE_PUBLISH,
+            source_runs=[],
+            safe_error_code="analysis_failed",
+        ),
+    )
+
+    records = load_run_records(tmp_path)
+    assert [report.date for report in active_reports(load_reports(tmp_path), records)] == [
+        failed_retry.date,
+        retained.date,
+    ]
+    assert load_history_urls(tmp_path, run_date) == {
+        "https://example.com/news/failed-retry",
+        "https://example.com/news/retained",
+    }
 
 
 def test_load_reports_returns_index_order_and_rejects_date_or_count_mismatch(

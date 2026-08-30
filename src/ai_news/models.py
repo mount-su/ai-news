@@ -55,6 +55,18 @@ class Category(StrEnum):
     RESEARCH = "论文研究"
 
 
+class SourceRole(StrEnum):
+    PRIMARY = "primary"
+    TRUSTED_MEDIA = "trusted_media"
+    DISCOVERY = "discovery"
+
+
+class RunStatus(StrEnum):
+    PUBLISHED = "published"
+    NO_ELIGIBLE_CONTENT = "no_eligible_content"
+    FAILED_BEFORE_PUBLISH = "failed_before_publish"
+
+
 class EditorialLane(StrEnum):
     PRODUCT_APPLICATION = "产品与应用"
     BUSINESS_MARKET = "商业与市场"
@@ -85,7 +97,20 @@ class SourceSpec(BaseModel):
     category: Category
     weight: int = Field(default=5, ge=1, le=10)
     official: bool = True
+    role: SourceRole
     enabled: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def default_source_role(cls, values: object) -> object:
+        if not isinstance(values, Mapping):
+            return values
+        normalized = dict(values)
+        normalized.setdefault(
+            "role",
+            "primary" if normalized.get("official", True) else "trusted_media",
+        )
+        return normalized
 
     @model_validator(mode="before")
     @classmethod
@@ -145,6 +170,10 @@ class SourceSpec(BaseModel):
                 raise ValueError("reddit communities must use valid subreddit names")
             if self.official or self.weight != 5:
                 raise ValueError("reddit_rss sources must be unofficial with weight 5")
+        if self.official and self.role is not SourceRole.PRIMARY:
+            raise ValueError("official sources must use primary role")
+        if self.kind == "reddit_rss" and self.role is not SourceRole.DISCOVERY:
+            raise ValueError("reddit_rss sources must use discovery role")
         return self
 
 
@@ -244,6 +273,26 @@ class RawItem(BaseModel):
     excerpt: str = ""
     category_hint: Category
     is_official_source: bool
+    source_role: SourceRole | None = None
+    discovery_verified: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def default_legacy_source_role(cls, values: object) -> object:
+        if not isinstance(values, Mapping):
+            return values
+        normalized = dict(values)
+        if normalized.get("source_role") is None:
+            normalized["source_role"] = (
+                "primary" if normalized.get("is_official_source", True) else "trusted_media"
+            )
+        return normalized
+
+    @model_validator(mode="after")
+    def require_source_role(self) -> RawItem:
+        if self.source_role is None:
+            raise ValueError("source_role must not be None")
+        return self
 
 
 class Candidate(BaseModel):
@@ -326,6 +375,13 @@ class NewsItem(BaseModel):
     canonical_url: HttpUrl
     original_title: str = Field(min_length=1, max_length=1000)
     source: str = Field(min_length=1, max_length=300)
+    source_id: str | None = Field(
+        default=None,
+        pattern=r"^[a-z0-9][a-z0-9-]+$",
+        max_length=100,
+    )
+    source_role: SourceRole | None = None
+    discovery_verified: bool | None = None
     published_at: datetime
     title: str = Field(min_length=1, max_length=1000)
     category: Category
@@ -410,6 +466,9 @@ class NewsItem(BaseModel):
             canonical_url=candidate.canonical_url,
             original_title=candidate.raw.title,
             source=candidate.raw.source_name,
+            source_id=candidate.raw.source_id,
+            source_role=candidate.raw.source_role,
+            discovery_verified=candidate.raw.discovery_verified,
             published_at=candidate.raw.published_at,
             title=analysis.title,
             category=analysis.category,
@@ -418,7 +477,7 @@ class NewsItem(BaseModel):
             importance=analysis.importance,
             why_it_matters=analysis.why_it_matters,
             tags=analysis.tags,
-            is_official=analysis.is_official,
+            is_official=candidate.raw.is_official_source,
             marketing_risk=analysis.marketing_risk,
             tracking_signal=analysis.tracking_signal,
         )
@@ -430,12 +489,18 @@ class SourceRun(BaseModel):
     source_id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]+$", max_length=100)
     source_name: str = Field(min_length=1, max_length=300)
     success: bool
-    item_count: int = Field(ge=0)
+    item_count: int | None = Field(default=None, ge=0)
     elapsed_ms: int = Field(ge=0)
     error_type: str | None = Field(
         default=None,
         pattern=r"^[A-Za-z][A-Za-z0-9_]{0,127}$",
     )
+    recent_count: int | None = Field(default=None, ge=0)
+    new_count: int | None = Field(default=None, ge=0)
+    eligible_count: int | None = Field(default=None, ge=0)
+    candidate_count: int | None = Field(default=None, ge=0)
+    selected_count: int | None = Field(default=None, ge=0)
+    latest_published_at: datetime | None = None
 
     @field_validator("source_name")
     @classmethod
@@ -444,8 +509,20 @@ class SourceRun(BaseModel):
             raise ValueError("source_name must not be blank")
         return value
 
+    @field_validator("latest_published_at")
+    @classmethod
+    def require_aware_latest_published_at(
+        cls,
+        value: datetime | None,
+    ) -> datetime | None:
+        if value is None:
+            return None
+        return _require_aware_datetime(value)
+
     @model_validator(mode="after")
     def require_consistent_error_state(self) -> SourceRun:
+        if self.success and self.item_count is None:
+            raise ValueError("successful source runs require an item_count")
         if self.success and self.error_type is not None:
             raise ValueError("successful source runs must not contain an error_type")
         if not self.success and self.error_type is None:
@@ -478,7 +555,6 @@ class SourceRun(BaseModel):
         source_name: str,
         elapsed_ms: int,
         error: BaseException,
-        item_count: int = 0,
     ) -> SourceRun:
         error_name = type(error).__name__
         if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,127}", error_name) is None:
@@ -487,16 +563,66 @@ class SourceRun(BaseModel):
             source_id=source_id,
             source_name=source_name,
             success=False,
-            item_count=item_count,
+            item_count=None,
             elapsed_ms=elapsed_ms,
             error_type=error_name,
         )
+
+    def with_diagnostics(self, **values: object) -> SourceRun:
+        return SourceRun.model_validate({**self.model_dump(), **values})
+
+
+class RunRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    date: date
+    cutoff_at: datetime
+    status: RunStatus
+    source_runs: list[SourceRun]
+    safe_error_code: Literal[
+        "none",
+        "no_healthy_sources",
+        "no_eligible_candidates",
+        "configuration_failed",
+        "collection_failed",
+        "candidate_preparation_failed",
+        "analysis_failed",
+        "report_validation_failed",
+        "persistence_failed",
+    ] = "none"
+
+    @field_validator("cutoff_at")
+    @classmethod
+    def require_aware_cutoff_at(cls, value: datetime) -> datetime:
+        return _require_aware_datetime(value)
+
+    @model_validator(mode="after")
+    def require_consistent_status(self) -> RunRecord:
+        source_ids = [source_run.source_id for source_run in self.source_runs]
+        if len(source_ids) != len(set(source_ids)):
+            raise ValueError("source_runs must contain unique source ids")
+
+        if self.status is RunStatus.PUBLISHED and self.safe_error_code != "none":
+            raise ValueError("published run safe_error_code must be none")
+        if (
+            self.status is RunStatus.NO_ELIGIBLE_CONTENT
+            and self.safe_error_code != "no_eligible_candidates"
+        ):
+            raise ValueError(
+                "no_eligible_content run safe_error_code must be no_eligible_candidates"
+            )
+        if self.status is RunStatus.FAILED_BEFORE_PUBLISH and self.safe_error_code in {
+            "none",
+            "no_eligible_candidates",
+        }:
+            raise ValueError("failed run requires a failure safe_error_code")
+        return self
 
 
 class DailyReport(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["1.0", "1.1", "1.2"] = "1.1"
+    schema_version: Literal["1.0", "1.1", "1.2", "1.3"] = "1.1"
     date: date
     generated_at: datetime
     model: str = Field(min_length=1, max_length=300)
@@ -536,4 +662,9 @@ class DailyReport(BaseModel):
         source_ids = [source_run.source_id for source_run in self.source_runs]
         if len(source_ids) != len(set(source_ids)):
             raise ValueError("source_runs must contain unique source ids")
+        if self.schema_version == "1.3" and any(
+            item.source_id is None or item.source_role is None or item.discovery_verified is None
+            for item in self.items
+        ):
+            raise ValueError("schema 1.3 items require complete source provenance")
         return self

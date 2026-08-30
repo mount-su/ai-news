@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
+import re
 import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -17,6 +19,8 @@ from ai_news.models import (
     EditorialLane,
     NewsItem,
     RawItem,
+    RunRecord,
+    RunStatus,
     SourceRun,
 )
 from ai_news.pipeline.normalize import to_candidate
@@ -27,7 +31,7 @@ from ai_news.pipeline.run import (
     PublicationThresholdError,
     run_daily,
 )
-from ai_news.storage import save_report
+from ai_news.storage import save_report, save_run_record
 
 _CONFIGURATION_ERROR = "configuration_error"
 _PIPELINE_ERROR = "pipeline_error"
@@ -35,6 +39,7 @@ _PUBLICATION_THRESHOLD = "publication_threshold"
 _SITE_BUILD_ERROR = "site_build_error"
 _DEMO_DATE = date(2026, 7, 26)
 _DEMO_GENERATED_AT = datetime(2026, 7, 26, 8, tzinfo=UTC)
+_BUILD_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
 
 class _SafeArgumentParser(argparse.ArgumentParser):
@@ -57,6 +62,10 @@ def _shanghai_today() -> date:
     return datetime.now(ZoneInfo("Asia/Shanghai")).date()
 
 
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
 def _historical_cutoff(run_date: date) -> datetime:
     end_of_day = datetime.combine(
         run_date,
@@ -77,10 +86,36 @@ def _safe_error(category: str, error: BaseException) -> None:
     print(f"{category}: Error", file=sys.stderr)
 
 
-def _build_site(root: Path, output: Path) -> None:
+def _build_site(
+    root: Path,
+    output: Path,
+    *,
+    build_revision: str = "local",
+    workflow_run_id: int | None = None,
+) -> None:
     from ai_news.site.builder import build_site
 
-    build_site(root, output)
+    build_site(
+        root,
+        output,
+        build_revision=build_revision,
+        workflow_run_id=workflow_run_id,
+    )
+
+
+def _build_provenance() -> tuple[str, int | None]:
+    revision = os.environ.get("AI_NEWS_BUILD_SHA", "local")
+    if revision != "local" and _BUILD_SHA_PATTERN.fullmatch(revision) is None:
+        raise ValueError("invalid build revision")
+    run_id_text = os.environ.get("AI_NEWS_BUILD_RUN_ID", "")
+    if not run_id_text:
+        return revision, None
+    if not run_id_text.isascii() or not run_id_text.isdecimal():
+        raise ValueError("invalid workflow run id")
+    run_id = int(run_id_text)
+    if run_id < 1:
+        raise ValueError("invalid workflow run id")
+    return revision, run_id
 
 
 def _demo_report() -> DailyReport:
@@ -88,6 +123,7 @@ def _demo_report() -> DailyReport:
         ("demo-product", "Offline Product"),
         ("demo-business", "Offline Business"),
         ("demo-platform", "Offline Platform"),
+        ("demo-ecosystem", "Offline Ecosystem"),
     ]
     lanes = [
         EditorialLane.PRODUCT_APPLICATION,
@@ -95,8 +131,6 @@ def _demo_report() -> DailyReport:
         EditorialLane.PRODUCT_APPLICATION,
         EditorialLane.BUSINESS_MARKET,
         EditorialLane.BUSINESS_MARKET,
-        EditorialLane.BUSINESS_MARKET,
-        EditorialLane.PLATFORM_POLICY,
         EditorialLane.PLATFORM_POLICY,
         EditorialLane.PLATFORM_POLICY,
     ]
@@ -132,6 +166,7 @@ def _demo_report() -> DailyReport:
         items.append(NewsItem.from_candidate_analysis(candidate, analysis))
 
     return DailyReport(
+        schema_version="1.3",
         date=_DEMO_DATE,
         generated_at=_DEMO_GENERATED_AT,
         model="offline-demo",
@@ -142,7 +177,7 @@ def _demo_report() -> DailyReport:
             SourceRun.succeeded(
                 source_id=source_id,
                 source_name=source_name,
-                item_count=3,
+                item_count=sum(item.source_id == source_id for item in items),
                 elapsed_ms=0,
             )
             for source_id, source_name in sources
@@ -151,15 +186,32 @@ def _demo_report() -> DailyReport:
 
 
 def _generate(root: Path, run_date: date | None) -> int:
+    today = _shanghai_today()
+    effective_date = run_date or today
+    cutoff_at = (
+        _historical_cutoff(run_date) if run_date is not None and run_date < today else _utc_now()
+    )
     try:
         source_config = load_source_config(root / "sources/feeds.yaml")
         settings = load_settings()
     except Exception as error:
+        try:
+            save_run_record(
+                root,
+                RunRecord(
+                    date=effective_date,
+                    cutoff_at=cutoff_at,
+                    status=RunStatus.FAILED_BEFORE_PUBLISH,
+                    source_runs=[],
+                    safe_error_code="configuration_failed",
+                ),
+            )
+        except Exception as persistence_error:
+            _safe_error(_PIPELINE_ERROR, persistence_error)
+            return 4
         _safe_error(_CONFIGURATION_ERROR, error)
         return 2
 
-    today = _shanghai_today()
-    effective_date = run_date or today
     run_arguments: dict[str, object] = {
         "root": root,
         "run_date": effective_date,
@@ -200,7 +252,13 @@ def _check_config() -> int:
 
 def _build(root: Path, output: Path) -> int:
     try:
-        _build_site(root, output)
+        build_revision, workflow_run_id = _build_provenance()
+        _build_site(
+            root,
+            output,
+            build_revision=build_revision,
+            workflow_run_id=workflow_run_id,
+        )
     except Exception as error:
         _safe_error(_SITE_BUILD_ERROR, error)
         return 5
@@ -210,7 +268,12 @@ def _build(root: Path, output: Path) -> int:
 def _demo(root: Path, output: Path) -> int:
     try:
         save_report(root, _demo_report())
-        _build_site(root, output)
+        _build_site(
+            root,
+            output,
+            build_revision="offline-demo",
+            workflow_run_id=None,
+        )
     except Exception as error:
         _safe_error(_SITE_BUILD_ERROR, error)
         return 5

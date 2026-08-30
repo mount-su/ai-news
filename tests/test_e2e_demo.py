@@ -57,8 +57,8 @@ def test_demo_cli_is_network_free_complete_and_deterministic(
     report_path = first_root / "data/2026/07/2026-07-26.json"
     report = DailyReport.model_validate_json(report_path.read_bytes())
     assert report.date.isoformat() == contract["date"]
-    assert len(report.items) == contract["item_count"] == 9
-    assert report.schema_version == "1.1"
+    assert len(report.items) == contract["item_count"] == 7
+    assert report.schema_version == "1.3"
     lane_counts = Counter(item.editorial_lane for item in report.items)
     assert set(lane_counts) == {
         EditorialLane.PRODUCT_APPLICATION,
@@ -66,7 +66,7 @@ def test_demo_cli_is_network_free_complete_and_deterministic(
         EditorialLane.PLATFORM_POLICY,
     }
     assert max(lane_counts.values()) <= 4
-    assert max(Counter(item.source for item in report.items).values()) <= 3
+    assert max(Counter(item.source for item in report.items).values()) <= 2
     assert [item.title for item in report.items] == contract["expected_titles"]
     assert all(
         item.summary and item.why_it_matters and item.tracking_signal for item in report.items
@@ -75,12 +75,25 @@ def test_demo_cli_is_network_free_complete_and_deterministic(
     markdown = first_root / "content/2026-07-26.md"
     required_files = {
         "index.html",
+        "404.html",
         "days/2026-07-26/index.html",
         "categories/model/index.html",
+        "categories/agent/index.html",
+        "categories/ai-tools/index.html",
+        "categories/open-source/index.html",
+        "categories/industry-policy/index.html",
         "archive/index.html",
+        "search/index.html",
+        "sources/index.html",
         "search.json",
+        "feed.xml",
+        "sitemap.xml",
+        "robots.txt",
+        "build-info.json",
         "assets/styles.css",
         "assets/app.js",
+        "assets/search-core.js",
+        "assets/favicon.svg",
     }
     assert markdown.is_file()
     assert markdown.read_text(encoding="utf-8").startswith("# AI 资讯日报")
@@ -88,7 +101,14 @@ def test_demo_cli_is_network_free_complete_and_deterministic(
 
     search_payload = json.loads((first_output / "search.json").read_text(encoding="utf-8"))
     assert len(search_payload) == len(report.items)
-    assert all(entry["page_url"] == "/ai-news/days/2026-07-26/" for entry in search_payload)
+    assert all(
+        entry["page_url"].startswith("/ai-news/days/2026-07-26/#item-") for entry in search_payload
+    )
+    assert json.loads((first_output / "build-info.json").read_text(encoding="utf-8")) == {
+        "revision": "offline-demo",
+        "schema_version": "1.0",
+        "workflow_run_id": None,
+    }
 
     assert _directory_bytes(first_root / "data") == _directory_bytes(second_root / "data")
     assert _directory_bytes(first_root / "content") == _directory_bytes(second_root / "content")

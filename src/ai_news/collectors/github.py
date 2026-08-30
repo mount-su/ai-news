@@ -118,6 +118,7 @@ def parse_github_releases(payload: bytes, source: SourceSpec) -> list[RawItem]:
                 excerpt=_clean_html(release.get("body"))[:_MAX_EXCERPT_LENGTH],
                 category_hint=source.category,
                 is_official_source=source.official,
+                source_role=source.role,
             )
         except (OverflowError, TypeError, ValueError, ValidationError):
             continue

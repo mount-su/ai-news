@@ -7,7 +7,8 @@ import html
 import json
 import os
 import tomllib
-from datetime import UTC, date, datetime
+import xml.etree.ElementTree as ET
+from datetime import UTC, date, datetime, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -15,37 +16,40 @@ from urllib.parse import urlsplit
 import pytest
 
 from ai_news import cli
-from ai_news.models import Category, DailyReport, NewsItem, SourceRun
+from ai_news.models import (
+    Category,
+    DailyReport,
+    EditorialLane,
+    NewsItem,
+    RunRecord,
+    RunStatus,
+    SourceRun,
+)
 from ai_news.site import builder
 from ai_news.site.builder import build_site
-from ai_news.storage import save_report
+from ai_news.storage import save_report, save_run_record
 
 BASE_PATH = "/ai-news/"
-CATEGORY_SLUGS = {
-    Category.MODEL: "model",
-    Category.AGENT: "agent",
-    Category.TOOL: "ai-tools",
-    Category.OPEN_SOURCE: "open-source",
-    Category.RESEARCH: "research",
-}
+FIXED_CHANNEL_SLUGS = (
+    "model",
+    "agent",
+    "ai-tools",
+    "open-source",
+    "industry-policy",
+)
 PUBLIC_SEARCH_FIELDS = {
     "id",
-    "canonical_url",
-    "original_title",
-    "source",
-    "published_at",
     "title",
-    "category",
     "summary",
-    "importance",
     "why_it_matters",
     "tags",
+    "display_category",
+    "source",
+    "published_at",
+    "report_date",
     "is_official",
     "marketing_risk",
-    "tracking_signal",
-    "date",
     "page_url",
-    "editorial_lane",
 }
 
 
@@ -57,6 +61,7 @@ class _DocumentParser(HTMLParser):
         self.element_ids: list[str] = []
         self.article_ids: list[str] = []
         self.script_starts = 0
+        self.meta: list[dict[str, str]] = []
         self._article_depth = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
@@ -66,6 +71,8 @@ class _DocumentParser(HTMLParser):
             self.element_ids.append(element_id)
         if tag in {"a", "link", "script"}:
             self.links.append({"tag": tag, **attributes})
+        if tag == "meta":
+            self.meta.append(attributes)
         if tag == "article":
             self._article_depth += 1
             if item_id := attributes.get("data-item-id"):
@@ -86,25 +93,29 @@ def _news_item(
     published_at: datetime,
     title: str | None = None,
     source: str = "官方实验室",
+    lane: EditorialLane | None = None,
 ) -> NewsItem:
     canonical_url = f"https://github.com/example/{slug}"
     item_id = hashlib.sha256(canonical_url.encode()).hexdigest()[:16]
-    return NewsItem(
-        id=item_id,
-        canonical_url=canonical_url,
-        original_title=f"Original **{slug}**",
-        source=source,
-        published_at=published_at,
-        title=title or f"中文情报 {slug}",
-        category=category,
-        summary=f"这是关于 {slug} 的事实摘要，长度足够用于验证站点构建和安全转义。",
-        importance=importance,
-        why_it_matters=f"{slug} 会影响开发团队的技术选择与未来产品路线。",
-        tags=["AI", slug],
-        is_official=slug != "old-research",
-        marketing_risk="high" if slug == "agent" else "low",
-        tracking_signal=f"持续跟踪 {slug} 的公开基准与正式发布说明。",
-    )
+    values: dict[str, object] = {
+        "id": item_id,
+        "canonical_url": canonical_url,
+        "original_title": f"Original **{slug}**",
+        "source": source,
+        "published_at": published_at,
+        "title": title or f"中文情报 {slug}",
+        "category": category,
+        "summary": f"这是关于 {slug} 的事实摘要，长度足够用于验证站点构建和安全转义。",
+        "importance": importance,
+        "why_it_matters": f"{slug} 会影响开发团队的技术选择与未来产品路线。",
+        "tags": ["AI", slug],
+        "is_official": slug != "old-research",
+        "marketing_risk": "high" if slug == "agent" else "low",
+        "tracking_signal": f"持续跟踪 {slug} 的公开基准与正式发布说明。",
+    }
+    if lane is not None:
+        values["editorial_lane"] = lane
+    return NewsItem.model_validate(values)
 
 
 def _report(
@@ -210,6 +221,35 @@ def _saved_report_root(tmp_path: Path) -> tuple[Path, dict[str, NewsItem]]:
     return root, items
 
 
+def _write_source_config(root: Path) -> None:
+    sources = root / "sources"
+    sources.mkdir(parents=True, exist_ok=True)
+    (sources / "feeds.yaml").write_text(
+        """sources:
+  - id: official-feed
+    name: Official Feed
+    kind: feed
+    url: https://example.com/official.xml
+    category: 大模型
+    official: true
+  - id: secondary-feed
+    name: Secondary Feed
+    kind: feed
+    url: https://example.com/secondary.xml
+    category: AI 工具
+    official: false
+    role: trusted_media
+  - id: configured-missing
+    name: Configured Missing
+    kind: feed
+    url: https://example.com/missing.xml
+    category: Agent
+    official: true
+""",
+        encoding="utf-8",
+    )
+
+
 @pytest.fixture
 def report_root(tmp_path: Path) -> tuple[Path, dict[str, NewsItem]]:
     return _saved_report_root(tmp_path)
@@ -261,6 +301,7 @@ def test_package_data_configuration_covers_all_site_templates_and_static_assets(
         "templates/*.html",
         "static/*.css",
         "static/*.js",
+        "static/*.svg",
     }
 
     site_directory = repository / "src/ai_news/site"
@@ -290,12 +331,14 @@ def test_build_writes_complete_subpath_site_and_valid_internal_links(
     expected = {
         "index.html",
         "archive/index.html",
+        "search/index.html",
+        "sources/index.html",
         "days/2026-07-26/index.html",
         "days/2026-07-25/index.html",
         "assets/styles.css",
         "assets/app.js",
         "search.json",
-        *(f"categories/{slug}/index.html" for slug in CATEGORY_SLUGS.values()),
+        *(f"categories/{slug}/index.html" for slug in FIXED_CHANNEL_SLUGS),
     }
     assert expected <= {
         path.relative_to(output).as_posix() for path in output.rglob("*") if path.is_file()
@@ -334,11 +377,149 @@ def test_home_uses_latest_report_and_feed_category_order_is_stable(
         items["old-coding"].id,
     ]
     assert not (output / "categories/coding-agent/index.html").exists()
+    assert not (output / "categories/research/index.html").exists()
+    assert (output / "categories/industry-policy/index.html").is_file()
 
     archive_text = (output / "archive/index.html").read_text(encoding="utf-8")
     assert archive_text.index("2026-07-26") < archive_text.index("2026-07-25")
-    assert "最后成功" in (output / "index.html").read_text(encoding="utf-8")
+    assert "最近生成" in (output / "index.html").read_text(encoding="utf-8")
     assert "北京时间" in (output / "index.html").read_text(encoding="utf-8")
+
+
+def test_fixed_channels_paginate_without_losing_time_ordered_entries(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    newest = date(2026, 8, 30)
+    expected_ids: list[str] = []
+    for offset in range(41):
+        run_date = newest - timedelta(days=offset)
+        item = _news_item(
+            f"model-{offset:02d}",
+            category=Category.MODEL,
+            importance=5,
+            published_at=datetime.combine(run_date, datetime.min.time(), tzinfo=UTC),
+        )
+        expected_ids.append(item.id)
+        save_report(root, _report(run_date, 1, [item], candidate_count=1))
+
+    output = tmp_path / "dist"
+    build_site(root, output)
+
+    pages = [
+        output / "categories/model/index.html",
+        output / "categories/model/page/2/index.html",
+        output / "categories/model/page/3/index.html",
+    ]
+    assert [len(_parse(page).article_ids) for page in pages] == [20, 20, 1]
+    assert [item_id for page in pages for item_id in _parse(page).article_ids] == expected_ids
+    assert all((output / f"categories/{slug}/index.html").is_file() for slug in FIXED_CHANNEL_SLUGS)
+    assert not (output / "categories/agent/page/2/index.html").exists()
+
+
+def test_day_entries_have_continuous_numbers_title_deep_links_and_edition_navigation(
+    report_root: tuple[Path, dict[str, NewsItem]],
+    tmp_path: Path,
+) -> None:
+    root, items = report_root
+    output = tmp_path / "dist"
+
+    build_site(root, output)
+
+    day_path = output / "days/2026-07-26/index.html"
+    day_text = day_path.read_text(encoding="utf-8")
+    day = _parse(day_path)
+    assert day_text.count('class="story-number"') == 3
+    assert all(f">{number:02d}<" in day_text for number in range(1, 4))
+    for item in (items["coding"], items["model"], items["agent"]):
+        fragment = f"item-{item.id}-2026-07-26"
+        assert fragment in day.ids
+        assert any(link.get("href") == f"#{fragment}" for link in day.links)
+    assert any(link.get("href") == f"{BASE_PATH}days/2026-07-25/" for link in day.links)
+    assert any(link.get("href") == f"{BASE_PATH}archive/" for link in day.links)
+
+
+def test_archive_uses_run_records_to_show_gaps_and_shadow_stale_reports(
+    report_root: tuple[Path, dict[str, NewsItem]],
+    tmp_path: Path,
+) -> None:
+    root, _items = report_root
+    save_run_record(
+        root,
+        RunRecord(
+            date=date(2026, 7, 25),
+            cutoff_at=datetime(2026, 7, 25, 15, 59, 59, tzinfo=UTC),
+            status=RunStatus.NO_ELIGIBLE_CONTENT,
+            source_runs=[],
+            safe_error_code="no_eligible_candidates",
+        ),
+    )
+    save_run_record(
+        root,
+        RunRecord(
+            date=date(2026, 7, 23),
+            cutoff_at=datetime(2026, 7, 23, 15, 59, 59, tzinfo=UTC),
+            status=RunStatus.FAILED_BEFORE_PUBLISH,
+            source_runs=[],
+            safe_error_code="analysis_failed",
+        ),
+    )
+    output = tmp_path / "dist"
+
+    build_site(root, output)
+
+    archive = (output / "archive/index.html").read_text(encoding="utf-8")
+    assert "无合格内容" in archive
+    assert "未运行" in archive
+    assert "生成失败" in archive
+    assert not (output / "days/2026-07-25/index.html").exists()
+
+
+def test_sources_page_uses_public_run_loader_and_keeps_configured_missing_sources(
+    report_root: tuple[Path, dict[str, NewsItem]],
+    tmp_path: Path,
+) -> None:
+    root, _items = report_root
+    _write_source_config(root)
+    detailed_run = SourceRun.succeeded(
+        source_id="official-feed",
+        source_name="Official Feed",
+        item_count=4,
+        elapsed_ms=20,
+    ).with_diagnostics(
+        recent_count=3,
+        new_count=2,
+        eligible_count=2,
+        candidate_count=1,
+        selected_count=1,
+        latest_published_at=datetime(2026, 7, 26, 9, tzinfo=UTC),
+    )
+    save_run_record(
+        root,
+        RunRecord(
+            date=date(2026, 7, 26),
+            cutoff_at=datetime(2026, 7, 26, 15, 59, 59, tzinfo=UTC),
+            status=RunStatus.PUBLISHED,
+            source_runs=[detailed_run],
+        ),
+    )
+    output = tmp_path / "dist"
+
+    build_site(root, output)
+
+    sources = (output / "sources/index.html").read_text(encoding="utf-8")
+    assert all(
+        name in sources for name in ("Official Feed", "Secondary Feed", "Configured Missing")
+    )
+    assert all(
+        metric in sources
+        for metric in (
+            "<dt>近窗</dt><dd>3</dd>",
+            "<dt>新增</dt><dd>2</dd>",
+            "<dt>合格</dt><dd>2</dd>",
+            "<dt>候选</dt><dd>1</dd>",
+            "<dt>入选</dt><dd>1</dd>",
+        )
+    )
+    assert "暂无运行数据" in sources
 
 
 def test_category_cards_have_unique_dom_ids_when_an_item_spans_multiple_reports(
@@ -419,7 +600,7 @@ def test_external_links_are_hardened_and_untrusted_titles_are_escaped(
     external_links = [
         link
         for link in parser.links
-        if (link.get("href") or "").startswith(("http://", "https://"))
+        if link.get("tag") == "a" and (link.get("href") or "").startswith(("http://", "https://"))
     ]
     assert external_links
     assert all(link.get("target") == "_blank" for link in external_links)
@@ -443,13 +624,15 @@ def test_search_json_is_public_deterministic_and_points_to_real_day_pages(
     build_site(root, output)
 
     assert (output / "search.json").read_bytes() == first_bytes
-    assert len(payload) == 7
+    assert len(payload) == 6
+    assert all(entry["display_category"] != "论文研究" for entry in payload)
     assert all(set(entry) == PUBLIC_SEARCH_FIELDS for entry in payload)
     assert all(entry["page_url"].startswith(f"{BASE_PATH}days/") for entry in payload)
-    assert all(
-        (output / entry["page_url"].removeprefix(BASE_PATH) / "index.html").is_file()
-        for entry in payload
-    )
+    for entry in payload:
+        parsed = urlsplit(entry["page_url"])
+        target = output / parsed.path.removeprefix(BASE_PATH) / "index.html"
+        assert target.is_file()
+        assert parsed.fragment in _parse(target).ids
     serialized = first_bytes.decode()
     for private_name in (
         "source_runs",
@@ -461,6 +644,100 @@ def test_search_json_is_public_deterministic_and_points_to_real_day_pages(
         "secret",
     ):
         assert private_name not in serialized
+
+
+def test_every_html_page_has_unique_absolute_metadata_and_custom_not_found(
+    report_root: tuple[Path, dict[str, NewsItem]],
+    tmp_path: Path,
+) -> None:
+    root, _items = report_root
+    output = tmp_path / "dist"
+
+    build_site(root, output)
+
+    html_pages = sorted(output.rglob("*.html"))
+    canonicals: list[str] = []
+    for page in html_pages:
+        parser = _parse(page)
+        canonical_links = [
+            link
+            for link in parser.links
+            if link.get("tag") == "link" and link.get("rel") == "canonical"
+        ]
+        assert len(canonical_links) == 1
+        canonical = canonical_links[0]["href"]
+        assert canonical.startswith("https://mount-su.github.io/ai-news/")
+        canonicals.append(canonical)
+        assert any(
+            meta.get("name") == "description" and meta.get("content") for meta in parser.meta
+        )
+        assert any(
+            meta.get("property") == "og:url" and meta.get("content") == canonical
+            for meta in parser.meta
+        )
+        assert any(
+            meta.get("property") == "og:title" and meta.get("content") for meta in parser.meta
+        )
+        assert any(
+            meta.get("name") == "twitter:card" and meta.get("content") == "summary"
+            for meta in parser.meta
+        )
+    assert len(canonicals) == len(set(canonicals))
+
+    not_found = output / "404.html"
+    assert not_found.is_file()
+    for link in _parse(not_found).links:
+        href = link.get("href", "")
+        if href and link.get("tag") == "a" and not href.startswith("#"):
+            assert href.startswith(BASE_PATH)
+
+
+def test_rss_sitemap_robots_and_build_provenance_are_valid_and_public(
+    report_root: tuple[Path, dict[str, NewsItem]],
+    tmp_path: Path,
+) -> None:
+    root, items = report_root
+    output = tmp_path / "dist"
+    revision = "a" * 40
+
+    build_site(root, output, build_revision=revision, workflow_run_id=123456)
+
+    feed_root = ET.parse(output / "feed.xml").getroot()
+    assert feed_root.tag == "rss"
+    feed_items = feed_root.findall("./channel/item")
+    assert feed_items
+    feed_links = [item.findtext("link", default="") for item in feed_items]
+    assert all(link.startswith("https://mount-su.github.io/ai-news/days/") for link in feed_links)
+    assert all("#item-" in link for link in feed_links)
+    descriptions = [item.findtext("description", default="") for item in feed_items]
+    assert all(
+        "<a href=" in description and "原始来源" in description for description in descriptions
+    )
+    assert str(items["old-research"].canonical_url) not in "".join(descriptions)
+
+    sitemap_root = ET.parse(output / "sitemap.xml").getroot()
+    namespace = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    sitemap_urls = {element.text for element in sitemap_root.findall("s:url/s:loc", namespace)}
+    required_urls = {
+        "https://mount-su.github.io/ai-news/",
+        "https://mount-su.github.io/ai-news/archive/",
+        "https://mount-su.github.io/ai-news/search/",
+        "https://mount-su.github.io/ai-news/sources/",
+        *(f"https://mount-su.github.io/ai-news/categories/{slug}/" for slug in FIXED_CHANNEL_SLUGS),
+        "https://mount-su.github.io/ai-news/days/2026-07-26/",
+        "https://mount-su.github.io/ai-news/days/2026-07-25/",
+    }
+    assert required_urls <= sitemap_urls
+    assert all("404" not in url for url in sitemap_urls)
+
+    robots = (output / "robots.txt").read_text(encoding="utf-8")
+    assert "User-agent: *" in robots
+    assert "Sitemap: https://mount-su.github.io/ai-news/sitemap.xml" in robots
+    assert json.loads((output / "build-info.json").read_text(encoding="utf-8")) == {
+        "revision": revision,
+        "schema_version": "1.0",
+        "workflow_run_id": 123456,
+    }
 
 
 @pytest.mark.parametrize(

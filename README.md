@@ -1,8 +1,8 @@
 # AI 情报雷达
 
-一个由 Python 生成的中文 AI 资讯静态站。它从受控的官方 Feed、显式官网页面适配器
-和受限 Reddit RSS 获取候选内容，经过去重、排序和结构化模型分析后，将可追溯的
-JSON、Markdown 日报写入仓库，再用 Jinja 构建 GitHub Pages。
+一个由 Python 生成的中文 AI 资讯静态日报。它从受控的一手来源、可信媒体和受限
+Reddit RSS 获取候选内容，经过去重、质量排序和结构化模型选编后，将可追溯的 JSON、
+Markdown 日报与运行记录写入仓库，再用 Jinja 构建 GitHub Pages。
 
 预期 Pages 地址（完成部署后）：<https://mount-su.github.io/ai-news/>
 
@@ -10,7 +10,7 @@ JSON、Markdown 日报写入仓库，再用 Jinja 构建 GitHub Pages。
 当前模型接入边界见
 [Coding Plan 补充设计](docs/superpowers/specs/2026-07-29-ark-coding-plan-design.md)，
 模型接入与部署的当前步骤见
-[当前实施计划](docs/superpowers/plans/2026-07-29-ark-coding-plan.md)。九条简报的编辑契约见
+[当前实施计划](docs/superpowers/plans/2026-07-29-ark-coding-plan.md)。日报的编辑契约见
 [精炼日报设计](docs/superpowers/specs/2026-07-31-concise-editorial-design.md)。厂商扩源和
 Reddit 边界见[扩源设计](docs/superpowers/specs/2026-08-23-official-model-vendor-sources-design.md)
 及[扩源实施计划](docs/superpowers/plans/2026-08-23-official-model-vendor-sources.md)。
@@ -23,9 +23,9 @@ Reddit 边界见[扩源设计](docs/superpowers/specs/2026-08-23-official-model-
 2. 采集官方 Feed、允许列表内的官网页面和受限 Reddit RSS，统一为候选数据。
 3. 规范 URL、清理文本，并结合最近 30 天索引跨来源、跨日期去重。
 4. 按来源可信度、时效和官方属性预筛选，建立最多 36 条、官方单来源最多 6 条、非官方单来源最多 3 条的候选池。
-5. 模型一次性选编 1–9 条；候选不少于 5 条时必须选出至少 5 条，并压缩为“变化、影响、行动”；无效时只允许一次定向修复。
+5. 模型一次性选编 0–7 条，目标 3–7 条；质量优先，可只发布 1–2 条，不为凑数降低门槛。全部不合格时返回空数组，并压缩为“变化、影响、行动”；无效时只允许一次定向修复。
 6. 校验入选条数、来源分布、字段长度和候选 ID。
-7. 达到发布门槛后，原子写入 JSON、Markdown 和全局索引。
+7. 达到发布门槛后，原子写入 JSON、Markdown、全局索引和运行记录；没有合格内容时只写安全运行记录，不生成当期日报。
 8. Jinja 从已落盘数据生成 `dist/`，静态检查通过后交给 GitHub Pages。
 
 采集器、模型适配器、存储和站点构建器彼此分离。模板不会发起模型请求，push 到
@@ -33,20 +33,24 @@ Reddit 边界见[扩源设计](docs/superpowers/specs/2026-08-23-official-model-
 
 ## 页面与数据结构
 
-站点提供首页、单日日报、日期归档和分类页。首页只呈现一条连续编号的九条简报流，
-前三条在同一列表内强调，不重复渲染榜单或跟踪区。页面及静态资源均以
-固定项目子路径 `SITE_BASE_PATH=/ai-news/` 生成。
+站点提供首页、单日日报、日期归档和五个固定频道：大模型、Agent、AI 产品、开源生态、
+行业政策。`/search/` 提供静态全文搜索与日期、频道、来源筛选，`/sources/` 展示来源的
+可访问性、新鲜度和各阶段贡献；`/feed.xml`、`/sitemap.xml`、`/robots.txt` 与
+`/404.html` 分别用于订阅、索引和错误回退。页面及静态资源均以固定项目子路径
+`SITE_BASE_PATH=/ai-news/` 生成，并支持桌面和移动端响应式查看。
 
 一份成功日报会写入：
 
 ```text
 data/YYYY/MM/YYYY-MM-DD.json
+data/runs/YYYY/MM/YYYY-MM-DD.json
 content/YYYY-MM-DD.md
 data/index.json
 ```
 
-JSON 是站点构建和程序读取的规范数据；Markdown 用于人工审阅；`data/index.json`
-保存跨日期去重和历史索引。`dist/` 是可重新生成的 Pages artifact，不提交到 Git。
+日报 JSON 是站点构建和程序读取的规范数据；运行记录区分已发布、无合格内容和发布前失败，
+并保存逐来源诊断；Markdown 用于人工审阅；`data/index.json` 保存跨日期去重和历史索引。
+`dist/` 是可重新生成的 Pages artifact，不提交到 Git。
 
 ## 本地快速开始
 
@@ -81,7 +85,7 @@ python -m http.server 8000 --directory .preview
 
 ## 离线演示
 
-离线演示不访问网络、不调用真实模型，也不需要任何凭证；它会生成固定的 9 条样本，
+离线演示不访问网络、不调用真实模型，也不需要任何凭证；它会生成固定的 7 条样本，
 适合验证从日报落盘到静态页面的完整链路：
 
 ```bash
@@ -141,7 +145,8 @@ userinfo、query 和 fragment。真实 API Key 只通过 GitHub Secret 或隐藏
 
 `SITE_BASE_PATH=/ai-news/` 已固定在 `.github/workflows/daily-news.yml`，不是第四个
 Repository Variable。GitHub Actions 只把 token 注入生成步骤；Secret 扫描在提交
-生成数据前执行。
+生成数据前执行。唯一必需的 Secret 是 `LLM_API_KEY`；Reddit 使用 RSS，不需要任何
+Reddit 客户端密钥或登录态。
 
 可以使用 GitHub CLI 配置非敏感 Variables。Secret 必须直接通过
 `gh secret set LLM_API_KEY` 的隐藏交互式输入设置，不能先保存到文件或发送到聊天：
@@ -159,9 +164,11 @@ gh secret set LLM_API_KEY --repo mount-su/ai-news
 `.github/workflows/ci.yml` 在 push 和 pull request 上运行 lint、格式、完整测试、Secret
 扫描、离线演示、站点校验和 workflow lint。
 
-`.github/workflows/source-health.yml` 在数据源或采集器相关 PR 上运行无 Secret 的实时
-来源健康检查；官方厂商来源必须能解析出带明确日期的历史记录。Reddit 若在
-GitHub Actions 匿名环境中持续被限流，会记录为单源失败，不阻止其他来源采集。
+`.github/workflows/source-health.yml` 在数据源或采集器相关 PR 上运行，并在每天
+北京时间 07:17 执行一次无 Secret 的实时巡检。巡检分别报告请求是否成功、是否为空、
+最新内容是否过期；日报再单独记录近窗、新增、合格、候选贡献和最终入选，不能用
+“可访问”替代“有近期内容”。Reddit 若在 GitHub Actions 匿名环境中持续被限流，会记录
+为单源失败，不阻止其他来源采集。
 
 `.github/workflows/daily-news.yml` 有三条触发路径：
 
@@ -188,9 +195,11 @@ gh run list --repo mount-su/ai-news --workflow daily-news.yml
 ## 数据源维护
 
 所有网络来源都在 `sources/feeds.yaml` 中显式声明。每项包含稳定 `id`、显示名称、
-`kind`、默认分类、权重和 `official` 标记。Feed 配置官方 HTTPS URL；官网来源配置
-代码内允许列表中的官方页面适配器；Reddit 只配置固定社区名，不能注入请求 URL、
-选择器或解析规则。
+`kind`、默认分类、权重、`official` 标记和来源角色：`primary` 是可直接核验的一手来源，
+`trusted_media` 是可信媒体，`discovery` 只负责发现线索。发现源必须解析并验证允许列表内
+的外部原文才可能进入候选，不能仅凭社区或产品榜单文案发布事实。Feed 配置受控 HTTPS
+URL；官网来源配置代码内允许列表中的官方页面适配器；Reddit 只配置固定社区名，不能
+注入请求 URL、选择器或解析规则。
 
 Reddit RSS 只承担社区线索发现，不作为事实来源。它串行请求 `new` 和 `top/day` 两条
 合并订阅，间隔 60 秒，并验证最终的可信外部原文、主题和明确发布日期；不保存用户、帖子正文、
@@ -218,11 +227,16 @@ Reddit RSS 只承担社区线索发现，不作为事实来源。它串行请求
 该字段由来源运行是否失败决定。
 
 模型限流和服务端错误采用有界重试；鉴权失败、无效模型和不安全重定向不会盲目重试。
-模型响应对完整候选池执行校验；候选不少于 5 条时，模型至少要返回 5 条合规选编。
+模型响应对完整候选池执行校验；最多返回 7 条，单一来源最多 2 条，质量不足时不得凑数。
 程序会容忍常见的供应商格式漂移，例如 JSON 外层解释文字、
 `items` 包装对象、可安全转换的数字/布尔字符串和略超字段长度。条数、ID、分类分布、
 来源分布或仍无法修复的字段无效时，只执行一次结构修复。修复后仍无效会抛出分析错误，
 整次生成失败且不写入新日报。
+
+历史补跑必须按日期从旧到新串行执行，并等待前一天的生成、提交与部署完成后再触发
+下一天；这样跨日期去重只读取已经确认的更早内容，也避免同一并发组替换尚未开始的任务。
+若新规则把已有日期判为无合格内容，该日期的旧日报会从站点和后续去重历史中失效，Git
+历史仍保留可恢复版本。
 
 日报先写同文件系统临时文件并校验，之后原子替换；多文件保存使用恢复日志和备份。同日
 补跑更新同一路径，进程异常后再次执行会先恢复未完成事务。站点也先在 staging 目录

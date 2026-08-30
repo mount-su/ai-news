@@ -15,19 +15,9 @@ from pydantic import ValidationError
 
 from ai_news.collectors.official_pages.base import OfficialEntry, article_metadata, clean_text
 from ai_news.http import HttpFetchError, get_bytes
-from ai_news.models import RawItem, SourceSpec
+from ai_news.models import RawItem, SourceRole, SourceSpec
 from ai_news.pipeline.normalize import canonical_url
 
-TRUSTED_MEDIA_DOMAINS = frozenset(
-    {
-        "reuters.com",
-        "apnews.com",
-        "theverge.com",
-        "arstechnica.com",
-        "techcrunch.com",
-        "wired.com",
-    }
-)
 MAX_FEED_ENTRIES = 100
 MAX_EXTERNAL_FETCHES = 8
 REQUEST_SPACING_SECONDS = 60
@@ -81,7 +71,12 @@ class RedditFeedStructureError(ValueError):
 
 
 def _require_source(source: SourceSpec) -> None:
-    if source.kind != "reddit_rss" or source.official or source.weight != 5:
+    if (
+        source.kind != "reddit_rss"
+        or source.official
+        or source.weight != 5
+        or source.role is not SourceRole.DISCOVERY
+    ):
         raise ValueError("reddit_rss source is required")
 
 
@@ -234,17 +229,22 @@ def build_reddit_item(
     allowed_domains: set[str] | frozenset[str],
 ) -> RawItem | None:
     _require_source(source)
-    if metadata is None or not metadata.excerpt:
+    if metadata is None:
         return None
-    parsed = urlsplit(metadata.url)
-    if parsed.hostname is None or not _is_domain_allowed(parsed.hostname, allowed_domains):
+    title = clean_text(metadata.title)
+    excerpt = clean_text(metadata.excerpt)
+    if not title or not excerpt:
         return None
     try:
-        if canonical_url(metadata.url) != canonical_url(entry.external_url):
+        verified_url = canonical_url(metadata.url)
+        if verified_url != canonical_url(entry.external_url):
             return None
     except (TypeError, ValueError):
         return None
-    if not _is_topic(f"{metadata.title} {metadata.excerpt}"):
+    parsed = urlsplit(verified_url)
+    if parsed.hostname is None or not _is_domain_allowed(parsed.hostname, allowed_domains):
+        return None
+    if not _is_topic(f"{title} {excerpt}"):
         return None
     if metadata.published_at.tzinfo is None or metadata.published_at.utcoffset() is None:
         return None
@@ -252,13 +252,15 @@ def build_reddit_item(
         return RawItem(
             source_id=source.id,
             source_name=f"Reddit · r/{entry.community}",
-            source_weight=5,
-            title=metadata.title,
-            url=metadata.url,
+            source_weight=source.weight,
+            title=title,
+            url=verified_url,
             published_at=metadata.published_at,
-            excerpt=metadata.excerpt,
+            excerpt=excerpt,
             category_hint=source.category,
             is_official_source=False,
+            source_role=source.role,
+            discovery_verified=True,
         )
     except (TypeError, ValueError, ValidationError):
         return None
@@ -282,7 +284,7 @@ async def collect_reddit_rss(
         *parse_reddit_atom(new_payload, source),
         *parse_reddit_atom(top_payload, source),
     ]
-    allowed_domains = frozenset({*official_domains, *TRUSTED_MEDIA_DOMAINS})
+    allowed_domains = frozenset(official_domains)
     unique: list[RedditEntry] = []
     seen_urls: set[str] = set()
     for entry in discovered:

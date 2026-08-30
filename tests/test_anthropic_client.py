@@ -95,16 +95,14 @@ def _editorial_rows(candidates: list[Candidate]) -> list[dict[str, Any]]:
         EditorialLane.PRODUCT_ENGINEERING,
         EditorialLane.PRODUCT_ENGINEERING,
         EditorialLane.PRODUCT_ENGINEERING,
-        EditorialLane.PRODUCT_ENGINEERING,
         EditorialLane.BUSINESS,
         EditorialLane.BUSINESS,
         EditorialLane.BUSINESS,
-        EditorialLane.RESEARCH,
         EditorialLane.RESEARCH,
     ]
     return [
         _analysis_row(candidate, editorial_lane=lane.value)
-        for candidate, lane in zip(candidates[:9], lanes, strict=True)
+        for candidate, lane in zip(candidates[:7], lanes, strict=True)
     ]
 
 
@@ -759,7 +757,7 @@ def test_duplicate_input_ids_are_rejected_before_any_request() -> None:
     assert attempts == 0
 
 
-def test_one_request_selects_nine_and_preserves_selected_order() -> None:
+def test_one_request_selects_at_most_seven_and_preserves_selected_order() -> None:
     candidates = [_candidate(f"batch-{index}") for index in range(11)]
     request_ids: list[list[str]] = []
 
@@ -777,4 +775,19 @@ def test_one_request_selects_nine_and_preserves_selected_order() -> None:
     result = _run_analyze(handler, candidates)
 
     assert [len(ids) for ids in request_ids] == [11]
-    assert list(result) == [candidate.id for candidate in candidates[:9]]
+    assert list(result) == [candidate.id for candidate in candidates[:7]]
+
+
+def test_anthropic_accepts_empty_editorial_selection_without_repair() -> None:
+    candidates = [_candidate(f"empty-{index}") for index in range(9)]
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(200, content=_anthropic_response([]), request=request)
+
+    result = _run_analyze(handler, candidates)
+
+    assert attempts == 1
+    assert result == {}

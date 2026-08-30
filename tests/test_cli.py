@@ -11,9 +11,9 @@ from typing import Any
 import pytest
 
 from ai_news import cli
-from ai_news.models import Category, Settings, SourceConfig, SourceSpec
+from ai_news.models import Category, RunStatus, Settings, SourceConfig, SourceSpec
 from ai_news.pipeline.run import AnalysisPipelineError, PublicationThresholdError
-from ai_news.storage import load_reports
+from ai_news.storage import load_reports, load_run_records
 
 RUN_DATE = date(2026, 7, 26)
 
@@ -125,6 +125,64 @@ def test_generate_does_not_override_collection_clock_for_current_date(
 
     assert cli.main(["generate", "--date", RUN_DATE.isoformat(), "--root", str(tmp_path)]) == 0
     assert "now" not in run_arguments[0]
+
+
+def test_generate_configuration_failure_persists_safe_historical_run_record(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "_shanghai_today", lambda: date(2026, 8, 30))
+    monkeypatch.setattr(
+        cli,
+        "load_source_config",
+        lambda _path: (_ for _ in ()).throw(ValueError("secret source config")),
+    )
+
+    result = cli.main(["generate", "--date", RUN_DATE.isoformat(), "--root", str(tmp_path)])
+
+    assert result == 2
+    assert capsys.readouterr().err == "configuration_error: Error\n"
+    records = load_run_records(tmp_path)
+    assert len(records) == 1
+    assert records[0].date == RUN_DATE
+    assert records[0].cutoff_at == datetime(
+        2026,
+        7,
+        26,
+        15,
+        59,
+        59,
+        999999,
+        tzinfo=UTC,
+    )
+    assert records[0].status is RunStatus.FAILED_BEFORE_PUBLISH
+    assert records[0].safe_error_code == "configuration_failed"
+    assert records[0].source_runs == []
+
+
+def test_generate_configuration_record_failure_returns_safe_pipeline_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "_shanghai_today", lambda: RUN_DATE)
+    monkeypatch.setattr(cli, "_utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
+    monkeypatch.setattr(
+        cli,
+        "load_settings",
+        lambda: (_ for _ in ()).throw(ValueError("secret settings")),
+    )
+    monkeypatch.setattr(
+        cli,
+        "save_run_record",
+        lambda *_args: (_ for _ in ()).throw(OSError("secret storage")),
+    )
+
+    result = cli.main(["generate", "--root", str(tmp_path)])
+
+    assert result == 4
+    assert capsys.readouterr().err == "pipeline_error: Error\n"
 
 
 def test_invalid_iso_date_is_rejected_by_argparse_without_echoing_value(
@@ -296,7 +354,9 @@ def test_build_dispatches_paths_without_loading_llm_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output = tmp_path / "dist"
-    calls: list[tuple[Path, Path]] = []
+    calls: list[tuple[Path, Path, str, int | None]] = []
+    monkeypatch.delenv("AI_NEWS_BUILD_SHA", raising=False)
+    monkeypatch.delenv("AI_NEWS_BUILD_RUN_ID", raising=False)
     monkeypatch.setattr(
         cli,
         "load_settings",
@@ -305,13 +365,57 @@ def test_build_dispatches_paths_without_loading_llm_settings(
     monkeypatch.setattr(
         cli,
         "_build_site",
-        lambda root, selected_output: calls.append((root, selected_output)),
+        lambda root, selected_output, *, build_revision, workflow_run_id: calls.append(
+            (root, selected_output, build_revision, workflow_run_id)
+        ),
     )
 
     result = cli.main(["build", "--root", str(tmp_path), "--output", str(output)])
 
     assert result == 0
-    assert calls == [(tmp_path, output)]
+    assert calls == [(tmp_path, output, "local", None)]
+
+
+def test_build_passes_validated_production_provenance_from_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "dist"
+    revision = "b" * 40
+    calls: list[tuple[str, int | None]] = []
+    monkeypatch.setenv("AI_NEWS_BUILD_SHA", revision)
+    monkeypatch.setenv("AI_NEWS_BUILD_RUN_ID", "987654")
+    monkeypatch.setattr(
+        cli,
+        "_build_site",
+        lambda _root, _output, *, build_revision, workflow_run_id: calls.append(
+            (build_revision, workflow_run_id)
+        ),
+    )
+
+    assert cli.main(["build", "--root", str(tmp_path), "--output", str(output)]) == 0
+    assert calls == [(revision, 987654)]
+
+
+@pytest.mark.parametrize(
+    ("revision", "run_id"),
+    [("main", "123"), ("a" * 39, "123"), ("a" * 40, "run-123"), ("a" * 40, "0")],
+)
+def test_build_rejects_invalid_provenance_without_calling_builder(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    revision: str,
+    run_id: str,
+) -> None:
+    monkeypatch.setenv("AI_NEWS_BUILD_SHA", revision)
+    monkeypatch.setenv("AI_NEWS_BUILD_RUN_ID", run_id)
+    monkeypatch.setattr(
+        cli,
+        "_build_site",
+        lambda *_args, **_kwargs: pytest.fail("invalid provenance must stop before build"),
+    )
+
+    assert cli.main(["build", "--root", str(tmp_path), "--output", str(tmp_path / "dist")]) == 5
 
 
 def test_lazy_build_adapter_imports_task8_builder_module(
@@ -323,7 +427,9 @@ def test_lazy_build_adapter_imports_task8_builder_module(
     site_package = types.ModuleType("ai_news.site")
     site_package.__path__ = []
     builder_module = types.ModuleType("ai_news.site.builder")
-    builder_module.build_site = lambda root, selected_output: calls.append((root, selected_output))
+    builder_module.build_site = lambda root, selected_output, **_kwargs: calls.append(
+        (root, selected_output)
+    )
     monkeypatch.setitem(sys.modules, "ai_news.site", site_package)
     monkeypatch.setitem(sys.modules, "ai_news.site.builder", builder_module)
 
@@ -337,7 +443,7 @@ def test_build_failure_returns_five_with_safe_stderr(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    def broken_builder(_root: Path, _output: Path) -> None:
+    def broken_builder(_root: Path, _output: Path, **_kwargs: object) -> None:
         raise RuntimeError("https://secret.example/build?token=value")
 
     monkeypatch.setattr(cli, "_build_site", broken_builder)
@@ -356,7 +462,7 @@ def test_demo_is_offline_deterministic_and_builds_from_a_real_saved_report(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output = tmp_path / "dist"
-    calls: list[tuple[Path, Path]] = []
+    calls: list[tuple[Path, Path, str, int | None]] = []
     for environment_name in (
         "LLM_PROTOCOL",
         "LLM_BASE_URL",
@@ -373,7 +479,9 @@ def test_demo_is_offline_deterministic_and_builds_from_a_real_saved_report(
     monkeypatch.setattr(
         cli,
         "_build_site",
-        lambda root, selected_output: calls.append((root, selected_output)),
+        lambda root, selected_output, *, build_revision, workflow_run_id: calls.append(
+            (root, selected_output, build_revision, workflow_run_id)
+        ),
     )
 
     first_result = cli.main(["demo", "--root", str(tmp_path), "--output", str(output)])
@@ -382,11 +490,14 @@ def test_demo_is_offline_deterministic_and_builds_from_a_real_saved_report(
     second_report = load_reports(tmp_path)[0]
 
     assert first_result == second_result == 0
-    assert len(first_report.items) == 9
-    assert first_report.schema_version == "1.1"
+    assert len(first_report.items) == 7
+    assert first_report.schema_version == "1.3"
     assert first_report == second_report
     assert first_report.model == "offline-demo"
-    assert calls == [(tmp_path, output), (tmp_path, output)]
+    assert calls == [
+        (tmp_path, output, "offline-demo", None),
+        (tmp_path, output, "offline-demo", None),
+    ]
     assert not any(name.startswith("LLM_") for name in os.environ)
 
 

@@ -3,49 +3,83 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark">
-    <meta name="theme-color" content="#07111f">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#f3efe6">
+    <meta name="description" content="{{ description }}">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:type" content="{{ og_type }}">
+    <meta property="og:site_name" content="{{ site_name }}">
+    <meta property="og:title" content="{{ page_title }}｜{{ site_name }}">
+    <meta property="og:description" content="{{ description }}">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ page_title }}｜{{ site_name }}">
+    <meta name="twitter:description" content="{{ description }}">
     <title>{{ page_title }}｜{{ site_name }}</title>
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="alternate" type="application/rss+xml" title="{{ site_name }} RSS" href="https://mount-su.github.io/ai-news/feed.xml">
+    <link rel="icon" href="{{ asset_url('favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ asset_url('styles.css') }}">
+    {% block page_scripts %}{% endblock %}
     <script src="{{ asset_url('app.js') }}" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
-    <header class="masthead">
-      <div class="masthead__inner">
-        <a class="brand" href="{{ page_url() }}" aria-label="{{ site_name }}首页">
-          <span class="brand__index" aria-hidden="true">AIR / 01</span>
-          <span class="brand__name">{{ site_name }}</span>
-        </a>
-        <p class="last-run">
-          <span>最后成功生成</span>
-          <time datetime="{{ latest_report.generated_at.isoformat() }}">
-            {{ latest_report.generated_at|beijing_datetime }}
-          </time>
-        </p>
+    <header class="site-header">
+      <div class="utility-strip">
+        <div class="utility-strip__inner">
+          <p>每日 AI 决策简报</p>
+          <nav aria-label="实用导航">
+            <a href="{{ page_url('search') }}">搜索</a>
+            <a href="{{ page_url('sources') }}">来源透明度</a>
+          </nav>
+        </div>
+      </div>
+      <div class="masthead">
+        <div class="masthead__inner">
+          <p class="edition-meta">
+            <time datetime="{{ latest_report.date }}">{{ latest_report.date }}</time>
+            {% if latest_report.issue_number %}<span>第 {{ '%03d'|format(latest_report.issue_number) }} 期</span>{% endif %}
+          </p>
+          <a class="brand" href="{{ page_url() }}" aria-label="{{ site_name }}首页">
+            <span class="brand__name">AI 情报日报</span>
+            <span class="brand__tagline">产品 · 商业 · 平台与政策</span>
+          </a>
+          <p class="last-run">
+            <span>最近生成</span>
+            <time datetime="{{ latest_report.generated_at.isoformat() }}">{{ latest_report.generated_at|beijing_datetime }}</time>
+          </p>
+        </div>
       </div>
       <nav class="primary-nav" aria-label="主要导航">
         <div class="primary-nav__inner">
-          <a href="{{ page_url() }}">首页</a>
+          <a href="{{ page_url() }}"{% if current_page == 'home' %} aria-current="page"{% endif %}>首页</a>
           {% for category in categories %}
-            <a href="{{ page_url('categories/' ~ category.slug) }}">{{ category.name }}</a>
+            <a href="{{ page_url('categories/' ~ category.slug) }}"{% if current_page == category.slug %} aria-current="page"{% endif %}>{{ category.name }}</a>
           {% endfor %}
-          <a href="{{ page_url('archive') }}">归档</a>
+          <a href="{{ page_url('search') }}"{% if current_page == 'search' %} aria-current="page"{% endif %}>搜索</a>
+          <a href="{{ page_url('sources') }}"{% if current_page == 'sources' %} aria-current="page"{% endif %}>来源</a>
+          <a href="{{ page_url('archive') }}"{% if current_page == 'archive' %} aria-current="page"{% endif %}>归档</a>
         </div>
       </nav>
-      <p class="status-line">
-        <span class="status-dot" aria-hidden="true"></span>
-        {{ latest_report.healthy_source_count }}/{{ latest_report.source_count }} 个来源正常
-        <span aria-hidden="true">·</span>
-        {{ latest_report.included_count }} 条入选
-      </p>
+      <div class="status-line">
+        <p><strong>{{ latest_report.included_count }}</strong> 条入选 <span aria-hidden="true">·</span> <strong>{{ fresh_source_count }}/{{ configured_source_count }}</strong> 个来源在近窗有贡献</p>
+        <a href="{{ page_url('sources') }}">查看来源明细</a>
+      </div>
     </header>
 
     {% block main %}{% endblock %}
 
     <footer class="site-footer">
-      <p><strong>{{ site_name }}</strong> · 每日 AI 要闻与决策底稿</p>
-      <a href="{{ page_url('archive') }}">浏览全部日期</a>
+      <div>
+        <strong>AI 情报日报</strong>
+        <p>从公开一手来源与可信媒体中，筛出真正影响产品和决策的变化。</p>
+      </div>
+      <nav aria-label="页脚导航">
+        <a href="{{ page_url('archive') }}">日期归档</a>
+        <a href="{{ page_url('sources') }}">来源说明</a>
+        <a href="{{ page_url('search') }}">全文搜索</a>
+      </nav>
     </footer>
   </body>
 </html>

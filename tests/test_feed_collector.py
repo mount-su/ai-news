@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import ai_news.models as models
 from ai_news.collectors.feed import parse_feed
 from ai_news.models import Category, SourceSpec
 
@@ -20,6 +21,7 @@ def _source() -> SourceSpec:
         category=Category.MODEL,
         weight=9,
         official=True,
+        role="primary",
     )
 
 
@@ -40,6 +42,28 @@ def test_parse_rss_returns_valid_item_with_source_metadata() -> None:
     assert item.excerpt == "A model update"
     assert item.category_hint == Category.MODEL
     assert item.is_official_source is True
+    assert item.source_role is models.SourceRole.PRIMARY
+    assert item.discovery_verified is False
+
+
+def test_discovery_feed_preserves_role_without_marking_item_verified() -> None:
+    payload = (FIXTURES / "openai-feed.xml").read_bytes()
+    source = SourceSpec(
+        id="producthunt-ai",
+        name="Product Hunt AI",
+        kind="feed",
+        url="https://www.producthunt.com/feed?category=artificial-intelligence",
+        category=Category.TOOL,
+        weight=5,
+        official=False,
+        role="discovery",
+    )
+
+    items = parse_feed(payload, source)
+
+    assert len(items) == 1
+    assert items[0].source_role is models.SourceRole.DISCOVERY
+    assert items[0].discovery_verified is False
 
 
 def test_invalid_entries_are_skipped_without_discarding_valid_entries() -> None:

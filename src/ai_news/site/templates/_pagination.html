@@ -1,0 +1,9 @@
+{% macro pagination_nav(pagination) -%}
+  {% if pagination.total > 1 %}
+    <nav class="pagination" aria-label="分页导航">
+      <span>{% if pagination.previous_url %}<a href="{{ pagination.previous_url }}">← 上一页</a>{% endif %}</span>
+      <strong>第 {{ pagination.current }} / {{ pagination.total }} 页</strong>
+      <span>{% if pagination.next_url %}<a href="{{ pagination.next_url }}">下一页 →</a>{% endif %}</span>
+    </nav>
+  {% endif %}
+{%- endmacro %}

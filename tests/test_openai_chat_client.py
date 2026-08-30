@@ -112,16 +112,14 @@ def _editorial_rows(candidates: list[Candidate]) -> list[dict[str, Any]]:
         EditorialLane.PRODUCT_ENGINEERING,
         EditorialLane.PRODUCT_ENGINEERING,
         EditorialLane.PRODUCT_ENGINEERING,
-        EditorialLane.PRODUCT_ENGINEERING,
         EditorialLane.BUSINESS,
         EditorialLane.BUSINESS,
         EditorialLane.BUSINESS,
-        EditorialLane.RESEARCH,
         EditorialLane.RESEARCH,
     ]
     return [
         _analysis_row(candidate, editorial_lane=lane.value)
-        for candidate, lane in zip(candidates[:9], lanes, strict=True)
+        for candidate, lane in zip(candidates[:7], lanes, strict=True)
     ]
 
 
@@ -204,7 +202,7 @@ def test_request_uses_exact_ark_endpoint_headers_body_and_isolates_client_defaul
     assert "header-secret" not in rendered
 
 
-def test_one_editorial_request_selects_nine_from_twelve_candidates() -> None:
+def test_one_editorial_request_selects_at_most_seven_from_twelve_candidates() -> None:
     candidates = [_candidate(f"editorial-{index}") for index in range(12)]
     requests: list[httpx.Request] = []
 
@@ -215,9 +213,12 @@ def test_one_editorial_request_selects_nine_from_twelve_candidates() -> None:
     result = _run_analyze(handler, candidates)
 
     assert len(requests) == 1
-    assert list(result) == [candidate.id for candidate in candidates[:9]]
+    assert list(result) == [candidate.id for candidate in candidates[:7]]
     prompt = json.loads(requests[0].content)["messages"][1]["content"]
-    assert "候选不少于 5 条时，必须选择 5 至 9 条" in prompt
+    assert "目标 3–7 条" in prompt
+    assert "最多选择 7 条" in prompt
+    assert "全部不合格时返回空数组" in prompt
+    assert "必须选择 5" not in prompt
     assert "恰好" not in prompt
 
 
@@ -236,20 +237,34 @@ def test_editorial_request_accepts_a_high_quality_minimum_subset_without_repair(
     assert list(result) == [candidate.id for candidate in candidates[:5]]
 
 
-def test_editorial_request_repairs_undersized_selection_when_candidates_are_plentiful() -> None:
+def test_editorial_request_accepts_one_quality_item_without_repair() -> None:
     candidates = [_candidate(f"undersized-{index}") for index in range(9)]
     attempts = 0
 
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal attempts
         attempts += 1
-        rows = _editorial_rows(candidates)[:1] if attempts == 1 else _editorial_rows(candidates)[:5]
-        return httpx.Response(200, content=_openai_response(rows))
+        return httpx.Response(200, content=_openai_response(_editorial_rows(candidates)[:1]))
 
     result = _run_analyze(handler, candidates)
 
-    assert attempts == 2
-    assert list(result) == [candidate.id for candidate in candidates[:5]]
+    assert attempts == 1
+    assert list(result) == [candidates[0].id]
+
+
+def test_editorial_request_accepts_empty_selection_without_repair() -> None:
+    candidates = [_candidate(f"empty-{index}") for index in range(9)]
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(200, content=_openai_response([]))
+
+    result = _run_analyze(handler, candidates)
+
+    assert attempts == 1
+    assert result == {}
 
 
 @pytest.mark.parametrize(
@@ -303,39 +318,14 @@ def test_openai_normalizes_safe_provider_schema_drift() -> None:
     assert analysis.tags == ["AI 工具", "产品更新"]
 
 
-@pytest.mark.parametrize(
-    ("error_kind", "mutate"),
-    [
-        (
-            "lane_distribution",
-            lambda rows: [
-                {
-                    **row,
-                    "editorial_lane": (
-                        EditorialLane.PRODUCT_ENGINEERING.value
-                        if index < 5
-                        else row["editorial_lane"]
-                    ),
-                }
-                for index, row in enumerate(rows)
-            ],
-        ),
-        (
-            "source_distribution",
-            lambda rows: rows,
-        ),
-    ],
-)
-def test_editorial_distribution_violations_repair_once_then_fail(
-    error_kind: str,
-    mutate: Any,
-) -> None:
-    shared_sources = ["source-shared"] * 4 + [f"source-{index}" for index in range(5)]
+def test_editorial_source_distribution_violation_repairs_once_then_fails() -> None:
+    error_kind = "source_distribution"
+    shared_sources = ["source-shared"] * 3 + [f"source-{index}" for index in range(4)]
     candidates = [
         _candidate(f"{error_kind}-{index}", source_id=source_id)
         for index, source_id in enumerate(shared_sources)
     ]
-    rows = mutate(_editorial_rows(candidates))
+    rows = _editorial_rows(candidates)
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:

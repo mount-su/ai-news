@@ -74,6 +74,7 @@ def parse_feed(payload: bytes, source: SourceSpec) -> list[RawItem]:
                 excerpt=_excerpt(entry),
                 category_hint=source.category,
                 is_official_source=source.official,
+                source_role=source.role,
             )
         except (OverflowError, TypeError, ValueError, ValidationError):
             continue

@@ -16,18 +16,21 @@ from ai_news.models import (
     DailyReport,
     EditorialLane,
     RawItem,
+    RunRecord,
+    RunStatus,
     Settings,
     SourceConfig,
+    SourceRun,
     SourceSpec,
 )
 from ai_news.pipeline.run import (
     AnalysisPipelineError,
     CollectionPipelineError,
+    PersistencePipelineError,
     PublicationThresholdError,
     ReportValidationError,
     run_daily,
 )
-from ai_news.storage import save_report
 
 RUN_DATE = date(2026, 7, 26)
 NOW = datetime(2026, 7, 26, 12, tzinfo=UTC)
@@ -38,6 +41,9 @@ def _source(
     *,
     kind: str = "feed",
     enabled: bool = True,
+    official: bool = True,
+    role: str | None = None,
+    hostname: str = "example.com",
 ) -> SourceSpec:
     values: dict[str, Any] = {
         "id": f"source-{number}",
@@ -45,11 +51,13 @@ def _source(
         "kind": kind,
         "category": Category.MODEL,
         "weight": 7,
-        "official": True,
+        "official": official,
         "enabled": enabled,
     }
+    if role is not None:
+        values["role"] = role
     if kind in {"feed", "arxiv"}:
-        values["url"] = f"https://example.com/{number}.xml"
+        values["url"] = f"https://{hostname}/{number}.xml"
     elif kind == "official_page":
         values["url"] = "https://www.anthropic.com/news"
         values["adapter"] = "anthropic_news"
@@ -57,6 +65,7 @@ def _source(
         values["communities"] = ["LocalLLaMA", "OpenAI"]
         values["weight"] = 5
         values["official"] = False
+        values["role"] = "discovery"
     else:
         values["repo"] = f"owner/repo-{number}"
     return SourceSpec.model_validate(values)
@@ -68,6 +77,7 @@ def _raw(
     source: SourceSpec | None = None,
     published_at: datetime = NOW,
     query: str = "",
+    discovery_verified: bool = False,
 ) -> RawItem:
     selected_source = source or _source(0)
     return RawItem(
@@ -80,6 +90,8 @@ def _raw(
         excerpt=f"Factual excerpt {number}",
         category_hint=selected_source.category,
         is_official_source=selected_source.official,
+        source_role=selected_source.role,
+        discovery_verified=discovery_verified,
     )
 
 
@@ -109,6 +121,20 @@ def _updated_raw(raw: RawItem, **updates: Any) -> RawItem:
     return RawItem.model_validate(raw_data)
 
 
+def _select_with_source_cap(items: list[Any], *, limit: int = 7) -> list[Any]:
+    source_counts: dict[str, int] = {}
+    selected: list[Any] = []
+    for item in items:
+        source_id = item.raw.source_id
+        if source_counts.get(source_id, 0) >= 2:
+            continue
+        source_counts[source_id] = source_counts.get(source_id, 0) + 1
+        selected.append(item)
+        if len(selected) == limit:
+            break
+    return selected
+
+
 class _Analyzer:
     def __init__(
         self,
@@ -125,16 +151,15 @@ class _Analyzer:
             EditorialLane.PRODUCT_ENGINEERING,
             EditorialLane.PRODUCT_ENGINEERING,
             EditorialLane.PRODUCT_ENGINEERING,
-            EditorialLane.PRODUCT_ENGINEERING,
             EditorialLane.BUSINESS,
             EditorialLane.BUSINESS,
             EditorialLane.BUSINESS,
-            EditorialLane.RESEARCH,
             EditorialLane.RESEARCH,
         ]
+        selected = _select_with_source_cap(items)
         return {
             item.id: _analysis(index, editorial_lane=lane)
-            for index, (item, lane) in enumerate(zip(items[:9], lanes, strict=False))
+            for index, (item, lane) in enumerate(zip(selected, lanes, strict=False))
         }
 
 
@@ -176,10 +201,28 @@ def _run(**kwargs: Any) -> DailyReport:
         "now": NOW,
         "model": "test-model",
         "history_loader": lambda _root, _date, _days: set(),
-        "report_saver": lambda _root, _report: None,
+        "publication_saver": lambda _root, _report, _record: None,
+        "run_record_saver": lambda _root, _record: None,
     }
     defaults.update(kwargs)
     return asyncio.run(run_daily(**defaults))
+
+
+def _source_diagnostics(report: DailyReport) -> dict[str, dict[str, Any]]:
+    return {
+        source_run.source_id: source_run.model_dump(
+            include={
+                "item_count",
+                "recent_count",
+                "new_count",
+                "eligible_count",
+                "candidate_count",
+                "selected_count",
+                "latest_published_at",
+            }
+        )
+        for source_run in report.source_runs
+    }
 
 
 def test_source_failure_does_not_block_healthy_source_and_marks_degraded() -> None:
@@ -205,10 +248,240 @@ def test_source_failure_does_not_block_healthy_source_and_marks_degraded() -> No
     ]
     assert report.source_runs[0].success is False
     assert report.source_runs[0].error_type == "RuntimeError"
-    assert report.source_runs[0].item_count == 0
+    assert report.source_runs[0].item_count is None
     assert report.source_runs[1].success is True
     assert all(run.item_count == 3 for run in report.source_runs[1:])
     assert "private-token" not in report.model_dump_json()
+
+
+def test_source_diagnostics_record_each_pipeline_stage_and_are_order_independent() -> None:
+    first_source = _source(0)
+    second_source = _source(1)
+    historical_url = "https://example.com/diagnostics/historical"
+    exact_url = "https://example.com/diagnostics/exact"
+    first_latest = NOW + timedelta(hours=1)
+    second_latest = NOW - timedelta(minutes=1)
+    first_items = [
+        _updated_raw(
+            _raw(1_000, source=first_source),
+            url="https://example.com/diagnostics/outside",
+            published_at=NOW - timedelta(hours=121),
+        ),
+        _updated_raw(
+            _raw(1_001, source=first_source),
+            url="https://example.com/diagnostics/future",
+            published_at=first_latest,
+        ),
+        _updated_raw(
+            _raw(1_002, source=first_source),
+            url=historical_url,
+            published_at=NOW - timedelta(hours=2),
+        ),
+        _updated_raw(
+            _raw(1_003, source=first_source),
+            url="https://example.com/diagnostics/rejected",
+            title="Generic tutorial template for teams",
+            published_at=NOW - timedelta(hours=3),
+        ),
+        _updated_raw(
+            _raw(1_004, source=first_source),
+            url=exact_url,
+            title="Shared exact enterprise assistant",
+            source_weight=10,
+            published_at=NOW - timedelta(minutes=4),
+        ),
+        _updated_raw(
+            _raw(1_005, source=first_source),
+            url="https://example.com/diagnostics/fuzzy-first",
+            title="Launch Aurora Enterprise AI Assistant for Teams",
+            source_weight=10,
+            published_at=NOW - timedelta(minutes=5),
+        ),
+        _updated_raw(
+            _raw(1_006, source=first_source),
+            url="https://example.com/diagnostics/first-selected",
+            title="Product availability expands to teams",
+            published_at=NOW - timedelta(minutes=6),
+        ),
+    ]
+    second_items = [
+        _updated_raw(
+            _raw(2_000, source=second_source),
+            url=exact_url,
+            title="Exact duplicate from the second source",
+            source_weight=1,
+            published_at=second_latest,
+        ),
+        _updated_raw(
+            _raw(2_001, source=second_source),
+            url="https://example.com/diagnostics/fuzzy-second",
+            title="Launch Aurora Enterprise AI Assistant for Team",
+            source_weight=1,
+            published_at=NOW - timedelta(minutes=7),
+        ),
+        _updated_raw(
+            _raw(2_002, source=second_source),
+            url="https://example.com/diagnostics/second-selected-a",
+            title="New assistant access for customers",
+            published_at=NOW - timedelta(minutes=8),
+        ),
+        _updated_raw(
+            _raw(2_003, source=second_source),
+            url="https://example.com/diagnostics/second-selected-b",
+            title="New assistant service for businesses",
+            published_at=NOW - timedelta(minutes=9),
+        ),
+    ]
+
+    def analyzed_items(candidates: list[Any]) -> dict[str, Analysis]:
+        return {
+            candidate.id: _analysis(index)
+            for index, candidate in enumerate(candidates)
+            if candidate.raw.title != "Launch Aurora Enterprise AI Assistant for Teams"
+        }
+
+    def run_with_order(
+        sources: list[SourceSpec],
+        items_by_source: dict[str, list[RawItem]],
+        delays: dict[str, float],
+    ) -> tuple[DailyReport, list[str]]:
+        completion_order: list[str] = []
+
+        async def collect(_client: Any, source: SourceSpec) -> list[RawItem]:
+            await asyncio.sleep(delays[source.id])
+            completion_order.append(source.id)
+            return items_by_source[source.id]
+
+        report = _run(
+            source_config=SourceConfig(sources=sources),
+            collector=collect,
+            analyzer=_Analyzer(analyzed_items),
+            history_loader=lambda _root, _date, _days: {historical_url},
+            monotonic=lambda: 100.0,
+        )
+        return report, completion_order
+
+    first_report, first_completion = run_with_order(
+        [first_source, second_source],
+        {first_source.id: first_items, second_source.id: second_items},
+        {first_source.id: 0.01, second_source.id: 0.0},
+    )
+    second_report, second_completion = run_with_order(
+        [second_source, first_source],
+        {
+            first_source.id: list(reversed(first_items)),
+            second_source.id: list(reversed(second_items)),
+        },
+        {first_source.id: 0.0, second_source.id: 0.01},
+    )
+
+    expected = {
+        first_source.id: {
+            "item_count": 7,
+            "recent_count": 5,
+            "new_count": 4,
+            "eligible_count": 3,
+            "candidate_count": 3,
+            "selected_count": 2,
+            "latest_published_at": first_latest,
+        },
+        second_source.id: {
+            "item_count": 4,
+            "recent_count": 4,
+            "new_count": 4,
+            "eligible_count": 4,
+            "candidate_count": 2,
+            "selected_count": 2,
+            "latest_published_at": second_latest,
+        },
+    }
+    assert first_completion == [second_source.id, first_source.id]
+    assert second_completion == [first_source.id, second_source.id]
+    assert _source_diagnostics(first_report) == expected
+    assert _source_diagnostics(second_report) == expected
+    assert first_report.candidate_count == second_report.candidate_count == 5
+    assert len(first_report.items) == len(second_report.items) == 4
+
+
+def test_source_diagnostics_leave_failed_collection_unknown() -> None:
+    failed_source = _source(0)
+    healthy_source = _source(1)
+
+    async def collect(_client: Any, source: SourceSpec) -> list[RawItem]:
+        if source.id == failed_source.id:
+            raise RuntimeError("private failure details")
+        return [_raw(3_000 + index, source=source) for index in range(3)]
+
+    report = _run(
+        source_config=SourceConfig(sources=[failed_source, healthy_source]),
+        collector=collect,
+        analyzer=_Analyzer(),
+    )
+
+    assert _source_diagnostics(report)[failed_source.id] == {
+        "item_count": None,
+        "recent_count": None,
+        "new_count": None,
+        "eligible_count": None,
+        "candidate_count": None,
+        "selected_count": None,
+        "latest_published_at": None,
+    }
+
+
+def test_source_diagnostics_record_successful_empty_collection_as_zero() -> None:
+    empty_source = _source(0)
+    healthy_source = _source(1)
+    items_by_source = {
+        empty_source.id: [],
+        healthy_source.id: [_raw(4_000 + index, source=healthy_source) for index in range(3)],
+    }
+
+    report = _run(
+        source_config=SourceConfig(sources=[empty_source, healthy_source]),
+        collector=_collector(items_by_source),
+        analyzer=_Analyzer(),
+    )
+
+    assert _source_diagnostics(report)[empty_source.id] == {
+        "item_count": 0,
+        "recent_count": 0,
+        "new_count": 0,
+        "eligible_count": 0,
+        "candidate_count": 0,
+        "selected_count": 0,
+        "latest_published_at": None,
+    }
+
+
+def test_prepared_candidate_diagnostics_are_deeply_immutable() -> None:
+    from ai_news.pipeline import run as run_module
+
+    source = _source(0)
+    source_run = SourceRun.succeeded(
+        source_id=source.id,
+        source_name=source.name,
+        item_count=1,
+        elapsed_ms=0,
+    )
+
+    prepared = run_module._prepare_collected_candidates(
+        [(source_run, [_raw(4_100, source=source)])],
+        set(),
+        NOW,
+    )
+
+    assert isinstance(prepared.selected, tuple)
+    with pytest.raises(TypeError):
+        prepared.latest_by_source[source.id] = NOW
+    with pytest.raises(TypeError):
+        prepared.recent_counts[source.id] = 0
+    with pytest.raises(TypeError):
+        prepared.new_counts[source.id] = 0
+    with pytest.raises(TypeError):
+        prepared.eligible_counts[source.id] = 0
+    with pytest.raises(TypeError):
+        prepared.candidate_counts[source.id] = 0
 
 
 def test_source_collection_concurrency_never_exceeds_six() -> None:
@@ -233,7 +506,7 @@ def test_source_collection_concurrency_never_exceeds_six() -> None:
     assert peak == 6
 
 
-def test_pipeline_publishes_available_quality_items_below_nine() -> None:
+def test_pipeline_publishes_available_quality_items_below_seven() -> None:
     primary_source = _source(0)
     source_config, collector = _with_filler_sources(
         primary_source,
@@ -261,17 +534,30 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     from ai_news.pipeline import run as run_module
 
     sources = [
-        _source(0, kind="feed"),
-        _source(1, kind="arxiv"),
+        _source(
+            0,
+            kind="feed",
+            official=False,
+            role="discovery",
+            hostname="discovery.example",
+        ),
+        _source(
+            1,
+            kind="arxiv",
+            official=False,
+            role="trusted_media",
+            hostname="media.example",
+        ),
         _source(2, kind="github"),
         _source(3, kind="official_page"),
         _source(4, kind="reddit_rss"),
-        _source(5, kind="feed", enabled=False),
+        _source(5, kind="feed", enabled=False, hostname="disabled.example"),
     ]
     client = object()
     factory_timeouts: list[int] = []
     seen_clients: list[object] = []
     seen_settings: list[Settings] = []
+    reddit_domain_allowlists: list[set[str] | frozenset[str]] = []
     analyzer = _Analyzer()
 
     class _ClientContext:
@@ -319,7 +605,7 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
         official_domains: set[str] | frozenset[str],
     ) -> list[RawItem]:
         seen_clients.append(received_client)
-        assert official_domains == {"example.com", "www.anthropic.com"}
+        reddit_domain_allowlists.append(official_domains)
         return [_raw(400 + index, source=source) for index in range(3)]
 
     def analyzer_factory(settings: Settings, *, client: object) -> _Analyzer:
@@ -356,6 +642,7 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     assert seen_settings[0].llm_protocol == "openai-chat"
     assert seen_settings[0].llm_model == "live-model"
     assert seen_clients == [client, client, client, client, client, client]
+    assert reddit_domain_allowlists == [{"media.example", "www.anthropic.com"}]
     assert len(report.source_runs) == 5
     assert len(analyzer.calls) == 1
 
@@ -515,7 +802,7 @@ def test_history_deduplication_and_pretrim_build_balanced_thirty_six_item_pool()
     assert report.candidate_count == 36
 
 
-def test_fewer_than_nine_valid_candidates_publishes_available_items(
+def test_eight_valid_candidates_publish_at_most_seven_items(
     tmp_path: Path,
 ) -> None:
     sources = [_source(index) for index in range(3)]
@@ -538,14 +825,14 @@ def test_fewer_than_nine_valid_candidates_publishes_available_items(
         )
     )
 
-    assert len(report.items) == 8
+    assert len(report.items) == 6
     assert len(analyzer.calls) == 1
 
 
-def test_nine_valid_items_build_and_persist_schema_1_2_report(tmp_path: Path) -> None:
-    sources = [_source(index) for index in range(3)]
+def test_seven_valid_items_build_and_persist_schema_1_3_report(tmp_path: Path) -> None:
+    sources = [_source(index) for index in range(4)]
     items_by_source = {
-        source.id: [_raw(source_index * 100 + index, source=source) for index in range(3)]
+        source.id: [_raw(source_index * 100 + index, source=source) for index in range(2)]
         for source_index, source in enumerate(sources)
     }
     report = asyncio.run(
@@ -563,15 +850,321 @@ def test_nine_valid_items_build_and_persist_schema_1_2_report(tmp_path: Path) ->
     report_path = tmp_path / "data/2026/07/2026-07-26.json"
     markdown_path = tmp_path / "content/2026-07-26.md"
     index_path = tmp_path / "data/index.json"
+    run_record_path = tmp_path / "data/runs/2026/07/2026-07-26.json"
     assert DailyReport.model_validate_json(report_path.read_bytes()) == report
-    assert report.schema_version == "1.2"
-    assert len(report.items) == 9
+    stored_record = RunRecord.model_validate_json(run_record_path.read_bytes())
+    assert stored_record.status is RunStatus.PUBLISHED
+    assert stored_record.source_runs == report.source_runs
+    assert report.schema_version == "1.3"
+    assert len(report.items) == 7
+    assert all(item.source_id is not None for item in report.items)
+    assert all(item.source_role is not None for item in report.items)
+    assert all(item.discovery_verified is not None for item in report.items)
     assert markdown_path.is_file()
     assert index_path.is_file()
 
 
-def test_final_nine_items_are_stably_sorted() -> None:
-    sources = [_source(source_index) for source_index in range(3)]
+def test_news_item_provenance_comes_from_raw_source_not_model_claims() -> None:
+    official = _source(0, official=True, role="primary")
+    media = _source(1, official=False, role="trusted_media")
+    fillers = [_source(2), _source(3)]
+    items_by_source = {
+        official.id: [_raw(10, source=official)],
+        media.id: [_raw(11, source=media)],
+        **{
+            source.id: [_raw(20 + index, source=source) for index in range(2)]
+            for index, source in enumerate(fillers)
+        },
+    }
+
+    def analyses(candidates: list[Any]) -> dict[str, Analysis]:
+        selected = {
+            candidate.raw.source_id: candidate
+            for candidate in candidates
+            if candidate.raw.source_id in {official.id, media.id}
+        }
+        return {
+            selected[official.id].id: _analysis(0).model_copy(update={"is_official": False}),
+            selected[media.id].id: _analysis(1).model_copy(update={"is_official": True}),
+        }
+
+    report = _run(
+        source_config=SourceConfig(sources=[official, media, *fillers]),
+        collector=_collector(items_by_source),
+        analyzer=_Analyzer(analyses),
+    )
+    items_by_source_id = {item.source_id: item for item in report.items}
+
+    assert items_by_source_id[official.id].is_official is True
+    assert items_by_source_id[official.id].source_role.value == "primary"
+    assert items_by_source_id[official.id].discovery_verified is False
+    assert items_by_source_id[media.id].is_official is False
+    assert items_by_source_id[media.id].source_role.value == "trusted_media"
+    assert items_by_source_id[media.id].discovery_verified is False
+
+
+def test_non_primary_high_marketing_risk_is_removed_but_primary_is_retained() -> None:
+    primary = _source(0, official=True, role="primary")
+    media = _source(1, official=False, role="trusted_media")
+    filler = _source(2)
+    items_by_source = {
+        primary.id: [_raw(30, source=primary)],
+        media.id: [_raw(31, source=media)],
+        filler.id: [_raw(32, source=filler)],
+    }
+
+    def analyses(candidates: list[Any]) -> dict[str, Analysis]:
+        return {
+            candidate.id: _analysis(index).model_copy(
+                update={
+                    "marketing_risk": (
+                        "high" if candidate.raw.source_id in {primary.id, media.id} else "low"
+                    )
+                }
+            )
+            for index, candidate in enumerate(candidates)
+        }
+
+    report = _run(
+        source_config=SourceConfig(sources=[primary, media, filler]),
+        collector=_collector(items_by_source),
+        analyzer=_Analyzer(analyses),
+    )
+
+    assert {item.source_id for item in report.items} == {primary.id, filler.id}
+    retained_primary = next(item for item in report.items if item.source_id == primary.id)
+    assert retained_primary.marketing_risk == "high"
+
+
+def test_empty_model_selection_publishes_no_report() -> None:
+    source = _source(0)
+    items = [_raw(index, source=source) for index in range(3)]
+    saves: list[DailyReport] = []
+
+    with pytest.raises(PublicationThresholdError, match="no valid editorial items"):
+        _run(
+            source_config=SourceConfig(sources=[source]),
+            collector=_collector({source.id: items}),
+            analyzer=_Analyzer(lambda _candidates: {}),
+            publication_saver=lambda _root, report, _record: saves.append(report),
+        )
+
+    assert saves == []
+
+
+def test_published_run_uses_one_atomic_publication_saver_with_matching_record(
+    tmp_path: Path,
+) -> None:
+    source = _source(0)
+    source_config, collector = _with_filler_sources(
+        source,
+        [_raw(index, source=source) for index in range(3)],
+    )
+    publications: list[tuple[DailyReport, RunRecord]] = []
+    standalone_records: list[RunRecord] = []
+
+    report = asyncio.run(
+        run_daily(
+            root=tmp_path,
+            run_date=RUN_DATE,
+            source_config=source_config,
+            collector=collector,
+            analyzer=_Analyzer(),
+            now=NOW,
+            model="test-model",
+            history_loader=lambda _root, _date, _days: set(),
+            publication_saver=(
+                lambda _root, saved_report, record: publications.append((saved_report, record))
+            ),
+            run_record_saver=lambda _root, record: standalone_records.append(record),
+        )
+    )
+
+    assert len(publications) == 1
+    saved_report, record = publications[0]
+    assert saved_report == report
+    assert record == RunRecord(
+        date=RUN_DATE,
+        cutoff_at=NOW,
+        status=RunStatus.PUBLISHED,
+        source_runs=report.source_runs,
+        safe_error_code="none",
+    )
+    assert standalone_records == []
+
+
+def test_no_candidates_persist_diagnostics_with_zero_selected_before_threshold(
+    tmp_path: Path,
+) -> None:
+    source = _source(0)
+    records: list[RunRecord] = []
+
+    with pytest.raises(PublicationThresholdError, match="no eligible candidates"):
+        asyncio.run(
+            run_daily(
+                root=tmp_path,
+                run_date=RUN_DATE,
+                source_config=SourceConfig(sources=[source]),
+                collector=_collector(
+                    {
+                        source.id: [
+                            _raw(
+                                1,
+                                source=source,
+                                published_at=NOW - timedelta(hours=121),
+                            )
+                        ]
+                    }
+                ),
+                analyzer=_Analyzer(lambda _items: pytest.fail("analyzer must not run")),
+                now=NOW,
+                model="test-model",
+                history_loader=lambda _root, _date, _days: set(),
+                publication_saver=lambda *_args: pytest.fail("must not publish"),
+                run_record_saver=lambda _root, record: records.append(record),
+            )
+        )
+
+    assert len(records) == 1
+    record = records[0]
+    assert record.status is RunStatus.NO_ELIGIBLE_CONTENT
+    assert record.safe_error_code == "no_eligible_candidates"
+    assert record.source_runs[0].recent_count == 0
+    assert record.source_runs[0].candidate_count == 0
+    assert record.source_runs[0].selected_count == 0
+
+
+def test_analysis_failure_persists_candidates_but_leaves_selected_unknown(
+    tmp_path: Path,
+) -> None:
+    source = _source(0)
+    source_config, collector = _with_filler_sources(
+        source,
+        [_raw(index, source=source) for index in range(3)],
+    )
+    records: list[RunRecord] = []
+
+    class _BrokenAnalyzer:
+        async def analyze(self, _items: list[Any]) -> dict[str, Analysis]:
+            raise RuntimeError("secret analyzer response")
+
+    with pytest.raises(AnalysisPipelineError):
+        asyncio.run(
+            run_daily(
+                root=tmp_path,
+                run_date=RUN_DATE,
+                source_config=source_config,
+                collector=collector,
+                analyzer=_BrokenAnalyzer(),
+                now=NOW,
+                model="test-model",
+                history_loader=lambda _root, _date, _days: set(),
+                publication_saver=lambda *_args: pytest.fail("must not publish"),
+                run_record_saver=lambda _root, record: records.append(record),
+            )
+        )
+
+    assert len(records) == 1
+    record = records[0]
+    assert record.status is RunStatus.FAILED_BEFORE_PUBLISH
+    assert record.safe_error_code == "analysis_failed"
+    assert sum(run.candidate_count or 0 for run in record.source_runs) > 0
+    assert all(run.selected_count is None for run in record.source_runs)
+
+
+def test_empty_validated_analysis_records_zero_selected_not_unknown(tmp_path: Path) -> None:
+    source = _source(0)
+    source_config, collector = _with_filler_sources(
+        source,
+        [_raw(index, source=source) for index in range(3)],
+    )
+    records: list[RunRecord] = []
+
+    with pytest.raises(PublicationThresholdError, match="no valid editorial items"):
+        asyncio.run(
+            run_daily(
+                root=tmp_path,
+                run_date=RUN_DATE,
+                source_config=source_config,
+                collector=collector,
+                analyzer=_Analyzer(lambda _items: {}),
+                now=NOW,
+                model="test-model",
+                history_loader=lambda _root, _date, _days: set(),
+                publication_saver=lambda *_args: pytest.fail("must not publish"),
+                run_record_saver=lambda _root, record: records.append(record),
+            )
+        )
+
+    assert records[0].status is RunStatus.NO_ELIGIBLE_CONTENT
+    assert all(run.selected_count == 0 for run in records[0].source_runs)
+
+
+def test_publication_failure_persists_safe_failure_record_then_raises(
+    tmp_path: Path,
+) -> None:
+    source = _source(0)
+    source_config, collector = _with_filler_sources(
+        source,
+        [_raw(index, source=source) for index in range(3)],
+    )
+    records: list[RunRecord] = []
+
+    def broken_publication_saver(
+        _root: Path,
+        _report: DailyReport,
+        _record: RunRecord,
+    ) -> None:
+        raise OSError("secret persistence path")
+
+    with pytest.raises(PersistencePipelineError, match="report persistence failed"):
+        asyncio.run(
+            run_daily(
+                root=tmp_path,
+                run_date=RUN_DATE,
+                source_config=source_config,
+                collector=collector,
+                analyzer=_Analyzer(),
+                now=NOW,
+                model="test-model",
+                history_loader=lambda _root, _date, _days: set(),
+                publication_saver=broken_publication_saver,
+                run_record_saver=lambda _root, record: records.append(record),
+            )
+        )
+
+    assert len(records) == 1
+    assert records[0].status is RunStatus.FAILED_BEFORE_PUBLISH
+    assert records[0].safe_error_code == "persistence_failed"
+
+
+def test_run_record_persistence_failure_overrides_no_content_success_exit(
+    tmp_path: Path,
+) -> None:
+    source = _source(0)
+
+    def broken_record_saver(_root: Path, _record: RunRecord) -> None:
+        raise OSError("secret record path")
+
+    with pytest.raises(PersistencePipelineError, match="run record persistence failed"):
+        asyncio.run(
+            run_daily(
+                root=tmp_path,
+                run_date=RUN_DATE,
+                source_config=SourceConfig(sources=[source]),
+                collector=_collector({source.id: []}),
+                analyzer=_Analyzer(),
+                now=NOW,
+                model="test-model",
+                history_loader=lambda _root, _date, _days: set(),
+                publication_saver=lambda *_args: pytest.fail("must not publish"),
+                run_record_saver=broken_record_saver,
+            )
+        )
+
+
+def test_final_seven_items_are_stably_sorted() -> None:
+    sources = [_source(source_index) for source_index in range(4)]
     items_by_source = {
         source.id: [
             _raw(
@@ -589,20 +1182,19 @@ def test_final_nine_items_are_stably_sorted() -> None:
             EditorialLane.PRODUCT_ENGINEERING,
             EditorialLane.PRODUCT_ENGINEERING,
             EditorialLane.PRODUCT_ENGINEERING,
-            EditorialLane.PRODUCT_ENGINEERING,
             EditorialLane.BUSINESS,
             EditorialLane.BUSINESS,
             EditorialLane.BUSINESS,
-            EditorialLane.RESEARCH,
             EditorialLane.RESEARCH,
         ]
+        selected = _select_with_source_cap(candidates)
         return {
             candidate.id: _analysis(
                 index,
                 importance=(index % 4) + 7,
                 editorial_lane=lane,
             )
-            for index, (candidate, lane) in enumerate(zip(candidates[:9], lanes, strict=True))
+            for index, (candidate, lane) in enumerate(zip(selected, lanes, strict=True))
         }
 
     report = _run(
@@ -619,11 +1211,11 @@ def test_final_nine_items_are_stably_sorted() -> None:
         ),
     )
 
-    assert len(report.items) == 9
+    assert len(report.items) == 7
     assert report.items == expected
 
 
-def test_pipeline_accepts_eight_analyzed_items() -> None:
+def test_pipeline_rejects_more_than_seven_analyzed_items() -> None:
     sources = [_source(index) for index in range(3)]
     items_by_source = {
         source.id: [_raw(source_index * 100 + index, source=source) for index in range(3)]
@@ -633,23 +1225,21 @@ def test_pipeline_accepts_eight_analyzed_items() -> None:
     def eight_analyses(candidates: list[Any]) -> dict[str, Analysis]:
         return {candidate.id: _analysis(index) for index, candidate in enumerate(candidates[:8])}
 
-    report = _run(
-        source_config=SourceConfig(sources=sources),
-        collector=_collector(items_by_source),
-        analyzer=_Analyzer(eight_analyses),
-    )
-    assert len(report.items) == 8
+    with pytest.raises(ReportValidationError, match="distribution"):
+        _run(
+            source_config=SourceConfig(sources=sources),
+            collector=_collector(items_by_source),
+            analyzer=_Analyzer(eight_analyses),
+        )
 
 
 def test_pipeline_allows_unbalanced_editorial_lanes() -> None:
-    sources = [_source(index) for index in range(3)]
+    sources = [_source(index) for index in range(4)]
     items_by_source = {
         source.id: [_raw(source_index * 100 + index, source=source) for index in range(3)]
         for source_index, source in enumerate(sources)
     }
     lanes = [
-        EditorialLane.PRODUCT_ENGINEERING,
-        EditorialLane.PRODUCT_ENGINEERING,
         EditorialLane.PRODUCT_ENGINEERING,
         EditorialLane.PRODUCT_ENGINEERING,
         EditorialLane.PRODUCT_ENGINEERING,
@@ -660,9 +1250,10 @@ def test_pipeline_allows_unbalanced_editorial_lanes() -> None:
     ]
 
     def invalid_lanes(candidates: list[Any]) -> dict[str, Analysis]:
+        selected = _select_with_source_cap(candidates)
         return {
             candidate.id: _analysis(index, editorial_lane=lane)
-            for index, (candidate, lane) in enumerate(zip(candidates[:9], lanes, strict=True))
+            for index, (candidate, lane) in enumerate(zip(selected, lanes, strict=True))
         }
 
     report = _run(
@@ -670,12 +1261,12 @@ def test_pipeline_allows_unbalanced_editorial_lanes() -> None:
         collector=_collector(items_by_source),
         analyzer=_Analyzer(invalid_lanes),
     )
-    assert len(report.items) == 9
+    assert len(report.items) == 7
 
 
-def test_pipeline_rejects_more_than_three_final_items_from_one_source() -> None:
+def test_pipeline_rejects_more_than_two_final_items_from_one_source() -> None:
     sources = [_source(index) for index in range(3)]
-    source_sizes = (4, 3, 2)
+    source_sizes = (3, 2, 2)
     items_by_source = {
         source.id: [
             _raw(source_index * 100 + index, source=source)
@@ -684,11 +1275,14 @@ def test_pipeline_rejects_more_than_three_final_items_from_one_source() -> None:
         for source_index, source in enumerate(sources)
     }
 
+    def invalid_distribution(candidates: list[Any]) -> dict[str, Analysis]:
+        return {candidate.id: _analysis(index) for index, candidate in enumerate(candidates[:7])}
+
     with pytest.raises(ReportValidationError, match="distribution"):
         _run(
             source_config=SourceConfig(sources=sources),
             collector=_collector(items_by_source),
-            analyzer=_Analyzer(),
+            analyzer=_Analyzer(invalid_distribution),
         )
 
 
@@ -712,6 +1306,8 @@ def test_missing_or_invalid_analysis_is_not_fabricated(
         analyzer=_Analyzer(result),
     )
     assert len(report.items) == 2
+    assert report.source_runs[0].candidate_count == 3
+    assert report.source_runs[0].selected_count == 2
 
 
 @pytest.mark.parametrize(
@@ -757,7 +1353,7 @@ def test_non_strict_analysis_payloads_are_discarded_without_saving(
             source_config=source_config,
             collector=collector,
             analyzer=_Analyzer(result),
-            report_saver=lambda _root, report: saves.append(report),
+            publication_saver=lambda _root, report, _record: saves.append(report),
         )
 
     assert saves == []
@@ -779,7 +1375,7 @@ def test_unknown_analysis_id_fails_the_whole_run_without_saving() -> None:
             source_config=source_config,
             collector=collector,
             analyzer=_Analyzer(result),
-            report_saver=lambda _root, report: saves.append(report),
+            publication_saver=lambda _root, report, _record: saves.append(report),
         )
 
     assert saves == []
@@ -823,7 +1419,7 @@ def test_report_validation_failure_happens_before_save() -> None:
             collector=collector,
             analyzer=_Analyzer(),
             model=" ",
-            report_saver=lambda _root, report: saves.append(report),
+            publication_saver=lambda _root, report, _record: saves.append(report),
         )
 
     assert saves == []
@@ -914,8 +1510,48 @@ def test_duplicate_canonical_urls_are_folded_before_bounded_pretrim() -> None:
     )
 
     assert report.candidate_count == 15
-    assert len(report.items) == 9
+    assert len(report.items) == 7
     assert sum(str(item.canonical_url) == duplicate_url for item in analyzer.calls[0]) == 1
+
+
+def test_exact_accumulator_prefers_primary_over_higher_weight_media_duplicate() -> None:
+    primary = _source(0, official=True, role="primary")
+    media = _source(1, official=False, role="trusted_media")
+    fillers = [_source(2), _source(3), _source(4)]
+    duplicate_url = "https://example.com/news/shared-official-event"
+    primary_item = _updated_raw(
+        _raw(100, source=primary),
+        url=duplicate_url,
+        title="Official product launch",
+        source_weight=1,
+        published_at=NOW - timedelta(hours=2),
+    )
+    media_item = _updated_raw(
+        _raw(101, source=media),
+        url=duplicate_url,
+        title="Media product launch",
+        source_weight=10,
+        published_at=NOW,
+    )
+    items_by_source = {
+        primary.id: [primary_item],
+        media.id: [media_item],
+        **{
+            source.id: [_raw(200 + index, source=source) for index in range(3)]
+            for index, source in enumerate(fillers)
+        },
+    }
+    analyzer = _Analyzer()
+
+    _run(
+        source_config=SourceConfig(sources=[primary, media, *fillers]),
+        collector=_collector(items_by_source),
+        analyzer=analyzer,
+    )
+
+    duplicate = [item for item in analyzer.calls[0] if str(item.canonical_url) == duplicate_url]
+    assert len(duplicate) == 1
+    assert duplicate[0].raw.source_id == primary.id
 
 
 def test_same_host_exact_titles_are_folded_before_bounded_pretrim() -> None:
@@ -948,7 +1584,7 @@ def test_same_host_exact_titles_are_folded_before_bounded_pretrim() -> None:
     )
 
     assert report.candidate_count == 15
-    assert len(report.items) == 9
+    assert len(report.items) == 7
     primary_titles = [
         item.raw.title for item in analyzer.calls[0] if item.raw.source_id == source.id
     ]
@@ -1006,7 +1642,7 @@ def test_exact_key_bridge_merges_both_existing_groups(
 
     assert dedupe_sizes == [6]
     assert report.candidate_count == 15
-    assert len(report.items) == 9
+    assert len(report.items) == 7
 
 
 def test_large_exact_title_alias_state_is_bounded_and_order_independent(
@@ -1248,11 +1884,12 @@ def test_more_than_1500_unique_items_stay_bounded_and_order_independent(
     ]
 
 
-def test_client_exit_failure_is_safe_and_prevents_all_persistence(
+def test_client_exit_failure_is_safe_and_persists_only_failure_record(
     tmp_path: Path,
 ) -> None:
     source = _source(0)
-    saves: list[DailyReport] = []
+    publications: list[DailyReport] = []
+    records: list[RunRecord] = []
 
     class _FailingExitContext:
         async def __aenter__(self) -> object:
@@ -1261,9 +1898,8 @@ def test_client_exit_failure_is_safe_and_prevents_all_persistence(
         async def __aexit__(self, *_args: object) -> None:
             raise RuntimeError("client-exit-secret?token=value")
 
-    def saver(root: Path, report: DailyReport) -> None:
-        saves.append(report)
-        save_report(root, report)
+    def saver(_root: Path, report: DailyReport, _record: RunRecord) -> None:
+        publications.append(report)
 
     source_config, collector = _with_filler_sources(
         source,
@@ -1276,12 +1912,16 @@ def test_client_exit_failure_is_safe_and_prevents_all_persistence(
             collector=collector,
             analyzer=_Analyzer(),
             client_factory=lambda *, timeout: _FailingExitContext(),
-            report_saver=saver,
+            publication_saver=saver,
+            run_record_saver=lambda _root, record: records.append(record),
         )
 
     assert str(exit_error.value) == "client initialization failed"
     assert "secret" not in str(exit_error.value)
-    assert saves == []
+    assert publications == []
+    assert len(records) == 1
+    assert records[0].status is RunStatus.FAILED_BEFORE_PUBLISH
+    assert records[0].safe_error_code == "collection_failed"
     assert not (tmp_path / "data/2026/07/2026-07-26.json").exists()
     assert not (tmp_path / "content/2026-07-26.md").exists()
     assert not (tmp_path / "data/index.json").exists()
@@ -1291,6 +1931,7 @@ def test_report_is_saved_once_only_after_normal_client_exit(tmp_path: Path) -> N
     source = _source(0)
     events: list[str] = []
     saves: list[DailyReport] = []
+    records: list[RunRecord] = []
 
     class _SuccessfulContext:
         async def __aenter__(self) -> object:
@@ -1300,9 +1941,10 @@ def test_report_is_saved_once_only_after_normal_client_exit(tmp_path: Path) -> N
         async def __aexit__(self, *_args: object) -> None:
             events.append("exit")
 
-    def saver(_root: Path, report: DailyReport) -> None:
+    def saver(_root: Path, report: DailyReport, record: RunRecord) -> None:
         events.append("save")
         saves.append(report)
+        records.append(record)
 
     source_config, collector = _with_filler_sources(
         source,
@@ -1314,8 +1956,9 @@ def test_report_is_saved_once_only_after_normal_client_exit(tmp_path: Path) -> N
         collector=collector,
         analyzer=_Analyzer(),
         client_factory=lambda *, timeout: _SuccessfulContext(),
-        report_saver=saver,
+        publication_saver=saver,
     )
 
     assert events == ["enter", "exit", "save"]
     assert saves == [report]
+    assert records[0].status is RunStatus.PUBLISHED

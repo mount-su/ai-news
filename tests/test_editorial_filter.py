@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from ai_news.models import Category, RawItem
+from ai_news.models import Category, RawItem, SourceRole
 from ai_news.pipeline.editorial import is_editorially_eligible
 from ai_news.pipeline.normalize import to_candidate
 
@@ -16,18 +16,25 @@ def _candidate(
     excerpt: str = "",
     source_id: str = "source-test",
     category: Category = Category.MODEL,
+    *,
+    source_name: str = "Test source",
+    official: bool = True,
+    source_role: SourceRole | None = None,
+    discovery_verified: bool = False,
 ):
     return to_candidate(
         RawItem(
             source_id=source_id,
-            source_name="Test source",
+            source_name=source_name,
             source_weight=7,
             title=title,
             url="https://example.com/editorial",
             published_at=datetime(2026, 8, 1, 8, tzinfo=UTC),
             excerpt=excerpt,
             category_hint=category,
-            is_official_source=True,
+            is_official_source=official,
+            source_role=source_role,
+            discovery_verified=discovery_verified,
         )
     )
 
@@ -218,3 +225,112 @@ def test_editorial_filter_rejects_low_value_technical_content(
     assert (
         is_editorially_eligible(_candidate(title, excerpt, source_id="github-langchain")) is False
     )
+
+
+@pytest.mark.parametrize(
+    "title,excerpt,category,source_name",
+    [
+        (
+            "Gemini Omni 1.1 Flash is now available",
+            "New product availability and lower latency for users.",
+            Category.RESEARCH,
+            "DeepMind Research",
+        ),
+        (
+            "Gemini 3.5 Transcribe launches for production",
+            "Production speech service with pricing and availability.",
+            Category.OPEN_SOURCE,
+            "Academic AI Lab",
+        ),
+    ],
+)
+def test_editorial_filter_uses_content_not_source_labels_for_product_releases(
+    title: str,
+    excerpt: str,
+    category: Category,
+    source_name: str,
+) -> None:
+    assert (
+        is_editorially_eligible(
+            _candidate(
+                title,
+                excerpt,
+                category=category,
+                source_name=source_name,
+            )
+        )
+        is True
+    )
+
+
+@pytest.mark.parametrize(
+    "title,excerpt",
+    [
+        (
+            "Randomized controlled study of ChatGPT students",
+            "We evaluate a treatment group and report a paper.",
+        ),
+        (
+            "A new preprint on alignment behavior",
+            "Research evaluation without product availability.",
+        ),
+        (
+            "Study of model reasoning",
+            "The paper reports experimental results without a product release.",
+        ),
+    ],
+)
+def test_editorial_filter_rejects_pure_english_academic_content(
+    title: str,
+    excerpt: str,
+) -> None:
+    assert is_editorially_eligible(_candidate(title, excerpt)) is False
+
+
+@pytest.mark.parametrize(
+    "title,excerpt",
+    [
+        ("Presented by VendorCo", "A new AI platform for enterprise customers."),
+        ("Partner Content: AI transformation", "Production adoption across businesses."),
+        ("Sponsored: The future of AI agents", "A product is now available to users."),
+    ],
+)
+def test_editorial_filter_rejects_sponsored_content(
+    title: str,
+    excerpt: str,
+) -> None:
+    assert (
+        is_editorially_eligible(
+            _candidate(
+                title,
+                excerpt,
+                official=False,
+                source_role=SourceRole.TRUSTED_MEDIA,
+            )
+        )
+        is False
+    )
+
+
+def test_editorial_filter_rejects_unverified_discovery_before_content_rules() -> None:
+    candidate = _candidate(
+        "AI assistant launches for production",
+        "The service is available to enterprise customers with published pricing.",
+        official=False,
+        source_role=SourceRole.DISCOVERY,
+        discovery_verified=False,
+    )
+
+    assert is_editorially_eligible(candidate) is False
+
+
+def test_editorial_filter_allows_verified_discovery_to_use_content_rules() -> None:
+    candidate = _candidate(
+        "AI assistant launches for production",
+        "The service is available to enterprise customers with published pricing.",
+        official=False,
+        source_role=SourceRole.DISCOVERY,
+        discovery_verified=True,
+    )
+
+    assert is_editorially_eligible(candidate) is True

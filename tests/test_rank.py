@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from ai_news.models import Candidate, Category, RawItem
+from ai_news.models import Candidate, Category, RawItem, SourceRole
 from ai_news.pipeline import rank as rank_module
 from ai_news.pipeline.normalize import to_candidate
 from ai_news.pipeline.rank import candidate_score, select_candidates
@@ -21,6 +21,9 @@ def _candidate(
     age_hours: float = 1,
     official: bool = False,
     source_id: str | None = None,
+    source_role: SourceRole | None = None,
+    excerpt: str = "Summary",
+    category: Category = Category.MODEL,
 ) -> Candidate:
     return to_candidate(
         RawItem(
@@ -30,9 +33,11 @@ def _candidate(
             title=title,
             url=f"https://example.com/{slug}",
             published_at=NOW - timedelta(hours=age_hours),
-            excerpt="Summary",
-            category_hint=Category.MODEL,
+            excerpt=excerpt,
+            category_hint=category,
             is_official_source=official,
+            source_role=source_role,
+            discovery_verified=source_role == SourceRole.DISCOVERY,
         )
     )
 
@@ -51,7 +56,11 @@ def _candidate(
         (36, 8),
         (36.01, 4),
         (72, 4),
-        (72.01, 0),
+        (72.01, 2),
+        (96, 2),
+        (96.01, 1),
+        (120, 1),
+        (120.01, 0),
     ],
 )
 def test_candidate_score_uses_exact_recency_boundaries(
@@ -60,7 +69,7 @@ def test_candidate_score_uses_exact_recency_boundaries(
 ) -> None:
     item = _candidate("recency", "Routine update", weight=1, age_hours=age_hours)
 
-    assert candidate_score(item, NOW) == 10 + expected_recency
+    assert candidate_score(item, NOW) == 12 + expected_recency
 
 
 def test_candidate_score_uses_exact_weight_official_and_single_keyword_formula() -> None:
@@ -72,7 +81,7 @@ def test_candidate_score_uses_exact_weight_official_and_single_keyword_formula()
         official=True,
     )
 
-    assert candidate_score(item, NOW) == 70 + 16 + 10 + 10
+    assert candidate_score(item, NOW) == 28 + 16 + 14 + 8 + 6
 
 
 @pytest.mark.parametrize(
@@ -87,7 +96,7 @@ def test_candidate_score_uses_exact_weight_official_and_single_keyword_formula()
     ],
 )
 def test_candidate_score_recognizes_supported_keyword_semantics(title: str) -> None:
-    assert candidate_score(_candidate("keyword", title, weight=1), NOW) == 40
+    assert candidate_score(_candidate("keyword", title, weight=1), NOW) == 38
 
 
 @pytest.mark.parametrize(
@@ -100,7 +109,49 @@ def test_candidate_score_recognizes_supported_keyword_semantics(title: str) -> N
     ],
 )
 def test_candidate_score_does_not_match_unrelated_or_non_exact_english_words(title: str) -> None:
-    assert candidate_score(_candidate("plain", title, weight=1), NOW) == 30
+    assert candidate_score(_candidate("plain", title, weight=1), NOW) == 32
+
+
+def test_candidate_score_rewards_source_role_and_excerpt_completeness() -> None:
+    complete_excerpt = "x" * 960
+    primary = _candidate(
+        "primary",
+        "Routine update",
+        weight=5,
+        official=True,
+        excerpt=complete_excerpt,
+    )
+    trusted = _candidate(
+        "trusted",
+        "Routine update",
+        weight=5,
+        official=False,
+        source_role=SourceRole.TRUSTED_MEDIA,
+        excerpt=complete_excerpt,
+    )
+    discovery = _candidate(
+        "discovery",
+        "Routine update",
+        weight=5,
+        official=False,
+        source_role=SourceRole.DISCOVERY,
+        excerpt="marketing snippet",
+    )
+
+    assert candidate_score(primary, NOW) > candidate_score(trusted, NOW)
+    assert candidate_score(trusted, NOW) > candidate_score(discovery, NOW)
+
+
+def test_select_candidates_gives_a_small_bonus_to_scarce_non_research_channels() -> None:
+    dominant = [
+        _candidate(f"model-{index}", "Routine update", category=Category.MODEL)
+        for index in range(6)
+    ]
+    rare = _candidate("tool", "Routine update", category=Category.TOOL)
+
+    selected = select_candidates([*dominant, rare], NOW)
+
+    assert selected[0] == rare
 
 
 def test_candidate_score_requires_timezone_aware_now() -> None:

@@ -102,6 +102,7 @@ def parse_arxiv(payload: bytes, source: SourceSpec) -> list[RawItem]:
                 excerpt=_clean_html(entry.get("summary"))[:_MAX_EXCERPT_LENGTH],
                 category_hint=source.category,
                 is_official_source=source.official,
+                source_role=source.role,
             )
         except (OverflowError, TypeError, ValueError, ValidationError):
             continue

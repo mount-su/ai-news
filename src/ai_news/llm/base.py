@@ -22,6 +22,11 @@ from pydantic import (
     field_validator,
 )
 
+from ai_news.editorial_policy import (
+    MAX_ITEMS_PER_SOURCE,
+    MAX_REPORT_ITEMS,
+    MIN_MODEL_SELECTION,
+)
 from ai_news.llm.endpoint import InvalidLLMEndpoint, build_llm_endpoint
 from ai_news.llm.prompt import build_analysis_prompt
 from ai_news.models import (
@@ -224,35 +229,20 @@ def _parse_analysis(
     except (ValidationError, TypeError, ValueError):
         return None, "schema"
 
-    selection_count = min(9, len(candidates))
-    minimum_selection_count = 5 if len(candidates) >= 5 else 1
+    selection_count = min(MAX_REPORT_ITEMS, len(candidates))
     row_ids = [row.id for row in parsed_rows]
     if len(row_ids) != len(set(row_ids)):
         return None, "duplicate"
     candidate_by_id = {candidate.id: candidate for candidate in candidates}
     if any(row_id not in candidate_by_id for row_id in row_ids):
         return None, "unknown"
-    if not row_ids:
-        return None, "missing"
-    if len(row_ids) < minimum_selection_count:
+    if len(row_ids) < MIN_MODEL_SELECTION:
         return None, "count"
     if len(row_ids) > selection_count:
         return None, "count"
-    if selection_count == 9:
-        # Legacy 1.1 fixtures used a balanced three-lane contract. Keep
-        # rejecting malformed legacy responses while allowing the current
-        # consumer brief to use whichever lanes have eligible stories.
-        legacy_lanes = {
-            EditorialLane.PRODUCT_ENGINEERING,
-            EditorialLane.BUSINESS,
-            EditorialLane.RESEARCH,
-        }
-        lane_counts = Counter(row.editorial_lane for row in parsed_rows)
-        if set(lane_counts) <= legacy_lanes and any(count > 4 for count in lane_counts.values()):
-            return None, "lane_distribution"
-        source_counts = Counter(candidate_by_id[row.id].raw.source_id for row in parsed_rows)
-        if any(count > 3 for count in source_counts.values()):
-            return None, "source_distribution"
+    source_counts = Counter(candidate_by_id[row.id].raw.source_id for row in parsed_rows)
+    if any(count > MAX_ITEMS_PER_SOURCE for count in source_counts.values()):
+        return None, "source_distribution"
 
     return {
         row.id: Analysis.model_validate(row.model_dump(exclude={"id"})) for row in parsed_rows
