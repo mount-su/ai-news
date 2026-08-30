@@ -4,10 +4,28 @@ from __future__ import annotations
 
 import re
 
-from ai_news.models import Candidate
+from ai_news.models import Candidate, SourceRole
 
 _ACADEMIC_MARKERS = re.compile(
-    r"(?:\barxiv\b|论文|学术|研究论文|科研|模型原理|模型训练|alignment behavior|对齐行为)",
+    r"(?:\barxiv\b|\bpaper\b|\bpreprint\b|\bstudy\b|"
+    r"\brandomi[sz]ed\s+controlled\b|\bresearch\s+evaluation\b|"
+    r"\balignment\s+behavio(?:u)?r\b|论文|学术|研究论文|科研|模型原理|模型训练|对齐行为)",
+    re.IGNORECASE,
+)
+_ACADEMIC_IMPACT_EXCEPTIONS = re.compile(
+    r"(?:\b(?:is|are|now)\s+available\b|\blaunch(?:es|ed|ing)?\b|"
+    r"\brelease[sd]?\s+(?:to|for)\b|\broll(?:s|ed|ing)?\s+out\b|"
+    r"\bproduction\s+(?:deployment|service|use|availability)\b|"
+    r"\bdeployed\s+in\s+production\b|\bpricing\b|\bprice\s+(?:cut|change|drops?)\b|"
+    r"\blower\s+[^.。]{0,40}(?:cost|latency)\b|\bpolicy\s+(?:change|rule|update)\b|"
+    r"\bregulat(?:ion|ory)\s+(?:change|rule|update)\b|"
+    r"\bsecurity\s+(?:issue|update|vulnerability|advisory)\b|"
+    r"现已可用|正式上线|正式发布|投入生产|生产部署|价格调整|降价|成本降低|"
+    r"政策变化|监管规则|安全漏洞)",
+    re.IGNORECASE,
+)
+_SPONSORED_MARKERS = re.compile(
+    r"(?:\bpresented\s+by\b|\bpartner\s+content\b|\bsponsored\b|赞助内容|商业推广)",
     re.IGNORECASE,
 )
 _BENCHMARK_MARKERS = re.compile(
@@ -72,8 +90,13 @@ def is_editorially_eligible(candidate: Candidate) -> bool:
     """
 
     raw = candidate.raw
-    text = " ".join((raw.title, raw.source_name, raw.excerpt, raw.category_hint.value))
-    if _ACADEMIC_MARKERS.search(text):
+    if raw.source_role == SourceRole.DISCOVERY and not raw.discovery_verified:
+        return False
+
+    text = " ".join((raw.title, raw.excerpt))
+    if _SPONSORED_MARKERS.search(text):
+        return False
+    if _ACADEMIC_MARKERS.search(text) and not _ACADEMIC_IMPACT_EXCEPTIONS.search(text):
         return False
     if _ALWAYS_LOW_VALUE_TECHNICAL_MARKERS.search(text):
         return False
