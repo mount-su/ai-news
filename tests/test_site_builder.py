@@ -329,8 +329,8 @@ def test_home_uses_latest_report_and_feed_category_order_is_stable(
     assert items["old-coding"].id not in homepage.article_ids
     agent_page = _parse(output / "categories/agent/index.html")
     assert agent_page.article_ids == [
-        items["coding"].id,
         items["agent"].id,
+        items["coding"].id,
         items["old-coding"].id,
     ]
     assert not (output / "categories/coding-agent/index.html").exists()

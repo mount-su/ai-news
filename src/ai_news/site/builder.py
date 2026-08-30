@@ -137,6 +137,19 @@ def _sort_items(items: Iterable[NewsItem]) -> list[NewsItem]:
     )
 
 
+def _sort_category_entries(
+    entries: Iterable[tuple[DailyReport, NewsItem]],
+) -> list[tuple[DailyReport, NewsItem]]:
+    return sorted(
+        entries,
+        key=lambda entry: (
+            -entry[1].published_at.timestamp(),
+            entry[1].id,
+            -entry[0].date.toordinal(),
+        ),
+    )
+
+
 def _beijing_datetime(value: datetime) -> str:
     return f"{value.astimezone(_SHANGHAI):%Y-%m-%d %H:%M} 北京时间"
 
@@ -280,15 +293,7 @@ def _build_staging(
     for category, report_items in category_items.items():
         ordered_entries = [
             {"report_date": report.date.isoformat(), "item": item}
-            for report, item in sorted(
-                report_items,
-                key=lambda entry: (
-                    -entry[1].importance,
-                    -entry[1].published_at.timestamp(),
-                    entry[1].id,
-                    -entry[0].date.toordinal(),
-                ),
-            )
+            for report, item in _sort_category_entries(report_items)
         ]
         _render(
             environment,
