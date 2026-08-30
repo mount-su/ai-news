@@ -236,16 +236,23 @@ def _parse_analysis(
     candidate_by_id = {candidate.id: candidate for candidate in candidates}
     if any(row_id not in candidate_by_id for row_id in row_ids):
         return None, "unknown"
-    if len(row_ids) < MIN_MODEL_SELECTION:
+
+    bounded_rows: list[_AnalysisRow] = []
+    source_counts: Counter[str] = Counter()
+    for row in parsed_rows:
+        source_id = candidate_by_id[row.id].raw.source_id
+        if source_counts[source_id] >= MAX_ITEMS_PER_SOURCE:
+            continue
+        source_counts[source_id] += 1
+        bounded_rows.append(row)
+        if len(bounded_rows) == selection_count:
+            break
+
+    if len(bounded_rows) < MIN_MODEL_SELECTION:
         return None, "count"
-    if len(row_ids) > selection_count:
-        return None, "count"
-    source_counts = Counter(candidate_by_id[row.id].raw.source_id for row in parsed_rows)
-    if any(count > MAX_ITEMS_PER_SOURCE for count in source_counts.values()):
-        return None, "source_distribution"
 
     return {
-        row.id: Analysis.model_validate(row.model_dump(exclude={"id"})) for row in parsed_rows
+        row.id: Analysis.model_validate(row.model_dump(exclude={"id"})) for row in bounded_rows
     }, None
 
 
