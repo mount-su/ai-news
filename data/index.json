@@ -1,6 +1,11 @@
 {
   "reports": [
     {
+      "date": "2026-08-29",
+      "item_count": 5,
+      "path": "data/2026/08/2026-08-29.json"
+    },
+    {
       "date": "2026-08-28",
       "item_count": 3,
       "path": "data/2026/08/2026-08-28.json"

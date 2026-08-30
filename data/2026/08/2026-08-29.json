@@ -1,0 +1,277 @@
+{
+  "candidate_count": 12,
+  "date": "2026-08-29",
+  "degraded": false,
+  "generated_at": "2026-08-29T15:59:59.999999Z",
+  "items": [
+    {
+      "canonical_url": "https://cursor.com/changelog/start-from-scratch",
+      "category": "Coding Agent",
+      "editorial_lane": "产品与应用",
+      "id": "13d1b5dab0dfabb7",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Start from scratch, without a repo",
+      "published_at": "2026-08-27T00:00:00Z",
+      "source": "Cursor Changelog",
+      "summary": "Cursor Cloud Agents 现在无需连接仓库即可从零开始工作，同时新增实时预览和 Vercel 发布能力，降低使用门槛并缩短从想法到部署的路径。",
+      "tags": [
+        "Cursor",
+        "Cloud Agents",
+        "Vercel"
+      ],
+      "title": "Cursor Cloud Agents 支持无仓库启动并新增实时预览与 Vercel 发布",
+      "tracking_signal": "关注 Cursor 官方文档中无仓库模式与 Vercel 发布的具体配置步骤，并在实际项目中验证预览与部署稳定性。",
+      "why_it_matters": "对没有现成代码库的用户，可以直接在云端启动编码代理并发布到 Vercel，扩大了 Coding Agent 的可用范围，也影响 Cursor 与现有开发工作流的集成方式。"
+    },
+    {
+      "canonical_url": "https://sourcegraph.com/blog/a-smarter-way-to-run-code-migrations-with-less-llm-context",
+      "category": "Coding Agent",
+      "editorial_lane": "产品与应用",
+      "id": "fa89676c2ca9be77",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "A smarter way to run code migrations with less LLM context",
+      "published_at": "2026-08-28T00:00:00Z",
+      "source": "Sourcegraph Blog",
+      "summary": "Deep Search 在 Sourcegraph 搜索 API 周围的沙箱中运行脚本，使迁移审计返回 CSV 清单，而不是数千个文件的大量 token，降低上下文成本。",
+      "tags": [
+        "Sourcegraph",
+        "代码迁移",
+        "LLM 上下文"
+      ],
+      "title": "Sourcegraph Deep Search 用沙箱脚本减少代码迁移审计的 LLM 上下文消耗",
+      "tracking_signal": "在 Sourcegraph 实例中试用 Deep Search 的迁移审计流程，对比 CSV 输出与原始文件扫描的 token 消耗和审计完整性。",
+      "why_it_matters": "对需要大规模代码迁移或审计的团队，可显著减少 LLM 调用成本和上下文窗口压力，提升审计结果的可操作性。"
+    },
+    {
+      "canonical_url": "https://ollama.com/blog/claude-desktop",
+      "category": "开源项目",
+      "editorial_lane": "产品与应用",
+      "id": "213972d562d3db62",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Claude Desktop support with Ollama",
+      "published_at": "2026-08-25T00:00:00Z",
+      "source": "Ollama Blog",
+      "summary": "Claude Desktop 现可配置 Ollama 作为第三方网关提供方，从而在 Claude 中使用开放模型，扩展了桌面端可接入的模型范围。",
+      "tags": [
+        "Ollama",
+        "Claude Desktop",
+        "开放模型"
+      ],
+      "title": "Ollama 支持作为 Claude Desktop 第三方网关使用开放模型",
+      "tracking_signal": "查看 Ollama 官方配置说明，测试 Claude Desktop 通过 Ollama 调用开放模型时的响应质量与本地资源占用。",
+      "why_it_matters": "用户可以在 Claude Desktop 内切换到本地或开放模型，减少对单一闭源模型的依赖，并可能降低 API 成本或提升隐私控制。"
+    },
+    {
+      "canonical_url": "https://www.producthunt.com/products/hunyuan-a13b",
+      "category": "开源项目",
+      "editorial_lane": "产品与应用",
+      "id": "671806f4b5bbbe16",
+      "importance": 5,
+      "is_official": false,
+      "marketing_risk": "high",
+      "original_title": "Hy4 preview",
+      "published_at": "2026-08-28T16:57:52Z",
+      "source": "Product Hunt AI",
+      "summary": "腾讯推出 770B 参数的开放模型 Hy4 预览版，定位为长周期工作负载，具体权重、许可和部署要求尚未在候选中说明。",
+      "tags": [
+        "腾讯",
+        "Hy4",
+        "开放模型"
+      ],
+      "title": "腾讯发布 770B 开放模型 Hy4 预览版，面向长周期任务",
+      "tracking_signal": "等待腾讯官方发布模型权重、许可证和硬件要求，避免仅根据预览信息进行生产部署决策。",
+      "why_it_matters": "大规模开放模型可能为需要长上下文或复杂任务的企业提供新的自托管选项，但预览阶段的实际可用性和许可仍需确认。"
+    },
+    {
+      "canonical_url": "https://www.producthunt.com/products/cohere-2",
+      "category": "AI 工具",
+      "editorial_lane": "产品与应用",
+      "id": "4c09c6e826b3cbcc",
+      "importance": 5,
+      "is_official": false,
+      "marketing_risk": "medium",
+      "original_title": "Cohere Parse 5",
+      "published_at": "2026-08-28T15:59:34Z",
+      "source": "Product Hunt AI",
+      "summary": "Cohere Parse 5 发布，可将复杂文档、表格和图像转换为 AI 就绪的结构化数据，面向需要处理非结构化输入的团队。",
+      "tags": [
+        "Cohere",
+        "文档解析",
+        "数据预处理"
+      ],
+      "title": "Cohere Parse 5 将复杂文档、表格与图像转换为 AI 可用数据",
+      "tracking_signal": "通过 Cohere 官方渠道确认 Parse 5 的可用区域和定价，并用真实复杂文档测试表格与图像解析准确率。",
+      "why_it_matters": "企业用户在处理合同、报表或扫描件时，可减少人工整理和预处理工作，提高 RAG 或自动化流程的数据质量。"
+    }
+  ],
+  "model": "deepseek-v4-pro",
+  "schema_version": "1.2",
+  "source_runs": [
+    {
+      "elapsed_ms": 840,
+      "error_type": null,
+      "item_count": 1157,
+      "source_id": "openai",
+      "source_name": "OpenAI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1388,
+      "error_type": null,
+      "item_count": 20,
+      "source_id": "google-ai",
+      "source_name": "Google AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1205,
+      "error_type": null,
+      "item_count": 100,
+      "source_id": "deepmind",
+      "source_name": "DeepMind",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1148,
+      "error_type": null,
+      "item_count": 852,
+      "source_id": "hugging-face",
+      "source_name": "Hugging Face",
+      "success": true
+    },
+    {
+      "elapsed_ms": 132,
+      "error_type": null,
+      "item_count": 82,
+      "source_id": "mistral",
+      "source_name": "Mistral",
+      "success": true
+    },
+    {
+      "elapsed_ms": 80,
+      "error_type": null,
+      "item_count": 44,
+      "source_id": "qwen",
+      "source_name": "通义千问 Qwen",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1522,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "anthropic",
+      "source_name": "Anthropic",
+      "success": true
+    },
+    {
+      "elapsed_ms": 6772,
+      "error_type": null,
+      "item_count": 4,
+      "source_id": "meta-ai",
+      "source_name": "Meta AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 452,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "deepseek",
+      "source_name": "DeepSeek",
+      "success": true
+    },
+    {
+      "elapsed_ms": 1187,
+      "error_type": null,
+      "item_count": 1,
+      "source_id": "zhipu-glm",
+      "source_name": "智谱 GLM",
+      "success": true
+    },
+    {
+      "elapsed_ms": 10169,
+      "error_type": null,
+      "item_count": 7,
+      "source_id": "minimax",
+      "source_name": "MiniMax",
+      "success": true
+    },
+    {
+      "elapsed_ms": 700,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "tencent-hunyuan",
+      "source_name": "腾讯混元",
+      "success": true
+    },
+    {
+      "elapsed_ms": 4552,
+      "error_type": null,
+      "item_count": 5,
+      "source_id": "volcengine-doubao",
+      "source_name": "豆包与火山方舟",
+      "success": true
+    },
+    {
+      "elapsed_ms": 6104,
+      "error_type": null,
+      "item_count": 2,
+      "source_id": "baidu-ernie",
+      "source_name": "百度文心",
+      "success": true
+    },
+    {
+      "elapsed_ms": 62652,
+      "error_type": null,
+      "item_count": 0,
+      "source_id": "reddit-ai",
+      "source_name": "Reddit AI 线索",
+      "success": true
+    },
+    {
+      "elapsed_ms": 273,
+      "error_type": null,
+      "item_count": 30,
+      "source_id": "sourcegraph-blog",
+      "source_name": "Sourcegraph Blog",
+      "success": true
+    },
+    {
+      "elapsed_ms": 221,
+      "error_type": null,
+      "item_count": 50,
+      "source_id": "cursor-changelog",
+      "source_name": "Cursor Changelog",
+      "success": true
+    },
+    {
+      "elapsed_ms": 189,
+      "error_type": null,
+      "item_count": 57,
+      "source_id": "ollama-blog",
+      "source_name": "Ollama Blog",
+      "success": true
+    },
+    {
+      "elapsed_ms": 109,
+      "error_type": null,
+      "item_count": 50,
+      "source_id": "producthunt-ai",
+      "source_name": "Product Hunt AI",
+      "success": true
+    },
+    {
+      "elapsed_ms": 93,
+      "error_type": null,
+      "item_count": 10,
+      "source_id": "github-blog-ai",
+      "source_name": "GitHub Blog AI",
+      "success": true
+    }
+  ]
+}
