@@ -124,7 +124,12 @@ jobs:
         run: python -m pip install .
 
       - name: Build static site
-        run: python -m ai_news build --root . --output dist
+        env:
+          AI_NEWS_BUILD_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          export AI_NEWS_BUILD_SHA="$(git rev-parse HEAD)"
+          python -m ai_news build --root . --output dist
 
       - name: Validate static site
         run: python scripts/validate_site.py dist --base-path /ai-news/

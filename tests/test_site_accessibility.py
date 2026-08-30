@@ -115,7 +115,8 @@ def test_all_pages_have_single_main_skip_link_landmarks_and_ordered_headings(
             channel in page_text
             for channel in ("大模型", "Agent", "AI 产品", "开源生态", "行业政策")
         )
-        assert any(link.get("aria-current") == "page" for link in parser.links)
+        if page.name != "404.html":
+            assert any(link.get("aria-current") == "page" for link in parser.links)
 
 
 def test_story_titles_are_links_and_external_sources_announce_new_windows(

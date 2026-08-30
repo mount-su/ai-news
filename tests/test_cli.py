@@ -354,7 +354,9 @@ def test_build_dispatches_paths_without_loading_llm_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output = tmp_path / "dist"
-    calls: list[tuple[Path, Path]] = []
+    calls: list[tuple[Path, Path, str, int | None]] = []
+    monkeypatch.delenv("AI_NEWS_BUILD_SHA", raising=False)
+    monkeypatch.delenv("AI_NEWS_BUILD_RUN_ID", raising=False)
     monkeypatch.setattr(
         cli,
         "load_settings",
@@ -363,13 +365,57 @@ def test_build_dispatches_paths_without_loading_llm_settings(
     monkeypatch.setattr(
         cli,
         "_build_site",
-        lambda root, selected_output: calls.append((root, selected_output)),
+        lambda root, selected_output, *, build_revision, workflow_run_id: calls.append(
+            (root, selected_output, build_revision, workflow_run_id)
+        ),
     )
 
     result = cli.main(["build", "--root", str(tmp_path), "--output", str(output)])
 
     assert result == 0
-    assert calls == [(tmp_path, output)]
+    assert calls == [(tmp_path, output, "local", None)]
+
+
+def test_build_passes_validated_production_provenance_from_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "dist"
+    revision = "b" * 40
+    calls: list[tuple[str, int | None]] = []
+    monkeypatch.setenv("AI_NEWS_BUILD_SHA", revision)
+    monkeypatch.setenv("AI_NEWS_BUILD_RUN_ID", "987654")
+    monkeypatch.setattr(
+        cli,
+        "_build_site",
+        lambda _root, _output, *, build_revision, workflow_run_id: calls.append(
+            (build_revision, workflow_run_id)
+        ),
+    )
+
+    assert cli.main(["build", "--root", str(tmp_path), "--output", str(output)]) == 0
+    assert calls == [(revision, 987654)]
+
+
+@pytest.mark.parametrize(
+    ("revision", "run_id"),
+    [("main", "123"), ("a" * 39, "123"), ("a" * 40, "run-123"), ("a" * 40, "0")],
+)
+def test_build_rejects_invalid_provenance_without_calling_builder(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    revision: str,
+    run_id: str,
+) -> None:
+    monkeypatch.setenv("AI_NEWS_BUILD_SHA", revision)
+    monkeypatch.setenv("AI_NEWS_BUILD_RUN_ID", run_id)
+    monkeypatch.setattr(
+        cli,
+        "_build_site",
+        lambda *_args, **_kwargs: pytest.fail("invalid provenance must stop before build"),
+    )
+
+    assert cli.main(["build", "--root", str(tmp_path), "--output", str(tmp_path / "dist")]) == 5
 
 
 def test_lazy_build_adapter_imports_task8_builder_module(
@@ -381,7 +427,9 @@ def test_lazy_build_adapter_imports_task8_builder_module(
     site_package = types.ModuleType("ai_news.site")
     site_package.__path__ = []
     builder_module = types.ModuleType("ai_news.site.builder")
-    builder_module.build_site = lambda root, selected_output: calls.append((root, selected_output))
+    builder_module.build_site = lambda root, selected_output, **_kwargs: calls.append(
+        (root, selected_output)
+    )
     monkeypatch.setitem(sys.modules, "ai_news.site", site_package)
     monkeypatch.setitem(sys.modules, "ai_news.site.builder", builder_module)
 
@@ -395,7 +443,7 @@ def test_build_failure_returns_five_with_safe_stderr(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    def broken_builder(_root: Path, _output: Path) -> None:
+    def broken_builder(_root: Path, _output: Path, **_kwargs: object) -> None:
         raise RuntimeError("https://secret.example/build?token=value")
 
     monkeypatch.setattr(cli, "_build_site", broken_builder)
@@ -414,7 +462,7 @@ def test_demo_is_offline_deterministic_and_builds_from_a_real_saved_report(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output = tmp_path / "dist"
-    calls: list[tuple[Path, Path]] = []
+    calls: list[tuple[Path, Path, str, int | None]] = []
     for environment_name in (
         "LLM_PROTOCOL",
         "LLM_BASE_URL",
@@ -431,7 +479,9 @@ def test_demo_is_offline_deterministic_and_builds_from_a_real_saved_report(
     monkeypatch.setattr(
         cli,
         "_build_site",
-        lambda root, selected_output: calls.append((root, selected_output)),
+        lambda root, selected_output, *, build_revision, workflow_run_id: calls.append(
+            (root, selected_output, build_revision, workflow_run_id)
+        ),
     )
 
     first_result = cli.main(["demo", "--root", str(tmp_path), "--output", str(output)])
@@ -444,7 +494,10 @@ def test_demo_is_offline_deterministic_and_builds_from_a_real_saved_report(
     assert first_report.schema_version == "1.3"
     assert first_report == second_report
     assert first_report.model == "offline-demo"
-    assert calls == [(tmp_path, output), (tmp_path, output)]
+    assert calls == [
+        (tmp_path, output, "offline-demo", None),
+        (tmp_path, output, "offline-demo", None),
+    ]
     assert not any(name.startswith("LLM_") for name in os.environ)
 
 

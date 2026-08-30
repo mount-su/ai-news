@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import stat
 import tempfile
+import xml.etree.ElementTree as ET
 from collections.abc import Iterable
 from datetime import datetime, timedelta
+from email.utils import format_datetime
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from uuid import uuid4
@@ -42,6 +45,8 @@ _TEMPLATE_DIRECTORY = _SITE_DIRECTORY / "templates"
 _STATIC_DIRECTORY = _SITE_DIRECTORY / "static"
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
 _RESERVED_ROOT_DIRECTORIES = ("data", "content", "sources")
+_PUBLIC_SITE_ROOT = "https://mount-su.github.io/ai-news/"
+_BUILD_REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
 
 def _display_category(category: Category) -> Category:
@@ -86,6 +91,32 @@ def _page_url(base_path: str, page: str = "") -> str:
     if any(part in {".", ".."} for part in clean_page.split("/")):
         raise ValueError("page path is invalid")
     return f"{base_path}{clean_page}/"
+
+
+def _canonical_url_for_output(relative_path: str) -> str:
+    normalized = relative_path.strip("/")
+    if normalized == "index.html":
+        return _PUBLIC_SITE_ROOT
+    if normalized.endswith("/index.html"):
+        return f"{_PUBLIC_SITE_ROOT}{normalized.removesuffix('index.html')}"
+    return f"{_PUBLIC_SITE_ROOT}{normalized}"
+
+
+def _validate_build_provenance(
+    build_revision: str,
+    workflow_run_id: int | None,
+) -> tuple[str, int | None]:
+    if build_revision not in {"local", "offline-demo"} and not _BUILD_REVISION_PATTERN.fullmatch(
+        build_revision
+    ):
+        raise ValueError("build_revision must be local, offline-demo, or a 40-character SHA")
+    if workflow_run_id is not None and (
+        isinstance(workflow_run_id, bool)
+        or not isinstance(workflow_run_id, int)
+        or workflow_run_id < 1
+    ):
+        raise ValueError("workflow_run_id must be a positive integer")
+    return build_revision, workflow_run_id
 
 
 def _resolved(path: Path, *, label: str) -> Path:
@@ -274,7 +305,16 @@ def _render(
     relative_path: str,
     context: dict[str, object],
 ) -> None:
-    rendered = environment.get_template(template_name).render(**context)
+    page_context = {
+        **context,
+        "description": context.get(
+            "description",
+            "每日筛选真正影响 AI 产品、商业与平台决策的重要变化。",
+        ),
+        "canonical_url": _canonical_url_for_output(relative_path),
+        "og_type": context.get("og_type", "website"),
+    }
+    rendered = environment.get_template(template_name).render(**page_context)
     _write_text(staging / relative_path, rendered)
 
 
@@ -302,6 +342,108 @@ def _public_search_entry(
     }
 
 
+def _write_xml(path: Path, root: ET.Element) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ET.indent(root, space="  ")
+    ET.ElementTree(root).write(
+        path,
+        encoding="utf-8",
+        xml_declaration=True,
+        short_empty_elements=True,
+    )
+
+
+def _rss_description(item: NewsItem) -> str:
+    container = ET.Element("div")
+    ET.SubElement(container, "p").text = item.summary
+    ET.SubElement(container, "p").text = item.why_it_matters
+    source_paragraph = ET.SubElement(container, "p")
+    source_link = ET.SubElement(
+        source_paragraph,
+        "a",
+        {"href": str(item.canonical_url)},
+    )
+    source_link.text = "原始来源"
+    return "".join(ET.tostring(child, encoding="unicode", method="html") for child in container)
+
+
+def _write_feed(staging: Path, reports: list[DailyReport]) -> None:
+    rss = ET.Element("rss", {"version": "2.0"})
+    channel = ET.SubElement(rss, "channel")
+    ET.SubElement(channel, "title").text = "AI 情报日报"
+    ET.SubElement(channel, "link").text = _PUBLIC_SITE_ROOT
+    ET.SubElement(
+        channel, "description"
+    ).text = "每日筛选真正影响 AI 产品、商业与平台决策的重要变化。"
+    ET.SubElement(channel, "language").text = "zh-CN"
+    ET.SubElement(channel, "lastBuildDate").text = format_datetime(reports[0].generated_at)
+
+    cutoff = reports[0].date - timedelta(days=29)
+    seen_item_ids: set[str] = set()
+    pairs: list[tuple[DailyReport, NewsItem]] = []
+    for report in reports:
+        if report.date < cutoff:
+            continue
+        for item in report.items:
+            if channel_for_item(item) is None or item.id in seen_item_ids:
+                continue
+            seen_item_ids.add(item.id)
+            pairs.append((report, item))
+    pairs.sort(key=lambda pair: (-pair[1].published_at.timestamp(), pair[1].id))
+    for report, item in pairs:
+        link = (
+            f"{_PUBLIC_SITE_ROOT}days/{report.date.isoformat()}/#{item_fragment(item, report.date)}"
+        )
+        element = ET.SubElement(channel, "item")
+        ET.SubElement(element, "title").text = item.title
+        ET.SubElement(element, "link").text = link
+        ET.SubElement(element, "guid", {"isPermaLink": "true"}).text = link
+        ET.SubElement(element, "pubDate").text = format_datetime(item.published_at)
+        ET.SubElement(element, "description").text = _rss_description(item)
+    _write_xml(staging / "feed.xml", rss)
+
+
+def _write_sitemap(staging: Path) -> None:
+    namespace = "http://www.sitemaps.org/schemas/sitemap/0.9"
+    ET.register_namespace("", namespace)
+    urlset = ET.Element(f"{{{namespace}}}urlset")
+    for path in sorted(staging.rglob("*.html")):
+        relative_path = path.relative_to(staging).as_posix()
+        if relative_path == "404.html":
+            continue
+        url = ET.SubElement(urlset, f"{{{namespace}}}url")
+        ET.SubElement(url, f"{{{namespace}}}loc").text = _canonical_url_for_output(relative_path)
+    _write_xml(staging / "sitemap.xml", urlset)
+
+
+def _write_discovery_files(
+    staging: Path,
+    reports: list[DailyReport],
+    build_revision: str,
+    workflow_run_id: int | None,
+) -> None:
+    _write_feed(staging, reports)
+    _write_sitemap(staging)
+    _write_text(
+        staging / "robots.txt",
+        f"User-agent: *\nAllow: /\nSitemap: {_PUBLIC_SITE_ROOT}sitemap.xml\n",
+    )
+    _write_text(
+        staging / "build-info.json",
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "revision": build_revision,
+                "workflow_run_id": workflow_run_id,
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+    )
+
+
 def _build_staging(
     staging: Path,
     reports: list[DailyReport],
@@ -309,6 +451,8 @@ def _build_staging(
     run_records: list[RunRecord],
     source_specs: list[SourceSpec],
     base_path: str,
+    build_revision: str,
+    workflow_run_id: int | None,
 ) -> None:
     environment = _environment(base_path)
     latest = reports[0]
@@ -361,6 +505,7 @@ def _build_staging(
                 **common,
                 "page_title": f"{report.date.isoformat()} 情报",
                 "current_page": "archive",
+                "og_type": "article",
                 "report": _report_context(report, issue_by_date[report.date]),
                 "items": report_items,
                 "entries": report_entries,
@@ -510,6 +655,24 @@ def _build_staging(
         staging / "search.json",
         json.dumps(search_payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
     )
+    _render(
+        environment,
+        staging,
+        "404.html",
+        "404.html",
+        {
+            **common,
+            "page_title": "页面未找到",
+            "current_page": "not-found",
+            "description": "页面不存在。可返回今日头版或日期归档继续浏览。",
+        },
+    )
+    _write_discovery_files(
+        staging,
+        reports,
+        build_revision,
+        workflow_run_id,
+    )
 
 
 def _validate_staging(staging: Path, reports: list[DailyReport]) -> None:
@@ -518,8 +681,13 @@ def _validate_staging(staging: Path, reports: list[DailyReport]) -> None:
         staging / "archive/index.html",
         staging / "search/index.html",
         staging / "sources/index.html",
+        staging / "404.html",
         staging / "assets/styles.css",
         staging / "assets/app.js",
+        staging / "feed.xml",
+        staging / "sitemap.xml",
+        staging / "robots.txt",
+        staging / "build-info.json",
         staging / "search.json",
         *(staging / f"days/{report.date.isoformat()}/index.html" for report in reports),
         *(staging / f"categories/{channel.slug}/index.html" for channel in CHANNELS),
@@ -589,10 +757,17 @@ def build_site(
     root: Path,
     output: Path,
     base_path: str = "/ai-news/",
+    *,
+    build_revision: str = "local",
+    workflow_run_id: int | None = None,
 ) -> None:
     """Build an atomic, subpath-safe static site from stored daily reports."""
 
     base_path = _validate_base_path(base_path)
+    build_revision, workflow_run_id = _validate_build_provenance(
+        build_revision,
+        workflow_run_id,
+    )
     root_path = Path(root)
     output_path = Path(output)
     root_resolved, output_resolved = _validate_output(root_path, output_path)
@@ -633,6 +808,8 @@ def build_site(
             run_records,
             source_specs,
             base_path,
+            build_revision,
+            workflow_run_id,
         )
         _validate_staging(staging, reports)
         _install_staging(staging, output_resolved)

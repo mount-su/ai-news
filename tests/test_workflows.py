@@ -438,6 +438,9 @@ def test_daily_build_reads_fresh_main_after_generate_success_or_skip() -> None:
     commands = _run_commands(steps)
     assert "python -m ai_news build --root . --output dist" in commands
     assert "python scripts/validate_site.py dist --base-path /ai-news/" in commands
+    build_step = next(step for step in steps if step.get("name") == "Build static site")
+    assert build_step["env"] == {"AI_NEWS_BUILD_RUN_ID": "${{ github.run_id }}"}
+    assert 'export AI_NEWS_BUILD_SHA="$(git rev-parse HEAD)"' in str(build_step["run"])
     upload = next(
         step
         for step in steps

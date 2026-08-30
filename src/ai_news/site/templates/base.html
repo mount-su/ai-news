@@ -5,7 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
     <meta name="theme-color" content="#f3efe6">
+    <meta name="description" content="{{ description }}">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:type" content="{{ og_type }}">
+    <meta property="og:site_name" content="{{ site_name }}">
+    <meta property="og:title" content="{{ page_title }}｜{{ site_name }}">
+    <meta property="og:description" content="{{ description }}">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ page_title }}｜{{ site_name }}">
+    <meta name="twitter:description" content="{{ description }}">
     <title>{{ page_title }}｜{{ site_name }}</title>
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="alternate" type="application/rss+xml" title="{{ site_name }} RSS" href="https://mount-su.github.io/ai-news/feed.xml">
     <link rel="icon" href="{{ asset_url('favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ asset_url('styles.css') }}">
     {% block page_scripts %}{% endblock %}

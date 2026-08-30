@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
+import re
 import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -37,6 +39,7 @@ _PUBLICATION_THRESHOLD = "publication_threshold"
 _SITE_BUILD_ERROR = "site_build_error"
 _DEMO_DATE = date(2026, 7, 26)
 _DEMO_GENERATED_AT = datetime(2026, 7, 26, 8, tzinfo=UTC)
+_BUILD_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
 
 class _SafeArgumentParser(argparse.ArgumentParser):
@@ -83,10 +86,36 @@ def _safe_error(category: str, error: BaseException) -> None:
     print(f"{category}: Error", file=sys.stderr)
 
 
-def _build_site(root: Path, output: Path) -> None:
+def _build_site(
+    root: Path,
+    output: Path,
+    *,
+    build_revision: str = "local",
+    workflow_run_id: int | None = None,
+) -> None:
     from ai_news.site.builder import build_site
 
-    build_site(root, output)
+    build_site(
+        root,
+        output,
+        build_revision=build_revision,
+        workflow_run_id=workflow_run_id,
+    )
+
+
+def _build_provenance() -> tuple[str, int | None]:
+    revision = os.environ.get("AI_NEWS_BUILD_SHA", "local")
+    if revision != "local" and _BUILD_SHA_PATTERN.fullmatch(revision) is None:
+        raise ValueError("invalid build revision")
+    run_id_text = os.environ.get("AI_NEWS_BUILD_RUN_ID", "")
+    if not run_id_text:
+        return revision, None
+    if not run_id_text.isascii() or not run_id_text.isdecimal():
+        raise ValueError("invalid workflow run id")
+    run_id = int(run_id_text)
+    if run_id < 1:
+        raise ValueError("invalid workflow run id")
+    return revision, run_id
 
 
 def _demo_report() -> DailyReport:
@@ -223,7 +252,13 @@ def _check_config() -> int:
 
 def _build(root: Path, output: Path) -> int:
     try:
-        _build_site(root, output)
+        build_revision, workflow_run_id = _build_provenance()
+        _build_site(
+            root,
+            output,
+            build_revision=build_revision,
+            workflow_run_id=workflow_run_id,
+        )
     except Exception as error:
         _safe_error(_SITE_BUILD_ERROR, error)
         return 5
@@ -233,7 +268,12 @@ def _build(root: Path, output: Path) -> int:
 def _demo(root: Path, output: Path) -> int:
     try:
         save_report(root, _demo_report())
-        _build_site(root, output)
+        _build_site(
+            root,
+            output,
+            build_revision="offline-demo",
+            workflow_run_id=None,
+        )
     except Exception as error:
         _safe_error(_SITE_BUILD_ERROR, error)
         return 5

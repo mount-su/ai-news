@@ -7,6 +7,7 @@ import html
 import json
 import os
 import tomllib
+import xml.etree.ElementTree as ET
 from datetime import UTC, date, datetime, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
@@ -60,6 +61,7 @@ class _DocumentParser(HTMLParser):
         self.element_ids: list[str] = []
         self.article_ids: list[str] = []
         self.script_starts = 0
+        self.meta: list[dict[str, str]] = []
         self._article_depth = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
@@ -69,6 +71,8 @@ class _DocumentParser(HTMLParser):
             self.element_ids.append(element_id)
         if tag in {"a", "link", "script"}:
             self.links.append({"tag": tag, **attributes})
+        if tag == "meta":
+            self.meta.append(attributes)
         if tag == "article":
             self._article_depth += 1
             if item_id := attributes.get("data-item-id"):
@@ -596,7 +600,7 @@ def test_external_links_are_hardened_and_untrusted_titles_are_escaped(
     external_links = [
         link
         for link in parser.links
-        if (link.get("href") or "").startswith(("http://", "https://"))
+        if link.get("tag") == "a" and (link.get("href") or "").startswith(("http://", "https://"))
     ]
     assert external_links
     assert all(link.get("target") == "_blank" for link in external_links)
@@ -640,6 +644,100 @@ def test_search_json_is_public_deterministic_and_points_to_real_day_pages(
         "secret",
     ):
         assert private_name not in serialized
+
+
+def test_every_html_page_has_unique_absolute_metadata_and_custom_not_found(
+    report_root: tuple[Path, dict[str, NewsItem]],
+    tmp_path: Path,
+) -> None:
+    root, _items = report_root
+    output = tmp_path / "dist"
+
+    build_site(root, output)
+
+    html_pages = sorted(output.rglob("*.html"))
+    canonicals: list[str] = []
+    for page in html_pages:
+        parser = _parse(page)
+        canonical_links = [
+            link
+            for link in parser.links
+            if link.get("tag") == "link" and link.get("rel") == "canonical"
+        ]
+        assert len(canonical_links) == 1
+        canonical = canonical_links[0]["href"]
+        assert canonical.startswith("https://mount-su.github.io/ai-news/")
+        canonicals.append(canonical)
+        assert any(
+            meta.get("name") == "description" and meta.get("content") for meta in parser.meta
+        )
+        assert any(
+            meta.get("property") == "og:url" and meta.get("content") == canonical
+            for meta in parser.meta
+        )
+        assert any(
+            meta.get("property") == "og:title" and meta.get("content") for meta in parser.meta
+        )
+        assert any(
+            meta.get("name") == "twitter:card" and meta.get("content") == "summary"
+            for meta in parser.meta
+        )
+    assert len(canonicals) == len(set(canonicals))
+
+    not_found = output / "404.html"
+    assert not_found.is_file()
+    for link in _parse(not_found).links:
+        href = link.get("href", "")
+        if href and link.get("tag") == "a" and not href.startswith("#"):
+            assert href.startswith(BASE_PATH)
+
+
+def test_rss_sitemap_robots_and_build_provenance_are_valid_and_public(
+    report_root: tuple[Path, dict[str, NewsItem]],
+    tmp_path: Path,
+) -> None:
+    root, items = report_root
+    output = tmp_path / "dist"
+    revision = "a" * 40
+
+    build_site(root, output, build_revision=revision, workflow_run_id=123456)
+
+    feed_root = ET.parse(output / "feed.xml").getroot()
+    assert feed_root.tag == "rss"
+    feed_items = feed_root.findall("./channel/item")
+    assert feed_items
+    feed_links = [item.findtext("link", default="") for item in feed_items]
+    assert all(link.startswith("https://mount-su.github.io/ai-news/days/") for link in feed_links)
+    assert all("#item-" in link for link in feed_links)
+    descriptions = [item.findtext("description", default="") for item in feed_items]
+    assert all(
+        "<a href=" in description and "原始来源" in description for description in descriptions
+    )
+    assert str(items["old-research"].canonical_url) not in "".join(descriptions)
+
+    sitemap_root = ET.parse(output / "sitemap.xml").getroot()
+    namespace = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    sitemap_urls = {element.text for element in sitemap_root.findall("s:url/s:loc", namespace)}
+    required_urls = {
+        "https://mount-su.github.io/ai-news/",
+        "https://mount-su.github.io/ai-news/archive/",
+        "https://mount-su.github.io/ai-news/search/",
+        "https://mount-su.github.io/ai-news/sources/",
+        *(f"https://mount-su.github.io/ai-news/categories/{slug}/" for slug in FIXED_CHANNEL_SLUGS),
+        "https://mount-su.github.io/ai-news/days/2026-07-26/",
+        "https://mount-su.github.io/ai-news/days/2026-07-25/",
+    }
+    assert required_urls <= sitemap_urls
+    assert all("404" not in url for url in sitemap_urls)
+
+    robots = (output / "robots.txt").read_text(encoding="utf-8")
+    assert "User-agent: *" in robots
+    assert "Sitemap: https://mount-su.github.io/ai-news/sitemap.xml" in robots
+    assert json.loads((output / "build-info.json").read_text(encoding="utf-8")) == {
+        "revision": revision,
+        "schema_version": "1.0",
+        "workflow_run_id": 123456,
+    }
 
 
 @pytest.mark.parametrize(
