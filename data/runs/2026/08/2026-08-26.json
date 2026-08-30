@@ -1,108 +1,7 @@
 {
-  "candidate_count": 13,
+  "cutoff_at": "2026-08-26T15:59:59.999999Z",
   "date": "2026-08-26",
-  "degraded": false,
-  "generated_at": "2026-08-26T15:59:59.999999Z",
-  "items": [
-    {
-      "canonical_url": "https://openai.com/index/bringing-chatgpt-for-teachers-to-more-us-school-districts",
-      "category": "大模型",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "fa2791fbc9af008f",
-      "importance": 7,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Bringing ChatGPT for Teachers to more U.S. school districts",
-      "published_at": "2026-08-26T10:00:00Z",
-      "source": "OpenAI",
-      "source_id": "openai",
-      "source_role": "primary",
-      "summary": "OpenAI 将 ChatGPT for Teachers 扩展到美国55个学校系统，为超过10万名教育工作者和工作人员提供安全AI工具、培训和支持。",
-      "tags": [
-        "ChatGPT",
-        "教育",
-        "OpenAI"
-      ],
-      "title": "ChatGPT for Teachers 扩展至美国55个学区",
-      "tracking_signal": "关注OpenAI是否公布55个学区的具体名单、使用数据或后续扩展计划。",
-      "why_it_matters": "教育工作者可直接获得官方AI工具和培训，学校系统可降低自行部署AI的安全与合规风险，影响K-12教育场景的规模化采用。"
-    },
-    {
-      "canonical_url": "https://ollama.com/blog/claude-desktop",
-      "category": "AI 工具",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "213972d562d3db62",
-      "importance": 6,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Claude Desktop support with Ollama",
-      "published_at": "2026-08-25T00:00:00Z",
-      "source": "Ollama Blog",
-      "source_id": "ollama-blog",
-      "source_role": "primary",
-      "summary": "Claude Desktop 现可配置为使用 Ollama 作为第三方网关提供商，从而在 Claude 中使用开放模型。",
-      "tags": [
-        "Claude",
-        "Ollama",
-        "开放模型"
-      ],
-      "title": "Claude Desktop 现可配置 Ollama 作为第三方网关",
-      "tracking_signal": "验证Claude Desktop与Ollama的配置步骤，并测试开放模型在Claude中的实际可用性。",
-      "why_it_matters": "Claude Desktop 用户可将本地或开放模型接入现有工作流，降低对单一闭源模型的依赖，对关注模型可控性和本地部署的开发者有直接实用价值。"
-    },
-    {
-      "canonical_url": "https://openai.com/index/introducing-admin-plugin",
-      "category": "Coding Agent",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "33eae878317d27dc",
-      "importance": 6,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Introducing the Admin plugin for ChatGPT Work and Codex",
-      "published_at": "2026-08-25T00:00:00Z",
-      "source": "OpenAI",
-      "source_id": "openai",
-      "source_role": "primary",
-      "summary": "OpenAI 为 ChatGPT Work 和 Codex 推出 Admin 插件，可分析工作区使用情况、管理成员和权限、调整限额并处理管理员请求。",
-      "tags": [
-        "ChatGPT Work",
-        "Codex",
-        "企业管理"
-      ],
-      "title": "ChatGPT Work 与 Codex 新增 Admin 管理插件",
-      "tracking_signal": "查看OpenAI官方文档中Admin插件的具体权限范围和限额调整能力。",
-      "why_it_matters": "企业管理员获得集中管理AI工作区的工具，可控制成员权限和使用限额，降低企业部署ChatGPT Work和Codex时的治理与成本管理难度。"
-    },
-    {
-      "canonical_url": "https://huggingface.co/blog/MultiverseComputingCAI/quantization-aware-healing",
-      "category": "开源项目",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "f1c76f23a788b688",
-      "importance": 5,
-      "is_official": true,
-      "marketing_risk": "medium",
-      "original_title": "Quantization-Aware Healing: a compressed, 4-bit model that outperforms its full-precision original",
-      "published_at": "2026-08-25T11:39:24Z",
-      "source": "Hugging Face",
-      "source_id": "hugging-face",
-      "source_role": "primary",
-      "summary": "Hugging Face 发布一种量化感知修复方法，使压缩后的4位模型性能超过其全精度原始模型。",
-      "tags": [
-        "模型量化",
-        "4-bit",
-        "Hugging Face"
-      ],
-      "title": "4位量化模型经量化感知修复后超越全精度原版",
-      "tracking_signal": "查找该方法对应的模型、代码和基准测试结果，确认性能提升是否在多个任务上可复现。",
-      "why_it_matters": "模型量化通常以性能损失为代价，该方法若可复现，将降低高性能模型在资源受限环境中的部署门槛，对边缘部署和成本敏感场景有实际影响。"
-    }
-  ],
-  "model": "deepseek-v4-pro",
-  "schema_version": "1.3",
+  "safe_error_code": "none",
   "source_runs": [
     {
       "candidate_count": 6,
@@ -440,5 +339,6 @@
       "source_name": "GitHub Blog AI",
       "success": true
     }
-  ]
+  ],
+  "status": "published"
 }
