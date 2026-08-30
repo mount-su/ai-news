@@ -7,9 +7,11 @@ import httpx
 
 from ai_news.models import Category, RawItem, SourceConfig, SourceSpec
 from ai_news.source_health import (
+    NEW_OFFICIAL_SOURCE_IDS,
     SourceHealthResult,
     check_source_health,
     format_health_result,
+    source_health_succeeded,
 )
 
 
@@ -77,6 +79,50 @@ def test_health_check_requires_nonempty_result_for_every_enabled_source() -> Non
         ("reddit-ai", False),
     ]
     assert results[1].error_type == "EmptySourceResult"
+
+
+def test_optional_reddit_health_failure_does_not_fail_source_health_gate() -> None:
+    results = [
+        SourceHealthResult(
+            source_id="anthropic",
+            healthy=True,
+            item_count=1,
+            latest_date=datetime(2026, 8, 20, tzinfo=UTC).date(),
+            error_type=None,
+        ),
+        SourceHealthResult(
+            source_id="reddit-ai",
+            healthy=False,
+            item_count=0,
+            latest_date=None,
+            error_type="HttpStatusFetchError",
+        ),
+    ]
+
+    assert source_health_succeeded(results) is True
+
+
+def test_default_source_health_includes_channel_supply_sources() -> None:
+    assert {
+        "cursor-changelog",
+        "sourcegraph-blog",
+        "ollama-blog",
+        "github-blog-ai",
+    } <= NEW_OFFICIAL_SOURCE_IDS
+
+
+def test_required_source_health_failure_fails_source_health_gate() -> None:
+    results = [
+        SourceHealthResult(
+            source_id="anthropic",
+            healthy=False,
+            item_count=0,
+            latest_date=None,
+            error_type="EmptySourceResult",
+        ),
+    ]
+
+    assert source_health_succeeded(results) is False
 
 
 def test_health_check_skips_disabled_reddit() -> None:

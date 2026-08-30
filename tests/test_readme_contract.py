@@ -116,6 +116,7 @@ def test_readme_documents_official_page_and_reddit_rss_boundaries() -> None:
     required_fragments = [
         "官方页面适配器",
         "Reddit RSS",
+        "默认启用",
         "不需要 `REDDIT_CLIENT_ID`",
         "`REDDIT_CLIENT_SECRET`",
         "不使用通用网页抓取",
@@ -155,7 +156,7 @@ def test_readme_does_not_contain_screenshot_markup_or_token_assignment() -> None
 def test_readme_describes_the_implemented_degraded_rule() -> None:
     readme = _readme()
 
-    assert "来源失败但最终仍满足九条契约" in readme
+    assert "来源失败但最终仍满足发布门槛" in readme
     assert "`degraded=true`" in readme
     assert "该字段由来源运行是否失败决定" in readme
     assert "候选损失时可以降级发布" not in readme
@@ -166,6 +167,7 @@ def test_docs_describe_strict_editorial_analysis_failure() -> None:
     design = EDITORIAL_DESIGN.read_text(encoding="utf-8")
 
     assert "完整候选池" in readme
+    assert "供应商格式漂移" in readme
     assert "只执行一次结构修复" in readme
     assert "整次生成失败且不写入新日报" in readme
     assert "所有候选在一次主编请求中统一比较" in design

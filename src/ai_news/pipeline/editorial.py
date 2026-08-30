@@ -38,7 +38,8 @@ _CORPORATE_ONLY_MARKERS = re.compile(
 _CONCRETE_IMPACT_MARKERS = re.compile(
     r"(?:产品|功能|套餐|订阅|价格|免费|free|tier|开放|上线|发布|推出|用户|客户|消费者|"
     r"企业|部署|采用|购物|平台|政策|监管|规则|合规|市场|可用|访问|服务|开发者|"
-    r"production|enterprise|availability|access|cost|latency|compatibility|migration)",
+    r"production|enterprise|availability|available|access|cost|latency|compatibility|"
+    r"migration|support|supports|configured)",
     re.IGNORECASE,
 )
 _GITHUB_RELEASE_MARKERS = re.compile(
@@ -50,7 +51,8 @@ _HIGH_IMPACT_TECHNICAL_MARKERS = re.compile(
     r"(?:安全漏洞|漏洞|security|vulnerability|重大故障|中断|outage|大规模落地|大规模采用|"
     r"生产部署|成本降低|成本|性能提升|performance|latency|adoption|breaking change|"
     r"重大版本|架构变化|migration|compatibility|enterprise|production|availability|"
-    r"可用范围|访问门槛|主流产品|稳定性|stability|reliability|major release)",
+    r"third-party gateway|gateway provider|open models?|可用范围|访问门槛|主流产品|"
+    r"稳定性|stability|reliability|major release)",
     re.IGNORECASE,
 )
 _BENCHMARK_IMPACT_MARKERS = re.compile(

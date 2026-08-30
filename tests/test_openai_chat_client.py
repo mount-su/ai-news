@@ -237,6 +237,57 @@ def test_editorial_request_accepts_a_high_quality_subset_without_repair() -> Non
 
 
 @pytest.mark.parametrize(
+    "response_text",
+    [
+        "下面是符合要求的 JSON：\n" + json.dumps([_analysis_row(_candidate("drift-text"))]),
+        json.dumps({"items": [_analysis_row(_candidate("drift-text"))]}),
+    ],
+)
+def test_openai_accepts_common_provider_json_formatting_drift(response_text: str) -> None:
+    candidate = _candidate("drift-text")
+    response_text = response_text.replace(_candidate("drift-text").id, candidate.id)
+
+    result = _run_analyze(
+        lambda _: httpx.Response(200, content=_openai_response(response_text)),
+        [candidate],
+    )
+
+    assert list(result) == [candidate.id]
+
+
+def test_openai_normalizes_safe_provider_schema_drift() -> None:
+    candidate = _candidate("schema-drift")
+    long_title = "这是一个超过八十字但仍然可读的中文标题" * 8
+    long_summary = "这是一段略微超长但事实完整的中文摘要，模型供应商偶尔会超过提示词要求。" * 8
+    long_why = "该变化会影响产品团队、开发者和企业客户的评估、接入、迁移与采购判断。" * 5
+    long_tracking = "继续观察官方后续公告、可用范围、价格变化、迁移要求和企业客户采用情况。" * 4
+    row = _analysis_row(
+        candidate,
+        title=long_title,
+        summary=long_summary,
+        importance="8",
+        why_it_matters=long_why,
+        tags=["  AI 工具  ", "产品更新", "产品更新", "x" * 80],
+        is_official="true",
+        tracking_signal=long_tracking,
+    )
+
+    result = _run_analyze(
+        lambda _: httpx.Response(200, content=_openai_response([row])),
+        [candidate],
+    )
+
+    analysis = result[candidate.id]
+    assert analysis.importance == 8
+    assert analysis.is_official is True
+    assert len(analysis.title) <= 80
+    assert len(analysis.summary) <= 160
+    assert len(analysis.why_it_matters) <= 100
+    assert len(analysis.tracking_signal) <= 80
+    assert analysis.tags == ["AI 工具", "产品更新"]
+
+
+@pytest.mark.parametrize(
     ("error_kind", "mutate"),
     [
         (

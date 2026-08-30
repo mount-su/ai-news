@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 
 from ai_news.config import load_source_config
-from ai_news.source_health import check_source_health, format_health_result
+from ai_news.source_health import check_source_health, format_health_result, source_health_succeeded
 
 
 def main() -> int:
@@ -12,7 +12,7 @@ def main() -> int:
     results = asyncio.run(check_source_health(config))
     for result in results:
         print(format_health_result(result))
-    return 0 if results and all(result.healthy for result in results) else 1
+    return 0 if source_health_succeeded(results) else 1
 
 
 if __name__ == "__main__":

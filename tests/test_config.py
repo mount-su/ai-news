@@ -960,7 +960,72 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
             5,
             "AI 工具",
             False,
+            True,
+        ),
+        (
+            "sourcegraph-blog",
+            "Sourcegraph Blog",
+            "feed",
+            "https://sourcegraph.com/blog/rss.xml",
+            None,
+            None,
+            (),
+            7,
+            "Agent",
+            True,
+            True,
+        ),
+        (
+            "cursor-changelog",
+            "Cursor Changelog",
+            "feed",
+            "https://cursor.com/changelog/rss.xml",
+            None,
+            None,
+            (),
+            7,
+            "Agent",
+            True,
+            True,
+        ),
+        (
+            "ollama-blog",
+            "Ollama Blog",
+            "feed",
+            "https://ollama.com/blog/rss.xml",
+            None,
+            None,
+            (),
+            7,
+            "开源项目",
+            True,
+            True,
+        ),
+        (
+            "producthunt-ai",
+            "Product Hunt AI",
+            "feed",
+            "https://www.producthunt.com/feed?category=artificial-intelligence",
+            None,
+            None,
+            (),
+            5,
+            "AI 工具",
             False,
+            True,
+        ),
+        (
+            "github-blog-ai",
+            "GitHub Blog AI",
+            "feed",
+            "https://github.blog/tag/ai/feed/",
+            None,
+            None,
+            (),
+            6,
+            "AI 工具",
+            True,
+            True,
         ),
     }
     source_ids = [source.id for source in config.sources]
@@ -969,9 +1034,8 @@ def test_repository_source_manifest_contains_only_verified_sources() -> None:
     assert len(source_ids) == len(set(source_ids))
     assert [source.id for source in config.sources if not source.enabled] == [
         "arxiv-ai",
-        "reddit-ai",
     ]
-    assert config.sources[-1].id == "reddit-ai"
+    assert config.sources[-1].id == "github-blog-ai"
     assert actual == expected
 
 
