@@ -9,6 +9,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+import ai_news.models as models
 from ai_news.collectors.github import (
     collect_github_releases,
     parse_github_releases,
@@ -28,6 +29,7 @@ def _source() -> SourceSpec:
         category=Category.OPEN_SOURCE,
         weight=7,
         official=True,
+        role="primary",
     )
 
 
@@ -48,6 +50,8 @@ def test_parse_github_releases_filters_unpublished_items_and_cleans_metadata() -
     assert item.excerpt == "Production ready release."
     assert item.category_hint == Category.OPEN_SOURCE
     assert item.is_official_source is True
+    assert item.source_role is models.SourceRole.PRIMARY
+    assert item.discovery_verified is False
 
 
 def test_parse_github_releases_uses_tag_fallback_and_isolates_invalid_items() -> None:

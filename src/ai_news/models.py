@@ -55,6 +55,12 @@ class Category(StrEnum):
     RESEARCH = "论文研究"
 
 
+class SourceRole(StrEnum):
+    PRIMARY = "primary"
+    TRUSTED_MEDIA = "trusted_media"
+    DISCOVERY = "discovery"
+
+
 class EditorialLane(StrEnum):
     PRODUCT_APPLICATION = "产品与应用"
     BUSINESS_MARKET = "商业与市场"
@@ -85,7 +91,20 @@ class SourceSpec(BaseModel):
     category: Category
     weight: int = Field(default=5, ge=1, le=10)
     official: bool = True
+    role: SourceRole
     enabled: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def default_source_role(cls, values: object) -> object:
+        if not isinstance(values, Mapping):
+            return values
+        normalized = dict(values)
+        normalized.setdefault(
+            "role",
+            "primary" if normalized.get("official", True) else "trusted_media",
+        )
+        return normalized
 
     @model_validator(mode="before")
     @classmethod
@@ -145,6 +164,10 @@ class SourceSpec(BaseModel):
                 raise ValueError("reddit communities must use valid subreddit names")
             if self.official or self.weight != 5:
                 raise ValueError("reddit_rss sources must be unofficial with weight 5")
+        if self.official and self.role is not SourceRole.PRIMARY:
+            raise ValueError("official sources must use primary role")
+        if self.kind == "reddit_rss" and self.role is not SourceRole.DISCOVERY:
+            raise ValueError("reddit_rss sources must use discovery role")
         return self
 
 
@@ -244,6 +267,26 @@ class RawItem(BaseModel):
     excerpt: str = ""
     category_hint: Category
     is_official_source: bool
+    source_role: SourceRole | None = None
+    discovery_verified: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def default_legacy_source_role(cls, values: object) -> object:
+        if not isinstance(values, Mapping):
+            return values
+        normalized = dict(values)
+        if normalized.get("source_role") is None:
+            normalized["source_role"] = (
+                "primary" if normalized.get("is_official_source", True) else "trusted_media"
+            )
+        return normalized
+
+    @model_validator(mode="after")
+    def require_source_role(self) -> RawItem:
+        if self.source_role is None:
+            raise ValueError("source_role must not be None")
+        return self
 
 
 class Candidate(BaseModel):

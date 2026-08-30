@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+import ai_news.models as models
 from ai_news.collectors.official_pages.base import (
     OfficialEntry,
     article_excerpt,
@@ -25,6 +26,7 @@ def _source() -> SourceSpec:
         category=Category.MODEL,
         weight=10,
         official=True,
+        role="primary",
     )
 
 
@@ -204,4 +206,6 @@ def test_to_raw_item_preserves_source_metadata_and_bounds_excerpt() -> None:
     assert item.source_weight == 10
     assert item.category_hint is Category.MODEL
     assert item.is_official_source is True
+    assert item.source_role is models.SourceRole.PRIMARY
+    assert item.discovery_verified is False
     assert len(item.excerpt) == 4_000

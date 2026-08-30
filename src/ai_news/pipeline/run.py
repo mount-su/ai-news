@@ -33,6 +33,7 @@ from ai_news.models import (
     RawItem,
     Settings,
     SourceConfig,
+    SourceRole,
     SourceRun,
     SourceSpec,
 )
@@ -140,7 +141,7 @@ async def _collect_live(
     client: httpx.AsyncClient,
     source: SourceSpec,
     *,
-    official_domains: frozenset[str] = frozenset(),
+    reddit_allowed_domains: frozenset[str] = frozenset(),
 ) -> list[RawItem]:
     if source.kind == "feed":
         if source.url is None:
@@ -153,7 +154,7 @@ async def _collect_live(
         return await collect_reddit_rss(
             client,
             source,
-            official_domains=official_domains,
+            official_domains=reddit_allowed_domains,
         )
     if source.kind == "arxiv":
         return await collect_arxiv(client, source)
@@ -486,10 +487,13 @@ async def _run_with_client(
     history_loader: HistoryLoader,
 ) -> DailyReport:
     if collector is None:
-        official_domains = frozenset(
+        reddit_allowed_domains = frozenset(
             hostname
             for source in source_config.sources
-            if source.enabled and source.official and source.url is not None
+            if source.enabled
+            and source.role in {SourceRole.PRIMARY, SourceRole.TRUSTED_MEDIA}
+            and source.url is not None
+            and source.url.scheme == "https"
             if (hostname := urlsplit(str(source.url)).hostname) is not None
         )
 
@@ -500,7 +504,7 @@ async def _run_with_client(
             return await _collect_live(
                 selected_client,
                 selected_source,
-                official_domains=official_domains,
+                reddit_allowed_domains=reddit_allowed_domains,
             )
 
     else:

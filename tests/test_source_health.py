@@ -37,6 +37,7 @@ def _reddit(*, enabled: bool = True) -> SourceSpec:
         category=Category.TOOL,
         weight=5,
         official=False,
+        role="discovery",
         enabled=enabled,
     )
 

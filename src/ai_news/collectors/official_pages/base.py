@@ -221,4 +221,5 @@ def to_raw_item(
         excerpt=clean_text(entry.excerpt),
         category_hint=source.category,
         is_official_source=source.official,
+        source_role=source.role,
     )

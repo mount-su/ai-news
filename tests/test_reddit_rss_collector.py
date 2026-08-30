@@ -8,6 +8,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+import ai_news.models as models
 from ai_news.collectors.official_pages.base import OfficialEntry
 from ai_news.collectors.reddit_rss import (
     MAX_EXTERNAL_FETCHES,
@@ -44,6 +45,7 @@ def _source() -> SourceSpec:
         category=Category.TOOL,
         weight=5,
         official=False,
+        role="discovery",
     )
 
 
@@ -97,6 +99,24 @@ def test_build_reddit_item_uses_verified_original_metadata() -> None:
     assert str(item.url) == "https://www.anthropic.com/news/claude-product"
     assert item.published_at == metadata.published_at
     assert item.is_official_source is False
+    assert item.source_role is models.SourceRole.DISCOVERY
+    assert item.discovery_verified is True
+
+
+def test_build_reddit_item_emits_the_verified_canonical_target() -> None:
+    entry = parse_reddit_atom(fixture("new.atom"), _source())[0]
+    metadata = OfficialEntry(
+        title="Anthropic launches a useful Claude AI product",
+        url=f"{entry.external_url}?utm_source=reddit",
+        published_at=datetime(2026, 8, 20, 1, tzinfo=UTC),
+        excerpt="The Claude AI product changes how customers complete practical work.",
+    )
+
+    item = build_reddit_item(entry, metadata, _source(), {"anthropic.com"})
+
+    assert item is not None
+    assert str(item.url) == entry.external_url
+    assert item.discovery_verified is True
 
 
 @pytest.mark.parametrize(
@@ -105,9 +125,21 @@ def test_build_reddit_item_uses_verified_original_metadata() -> None:
         None,
         OfficialEntry(
             title="Ordinary database release",
-            url="https://www.anthropic.com/news/database",
+            url="https://www.anthropic.com/news/claude-product",
             published_at=datetime(2026, 8, 20, 1, tzinfo=UTC),
             excerpt="This item changes an ordinary database maintenance process.",
+        ),
+        OfficialEntry(
+            title="Anthropic launches a useful Claude AI product",
+            url="https://www.anthropic.com/news/claude-product",
+            published_at=datetime(2026, 8, 20, 1, tzinfo=UTC),
+            excerpt="",
+        ),
+        OfficialEntry(
+            title="Anthropic launches a useful Claude AI product",
+            url="https://www.anthropic.com/news/different-product",
+            published_at=datetime(2026, 8, 20, 1, tzinfo=UTC),
+            excerpt="A useful Claude AI product update for customers.",
         ),
         OfficialEntry(
             title="Anthropic launches a useful Claude AI product",
@@ -146,7 +178,7 @@ def test_collect_reddit_requests_feeds_sequentially_and_deduplicates_links() -> 
             return await collect_reddit_rss(
                 client,
                 source,
-                official_domains={"anthropic.com"},
+                official_domains={"anthropic.com", "techcrunch.com"},
                 fetcher=fake_fetcher,
                 sleep=fake_sleep,
             )
@@ -157,8 +189,42 @@ def test_collect_reddit_requests_feeds_sequentially_and_deduplicates_links() -> 
     assert REQUEST_SPACING_SECONDS == 60
     assert [str(item.url) for item in items] == [
         "https://www.anthropic.com/news/claude-product",
-        "https://techcrunch.com/2026/08/20/generative-ai-product/",
+        "https://techcrunch.com/2026/08/20/generative-ai-product",
     ]
+    assert all(item.discovery_verified for item in items)
+
+
+def test_collect_reddit_does_not_fetch_an_unconfigured_media_domain() -> None:
+    source = _source()
+    feed_urls = reddit_feed_urls(source.communities)
+    external_requests: list[str] = []
+
+    async def fake_fetcher(_client: httpx.AsyncClient, url: str) -> bytes:
+        if url == feed_urls[0]:
+            return fixture("new.atom")
+        if url == feed_urls[1]:
+            return fixture("top.atom")
+        external_requests.append(url)
+        return fixture("article.html")
+
+    async def fake_sleep(_seconds: float) -> None:
+        return None
+
+    async def run() -> list[object]:
+        async with httpx.AsyncClient() as client:
+            return await collect_reddit_rss(
+                client,
+                source,
+                official_domains={"anthropic.com"},
+                fetcher=fake_fetcher,
+                sleep=fake_sleep,
+            )
+
+    items = asyncio.run(run())
+
+    assert external_requests == ["https://www.anthropic.com/news/claude-product"]
+    assert len(items) == 1
+    assert items[0].discovery_verified is True
 
 
 def test_collect_reddit_limits_external_article_fetches_to_eight() -> None:

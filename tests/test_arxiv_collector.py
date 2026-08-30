@@ -8,6 +8,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+import ai_news.models as models
 from ai_news.collectors.arxiv import collect_arxiv, parse_arxiv
 from ai_news.models import Category, SourceSpec
 
@@ -23,6 +24,7 @@ def _source() -> SourceSpec:
         category=Category.RESEARCH,
         weight=8,
         official=False,
+        role="trusted_media",
     )
 
 
@@ -43,6 +45,8 @@ def test_parse_arxiv_returns_clean_valid_item_with_source_metadata() -> None:
     assert item.excerpt == "A practical agent study."
     assert item.category_hint == Category.RESEARCH
     assert item.is_official_source is False
+    assert item.source_role is models.SourceRole.TRUSTED_MEDIA
+    assert item.discovery_verified is False
 
 
 def test_parse_arxiv_skips_invalid_entries_and_keeps_later_valid_entry() -> None:

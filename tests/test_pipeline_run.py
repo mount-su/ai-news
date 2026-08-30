@@ -38,6 +38,9 @@ def _source(
     *,
     kind: str = "feed",
     enabled: bool = True,
+    official: bool = True,
+    role: str | None = None,
+    hostname: str = "example.com",
 ) -> SourceSpec:
     values: dict[str, Any] = {
         "id": f"source-{number}",
@@ -45,11 +48,13 @@ def _source(
         "kind": kind,
         "category": Category.MODEL,
         "weight": 7,
-        "official": True,
+        "official": official,
         "enabled": enabled,
     }
+    if role is not None:
+        values["role"] = role
     if kind in {"feed", "arxiv"}:
-        values["url"] = f"https://example.com/{number}.xml"
+        values["url"] = f"https://{hostname}/{number}.xml"
     elif kind == "official_page":
         values["url"] = "https://www.anthropic.com/news"
         values["adapter"] = "anthropic_news"
@@ -57,6 +62,7 @@ def _source(
         values["communities"] = ["LocalLLaMA", "OpenAI"]
         values["weight"] = 5
         values["official"] = False
+        values["role"] = "discovery"
     else:
         values["repo"] = f"owner/repo-{number}"
     return SourceSpec.model_validate(values)
@@ -261,17 +267,30 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     from ai_news.pipeline import run as run_module
 
     sources = [
-        _source(0, kind="feed"),
-        _source(1, kind="arxiv"),
+        _source(
+            0,
+            kind="feed",
+            official=False,
+            role="discovery",
+            hostname="discovery.example",
+        ),
+        _source(
+            1,
+            kind="arxiv",
+            official=False,
+            role="trusted_media",
+            hostname="media.example",
+        ),
         _source(2, kind="github"),
         _source(3, kind="official_page"),
         _source(4, kind="reddit_rss"),
-        _source(5, kind="feed", enabled=False),
+        _source(5, kind="feed", enabled=False, hostname="disabled.example"),
     ]
     client = object()
     factory_timeouts: list[int] = []
     seen_clients: list[object] = []
     seen_settings: list[Settings] = []
+    reddit_domain_allowlists: list[set[str] | frozenset[str]] = []
     analyzer = _Analyzer()
 
     class _ClientContext:
@@ -319,7 +338,7 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
         official_domains: set[str] | frozenset[str],
     ) -> list[RawItem]:
         seen_clients.append(received_client)
-        assert official_domains == {"example.com", "www.anthropic.com"}
+        reddit_domain_allowlists.append(official_domains)
         return [_raw(400 + index, source=source) for index in range(3)]
 
     def analyzer_factory(settings: Settings, *, client: object) -> _Analyzer:
@@ -356,6 +375,7 @@ def test_live_wiring_uses_one_twenty_second_client_for_all_sources_and_analyzer(
     assert seen_settings[0].llm_protocol == "openai-chat"
     assert seen_settings[0].llm_model == "live-model"
     assert seen_clients == [client, client, client, client, client, client]
+    assert reddit_domain_allowlists == [{"media.example", "www.anthropic.com"}]
     assert len(report.source_runs) == 5
     assert len(analyzer.calls) == 1
 
