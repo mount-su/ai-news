@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block main %}
+  <main id="main-content" class="page-shell">
+    <section class="edition-heading" aria-labelledby="sources-title">
+      <p class="eyebrow">SOURCE DESK</p>
+      <h1 id="sources-title">来源状态</h1>
+      <p>展示最近七个运行日中，各来源从抓取到入选的真实贡献。</p>
+    </section>
+    <section class="source-ledger" aria-label="来源贡献明细">
+      <ol>
+        {% for source in source_statuses %}
+          <li>
+            <article>
+              <header>
+                <h2>{{ source.source_name }}</h2>
+                <span>{{ source.source_role.value }}</span>
+              </header>
+              <p>
+                近窗 {{ source.recent_count if source.recent_count is not none else '—' }}
+                · 新增 {{ source.new_count if source.new_count is not none else '—' }}
+                · 合格 {{ source.eligible_count if source.eligible_count is not none else '—' }}
+                · 候选 {{ source.candidate_count if source.candidate_count is not none else '—' }}
+                · 入选 {{ source.selected_count if source.selected_count is not none else '—' }}
+              </p>
+              {% if source.diagnostic_label %}<p>{{ source.diagnostic_label }}</p>{% endif %}
+            </article>
+          </li>
+        {% endfor %}
+      </ol>
+    </section>
+  </main>
+{% endblock %}

@@ -5,9 +5,8 @@ import os
 import shutil
 import stat
 import tempfile
-from collections import defaultdict
-from collections.abc import Callable, Iterable
-from datetime import datetime
+from collections.abc import Iterable
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from uuid import uuid4
@@ -15,22 +14,34 @@ from zoneinfo import ZoneInfo
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
-from ai_news.models import Category, DailyReport, NewsItem
-from ai_news.storage import load_reports
+from ai_news.config import load_source_config
+from ai_news.models import (
+    Category,
+    DailyReport,
+    NewsItem,
+    RunRecord,
+    RunStatus,
+    SourceRole,
+    SourceSpec,
+)
+from ai_news.site.presentation import (
+    CHANNELS,
+    archive_entries,
+    channel_for_item,
+    edition_neighbors,
+    issue_numbers,
+    item_day_url,
+    item_fragment,
+    paginate,
+    source_statuses,
+)
+from ai_news.storage import load_reports, load_run_records
 
 _SITE_DIRECTORY = Path(__file__).parent
 _TEMPLATE_DIRECTORY = _SITE_DIRECTORY / "templates"
 _STATIC_DIRECTORY = _SITE_DIRECTORY / "static"
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
 _RESERVED_ROOT_DIRECTORIES = ("data", "content", "sources")
-
-CATEGORY_SLUGS: dict[Category, str] = {
-    Category.MODEL: "model",
-    Category.AGENT: "agent",
-    Category.TOOL: "ai-tools",
-    Category.OPEN_SOURCE: "open-source",
-    Category.RESEARCH: "research",
-}
 
 
 def _display_category(category: Category) -> Category:
@@ -178,24 +189,73 @@ def _environment(base_path: str) -> Environment:
     return environment
 
 
-def _category_navigation(categories: Iterable[Category]) -> list[dict[str, str]]:
-    category_set = {_display_category(category) for category in categories}
-    return [
-        {"name": category.value, "slug": slug}
-        for category, slug in CATEGORY_SLUGS.items()
-        if category in category_set
-    ]
+def _category_navigation() -> list[dict[str, str]]:
+    return [{"name": channel.name, "slug": channel.slug} for channel in CHANNELS]
 
 
-def _report_context(report: DailyReport) -> dict[str, object]:
+def _report_context(report: DailyReport, issue_number: int | None = None) -> dict[str, object]:
     return {
         "date": report.date.isoformat(),
         "generated_at": report.generated_at,
+        "issue_number": issue_number,
         "source_count": len(report.source_runs),
         "healthy_source_count": sum(run.success for run in report.source_runs),
         "candidate_count": report.candidate_count,
         "included_count": len(report.items),
     }
+
+
+def _story_entries(
+    report: DailyReport,
+    items: Iterable[NewsItem],
+    base_path: str,
+    *,
+    start: int = 1,
+) -> list[dict[str, object]]:
+    return [
+        {
+            "item": item,
+            "number": f"{index:02d}",
+            "report_date": report.date.isoformat(),
+            "fragment": item_fragment(item, report.date),
+            "day_url": item_day_url(item, report.date, base_path),
+        }
+        for index, item in enumerate(items, start=start)
+    ]
+
+
+def _fallback_source_specs(
+    reports: Iterable[DailyReport],
+    run_records: Iterable[RunRecord],
+) -> list[SourceSpec]:
+    names: dict[str, str] = {}
+    for source_run in (
+        source_run for container in (*reports, *run_records) for source_run in container.source_runs
+    ):
+        names.setdefault(source_run.source_id, source_run.source_name)
+    return [
+        SourceSpec(
+            id=source_id,
+            name=source_name,
+            kind="feed",
+            url=f"https://example.invalid/{source_id}.xml",
+            category=Category.MODEL,
+            official=False,
+            role=SourceRole.TRUSTED_MEDIA,
+        )
+        for source_id, source_name in sorted(names.items())
+    ]
+
+
+def _load_source_specs(
+    root: Path,
+    reports: list[DailyReport],
+    run_records: list[RunRecord],
+) -> list[SourceSpec]:
+    try:
+        return load_source_config(root / "sources/feeds.yaml").sources
+    except FileNotFoundError:
+        return _fallback_source_specs(reports, run_records)
 
 
 def _write_text(path: Path, content: str) -> None:
@@ -216,56 +276,51 @@ def _render(
 
 def _public_search_entry(
     item: NewsItem,
-    report_date: str,
-    page_url: Callable[[str], str],
+    report: DailyReport,
+    base_path: str,
 ) -> dict[str, object]:
-    payload = item.model_dump(
-        mode="json",
-        include={
-            "id",
-            "canonical_url",
-            "original_title",
-            "source",
-            "published_at",
-            "title",
-            "category",
-            "summary",
-            "importance",
-            "why_it_matters",
-            "tags",
-            "is_official",
-            "marketing_risk",
-            "tracking_signal",
-            "editorial_lane",
-        },
-    )
-    payload["date"] = report_date
-    payload["page_url"] = page_url(f"days/{report_date}")
-    return payload
+    channel = channel_for_item(item)
+    if channel is None:
+        raise ValueError("excluded items cannot enter public search")
+    return {
+        "id": item.id,
+        "title": item.title,
+        "summary": item.summary,
+        "why_it_matters": item.why_it_matters,
+        "tags": item.tags,
+        "display_category": channel.name,
+        "source": item.source,
+        "published_at": item.published_at.isoformat(),
+        "report_date": report.date.isoformat(),
+        "is_official": item.is_official,
+        "marketing_risk": item.marketing_risk,
+        "page_url": item_day_url(item, report.date, base_path),
+    }
 
 
 def _build_staging(
     staging: Path,
     reports: list[DailyReport],
+    archive_reports: list[DailyReport],
+    run_records: list[RunRecord],
+    source_specs: list[SourceSpec],
     base_path: str,
 ) -> None:
     environment = _environment(base_path)
-
-    def page_url(page: str = "") -> str:
-        return _page_url(base_path, page)
-
     latest = reports[0]
+    issue_by_date = issue_numbers(reports)
     all_pairs = [(report, item) for report in reports for item in report.items]
-    categories = _category_navigation(item.category for _report, item in all_pairs)
+    categories = _category_navigation()
     common: dict[str, object] = {
         "site_name": "AI 情报雷达",
-        "latest_report": _report_context(latest),
+        "latest_report": _report_context(latest, issue_by_date[latest.date]),
         "categories": categories,
     }
 
     shutil.copytree(_STATIC_DIRECTORY, staging / "assets")
 
     latest_items = _sort_items(latest.items)
+    latest_entries = _story_entries(latest, latest_items, base_path)
     _render(
         environment,
         staging,
@@ -274,13 +329,20 @@ def _build_staging(
         {
             **common,
             "page_title": "今日情报",
-            "report": _report_context(latest),
+            "current_page": "home",
+            "report": _report_context(latest, issue_by_date[latest.date]),
             "items": latest_items,
+            "entries": latest_entries,
+            "lead": latest_entries[0] if latest_entries else None,
+            "briefs": latest_entries[1:4],
+            "remaining_entries": latest_entries[4:],
         },
     )
 
     for report in reports:
         report_items = _sort_items(report.items)
+        report_entries = _story_entries(report, report_items, base_path)
+        neighbors = edition_neighbors(reports, report.date)
         _render(
             environment,
             staging,
@@ -289,11 +351,24 @@ def _build_staging(
             {
                 **common,
                 "page_title": f"{report.date.isoformat()} 情报",
-                "report": _report_context(report),
+                "current_page": "archive",
+                "report": _report_context(report, issue_by_date[report.date]),
                 "items": report_items,
+                "entries": report_entries,
+                "older_report": (
+                    _report_context(neighbors.older, issue_by_date[neighbors.older.date])
+                    if neighbors.older is not None
+                    else None
+                ),
+                "newer_report": (
+                    _report_context(neighbors.newer, issue_by_date[neighbors.newer.date])
+                    if neighbors.newer is not None
+                    else None
+                ),
             },
         )
 
+    archive_rows = archive_entries(archive_reports, run_records)
     _render(
         environment,
         staging,
@@ -302,41 +377,125 @@ def _build_staging(
         {
             **common,
             "page_title": "日期归档",
-            "reports": [_report_context(report) for report in reports],
+            "current_page": "archive",
+            "entries": archive_rows,
+            "reports": [
+                _report_context(report, issue_by_date.get(report.date)) for report in reports
+            ],
         },
     )
 
-    category_items: dict[Category, list[tuple[DailyReport, NewsItem]]] = defaultdict(list)
+    channel_items: dict[str, list[tuple[DailyReport, NewsItem]]] = {
+        channel.slug: [] for channel in CHANNELS
+    }
     for report, item in all_pairs:
-        category_items[_display_category(item.category)].append((report, item))
-    for category, report_items in category_items.items():
-        ordered_entries = [
-            {"report_date": report.date.isoformat(), "item": item}
-            for report, item in _sort_category_entries(report_items)
-        ]
-        _render(
-            environment,
-            staging,
-            "category.html",
-            f"categories/{CATEGORY_SLUGS[category]}/index.html",
-            {
-                **common,
-                "page_title": f"{category.value} 情报",
-                "category_name": category.value,
-                "entries": ordered_entries,
-            },
-        )
+        channel = channel_for_item(item)
+        if channel is not None:
+            channel_items[channel.slug].append((report, item))
+    for channel in CHANNELS:
+        ordered_pairs = _sort_category_entries(channel_items[channel.slug])
+        pair_pages = paginate(ordered_pairs)
+        total_pages = len(pair_pages)
+        for page_number, page_pairs in enumerate(pair_pages, start=1):
+            ordered_entries = [
+                {
+                    "report_date": report.date.isoformat(),
+                    "item": item,
+                    "number": f"{index:02d}",
+                    "fragment": item_fragment(item, report.date),
+                    "day_url": item_day_url(item, report.date, base_path),
+                }
+                for index, (report, item) in enumerate(
+                    page_pairs,
+                    start=(page_number - 1) * 20 + 1,
+                )
+            ]
+            relative_path = (
+                f"categories/{channel.slug}/index.html"
+                if page_number == 1
+                else f"categories/{channel.slug}/page/{page_number}/index.html"
+            )
+            _render(
+                environment,
+                staging,
+                "category.html",
+                relative_path,
+                {
+                    **common,
+                    "page_title": f"{channel.name} 情报",
+                    "current_page": channel.slug,
+                    "category_name": channel.name,
+                    "entries": ordered_entries,
+                    "pagination": {
+                        "current": page_number,
+                        "total": total_pages,
+                        "previous_url": (
+                            _page_url(
+                                base_path,
+                                f"categories/{channel.slug}"
+                                if page_number == 2
+                                else f"categories/{channel.slug}/page/{page_number - 1}",
+                            )
+                            if page_number > 1
+                            else None
+                        ),
+                        "next_url": (
+                            _page_url(
+                                base_path,
+                                f"categories/{channel.slug}/page/{page_number + 1}",
+                            )
+                            if page_number < total_pages
+                            else None
+                        ),
+                    },
+                },
+            )
 
-    search_payload = [
-        _public_search_entry(item, report.date.isoformat(), page_url) for report, item in all_pairs
-    ]
-    search_payload.sort(
-        key=lambda entry: (
-            -int(entry["importance"]),
-            -datetime.fromisoformat(str(entry["published_at"]).replace("Z", "+00:00")).timestamp(),
-            str(entry["id"]),
+    _render(
+        environment,
+        staging,
+        "search.html",
+        "search/index.html",
+        {
+            **common,
+            "page_title": "搜索",
+            "current_page": "search",
+        },
+    )
+    _render(
+        environment,
+        staging,
+        "sources.html",
+        "sources/index.html",
+        {
+            **common,
+            "page_title": "来源状态",
+            "current_page": "sources",
+            "source_statuses": source_statuses(source_specs, run_records),
+        },
+    )
+
+    search_cutoff = latest.date - timedelta(days=179)
+    seen_item_ids: set[str] = set()
+    search_pairs: list[tuple[DailyReport, NewsItem]] = []
+    for report in reports:
+        if report.date < search_cutoff:
+            continue
+        for item in report.items:
+            if channel_for_item(item) is None or item.id in seen_item_ids:
+                continue
+            seen_item_ids.add(item.id)
+            search_pairs.append((report, item))
+    search_pairs.sort(
+        key=lambda pair: (
+            -pair[1].published_at.timestamp(),
+            -pair[0].date.toordinal(),
+            pair[1].id,
         )
     )
+    search_payload = [
+        _public_search_entry(item, report, base_path) for report, item in search_pairs
+    ]
     _write_text(
         staging / "search.json",
         json.dumps(search_payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -347,17 +506,14 @@ def _validate_staging(staging: Path, reports: list[DailyReport]) -> None:
     required = {
         staging / "index.html",
         staging / "archive/index.html",
+        staging / "search/index.html",
+        staging / "sources/index.html",
         staging / "assets/styles.css",
         staging / "assets/app.js",
         staging / "search.json",
         *(staging / f"days/{report.date.isoformat()}/index.html" for report in reports),
+        *(staging / f"categories/{channel.slug}/index.html" for channel in CHANNELS),
     }
-    category_slugs = {
-        CATEGORY_SLUGS[_display_category(item.category)]
-        for report in reports
-        for item in report.items
-    }
-    required.update(staging / f"categories/{slug}/index.html" for slug in category_slugs)
     missing = [path for path in required if not path.is_file()]
     if missing:
         raise RuntimeError("site staging validation failed")
@@ -430,9 +586,24 @@ def build_site(
     root_path = Path(root)
     output_path = Path(output)
     root_resolved, output_resolved = _validate_output(root_path, output_path)
-    reports = sorted(load_reports(root_path), key=lambda report: report.date, reverse=True)
-    if not reports:
+    archive_reports = sorted(
+        load_reports(root_path),
+        key=lambda report: report.date,
+        reverse=True,
+    )
+    if not archive_reports:
         raise ValueError("at least one report is required to build the site")
+    run_records = load_run_records(root_path)
+    record_by_date = {record.date: record for record in run_records}
+    reports = [
+        report
+        for report in archive_reports
+        if record_by_date.get(report.date) is None
+        or record_by_date[report.date].status is not RunStatus.NO_ELIGIBLE_CONTENT
+    ]
+    if not reports:
+        raise ValueError("at least one published report is required to build the site")
+    source_specs = _load_source_specs(root_path, archive_reports, run_records)
 
     output_resolved.parent.mkdir(parents=True, exist_ok=True)
     confirmed_root, confirmed_output = _validate_output(root_path, output_path)
@@ -445,7 +616,14 @@ def build_site(
         )
     )
     try:
-        _build_staging(staging, reports, base_path)
+        _build_staging(
+            staging,
+            reports,
+            archive_reports,
+            run_records,
+            source_specs,
+            base_path,
+        )
         _validate_staging(staging, reports)
         _install_staging(staging, output_resolved)
     except BaseException:

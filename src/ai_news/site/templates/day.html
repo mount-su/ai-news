@@ -14,14 +14,18 @@
         <p>DAILY SELECTION</p>
         <h2 id="feed-title">当日简报</h2>
       </div>
-      {% for lane, lane_items in items|groupby('editorial_lane.value') %}
-        <section class="lane-section" aria-labelledby="day-lane-{{ loop.index }}">
-          <h3 id="day-lane-{{ loop.index }}">{{ lane }}</h3>
-          <div class="news-grid">
-            {% for item in lane_items %}{{ news_card(item, report.date) }}{% endfor %}
-          </div>
-        </section>
-      {% endfor %}
+      <div class="news-grid">
+        {% for entry in entries %}{{ news_card(entry, '#' ~ entry.fragment) }}{% endfor %}
+      </div>
+      <nav class="edition-navigation" aria-label="日报期次导航">
+        {% if older_report %}
+          <a href="{{ page_url('days/' ~ older_report.date) }}">← 上一期 {{ older_report.date }}</a>
+        {% endif %}
+        <a href="{{ page_url('archive') }}">返回归档</a>
+        {% if newer_report %}
+          <a href="{{ page_url('days/' ~ newer_report.date) }}">下一期 {{ newer_report.date }} →</a>
+        {% endif %}
+      </nav>
     </section>
   </main>
 {% endblock %}

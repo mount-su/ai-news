@@ -19,14 +19,9 @@
         <p>EDITORIAL SELECTION</p>
         <h2 id="brief-title">本期简报</h2>
       </div>
-      {% for lane, lane_items in items|groupby('editorial_lane.value') %}
-        <section class="lane-section" aria-labelledby="lane-{{ loop.index }}">
-          <h3 id="lane-{{ loop.index }}">{{ lane }}</h3>
-          <div class="news-grid">
-            {% for item in lane_items %}{{ news_card(item, report.date) }}{% endfor %}
-          </div>
-        </section>
-      {% endfor %}
+      <div class="news-grid">
+        {% for entry in entries %}{{ news_card(entry, entry.day_url) }}{% endfor %}
+      </div>
     </section>
   </main>
 {% endblock %}

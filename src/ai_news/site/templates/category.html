@@ -15,9 +15,16 @@
       </div>
       <ol class="news-list">
         {% for entry in entries %}
-          <li>{{ news_card(entry.item, entry.report_date) }}</li>
+          <li>{{ news_card(entry, entry.day_url) }}</li>
         {% endfor %}
       </ol>
+      {% if pagination.total > 1 %}
+        <nav class="pagination" aria-label="分页导航">
+          {% if pagination.previous_url %}<a href="{{ pagination.previous_url }}">← 上一页</a>{% endif %}
+          <span>第 {{ pagination.current }} / {{ pagination.total }} 页</span>
+          {% if pagination.next_url %}<a href="{{ pagination.next_url }}">下一页 →</a>{% endif %}
+        </nav>
+      {% endif %}
     </section>
   </main>
 {% endblock %}

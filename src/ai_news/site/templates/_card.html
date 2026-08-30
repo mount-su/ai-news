@@ -1,18 +1,20 @@
-{% macro news_card(item, report_date) -%}
+{% macro news_card(entry, title_url) -%}
+  {% set item = entry.item %}
   <article
-    id="item-{{ item.id }}-{{ report_date }}"
+    id="{{ entry.fragment }}"
     class="news-card"
     data-news-card
     data-item-id="{{ item.id }}"
   >
     <header class="news-card__header">
+      <span class="story-number" aria-label="第 {{ entry.number }} 条">{{ entry.number }}</span>
       <div class="news-card__labels">
         <span class="lane">{{ item.editorial_lane.value }}</span>
         <span class="category">{{ item.category.value|display_category }}</span>
       </div>
     </header>
     <div class="news-card__body">
-      <h3>{{ item.title }}</h3>
+      <h3><a class="story-title-link" href="{{ title_url }}">{{ item.title }}</a></h3>
       <p class="news-card__source">
         {{ item.source }}
         <span aria-hidden="true">·</span>

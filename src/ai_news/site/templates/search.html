@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block main %}
+  <main id="main-content" class="page-shell">
+    <section class="edition-heading" aria-labelledby="search-title">
+      <p class="eyebrow">SEARCH THE EDITIONS</p>
+      <h1 id="search-title">搜索情报</h1>
+      <p>按标题、摘要、来源、频道和日期查找近 180 天的精选内容。</p>
+    </section>
+    <section class="search-shell" aria-label="站内搜索">
+      <form id="search-form" role="search">
+        <label for="search-query">关键词</label>
+        <input id="search-query" name="q" type="search" autocomplete="off">
+        <button type="submit">搜索</button>
+      </form>
+      <p id="search-status" role="status" aria-live="polite">输入关键词开始搜索。</p>
+      <ol id="search-results"></ol>
+    </section>
+  </main>
+{% endblock %}

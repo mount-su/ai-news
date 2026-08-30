@@ -28,9 +28,11 @@
         <div class="primary-nav__inner">
           <a href="{{ page_url() }}">首页</a>
           {% for category in categories %}
-            <a href="{{ page_url('categories/' ~ category.slug) }}">{{ category.name }}</a>
+            <a href="{{ page_url('categories/' ~ category.slug) }}"{% if current_page == category.slug %} aria-current="page"{% endif %}>{{ category.name }}</a>
           {% endfor %}
-          <a href="{{ page_url('archive') }}">归档</a>
+          <a href="{{ page_url('search') }}"{% if current_page == 'search' %} aria-current="page"{% endif %}>搜索</a>
+          <a href="{{ page_url('sources') }}"{% if current_page == 'sources' %} aria-current="page"{% endif %}>来源</a>
+          <a href="{{ page_url('archive') }}"{% if current_page == 'archive' %} aria-current="page"{% endif %}>归档</a>
         </div>
       </nav>
       <p class="status-line">

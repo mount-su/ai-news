@@ -13,15 +13,28 @@
         <h2 id="ledger-title">全部日期</h2>
       </div>
       <ol>
-        {% for report in reports %}
+        {% for entry in entries %}
           <li>
             <article>
-              <a href="{{ page_url('days/' ~ report.date) }}">
-                <time datetime="{{ report.date }}">{{ report.date }}</time>
-                <span>{{ report.included_count }} 条收录</span>
-                <span>{{ report.candidate_count }} 条候选</span>
-                <strong>打开档案 <span aria-hidden="true">→</span></strong>
-              </a>
+              {% if entry.status == 'published' %}
+                <a href="{{ page_url('days/' ~ entry.date.isoformat()) }}">
+                  <time datetime="{{ entry.date.isoformat() }}">{{ entry.date.isoformat() }}</time>
+                  <span>{{ entry.report.items|length }} 条收录</span>
+                  <span>{{ entry.report.candidate_count }} 条候选</span>
+                  <strong>打开档案 <span aria-hidden="true">→</span></strong>
+                </a>
+              {% else %}
+                <div class="archive-status archive-status--{{ entry.status }}">
+                  <time datetime="{{ entry.date.isoformat() }}">{{ entry.date.isoformat() }}</time>
+                  {% if entry.status == 'no_eligible_content' %}
+                    <strong>无合格内容</strong><span>本期未为凑数发布</span>
+                  {% elif entry.status == 'failed_before_publish' %}
+                    <strong>生成失败</strong><span>保留上一期已发布内容</span>
+                  {% else %}
+                    <strong>未运行</strong><span>当日没有运行记录</span>
+                  {% endif %}
+                </div>
+              {% endif %}
             </article>
           </li>
         {% endfor %}
