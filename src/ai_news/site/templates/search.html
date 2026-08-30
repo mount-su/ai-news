@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 
+{% block page_scripts %}<script src="{{ asset_url('search-core.js') }}" defer></script>{% endblock %}
+
 {% block main %}
-  <main id="main-content" class="page-shell">
+  <main id="main-content" class="page-shell" data-search-page data-index-url="{{ page_url() }}search.json">
     <header class="channel-header">
       <p class="eyebrow">SEARCH THE EDITIONS</p>
       <h1>搜索情报</h1>

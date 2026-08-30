@@ -488,6 +488,11 @@ select { font: inherit; }
 .search-form .button-secondary { color: var(--ink); background: transparent; }
 .search-status { min-height: 2rem; color: var(--muted); }
 .search-results > li { border-top: 1px solid var(--rule); }
+.search-result { padding-block: 1.25rem; }
+.search-result h3 { margin: 0; font-family: var(--serif); font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
+.search-result__meta { margin: 0.35rem 0 0; color: var(--editorial-red); font-size: 12px; }
+.search-result__summary { margin: 0.65rem 0 0; }
+.search-result__impact { margin: 0.35rem 0 0; color: var(--muted); }
 
 .message-actions { display: flex; justify-content: center; gap: 1.5rem; }
 

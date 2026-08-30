@@ -137,6 +137,7 @@ def test_ci_runs_all_quality_and_offline_validation_commands() -> None:
         'python -m pip install ".[dev]"',
         "ruff check .",
         "ruff format --check .",
+        "node --test tests/site-search.test.cjs",
         "pytest --cov=ai_news",
         "--cov-fail-under=85",
         "python scripts/check_no_secrets.py",
@@ -144,6 +145,9 @@ def test_ci_runs_all_quality_and_offline_validation_commands() -> None:
         "python scripts/validate_site.py .demo/dist --base-path /ai-news/",
     ):
         assert command in commands
+    assert commands.index("node --test tests/site-search.test.cjs") < commands.index(
+        "pytest --cov=ai_news"
+    )
 
 
 def test_ci_actionlint_is_pinned_and_only_ignores_the_known_timezone_schema_gap() -> None:

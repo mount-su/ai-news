@@ -32,6 +32,9 @@ jobs:
       - name: Check formatting
         run: ruff format --check .
 
+      - name: Test static search
+        run: node --test tests/site-search.test.cjs
+
       - name: Run tests with coverage
         run: pytest --cov=ai_news --cov-report=term-missing --cov-fail-under=85
 

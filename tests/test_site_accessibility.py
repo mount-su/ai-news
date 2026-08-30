@@ -209,7 +209,7 @@ def test_styles_define_warm_responsive_newspaper_and_accessibility_contract(
     assert f"{BASE_PATH}assets/favicon.svg" in homepage
 
 
-def test_javascript_is_safe_progressive_enhancement_without_content_mutation(
+def test_javascript_is_safe_progressive_enhancement_and_search_is_page_scoped(
     accessibility_report_root: tuple[Path, object],
     tmp_path: Path,
 ) -> None:
@@ -219,9 +219,18 @@ def test_javascript_is_safe_progressive_enhancement_without_content_mutation(
     javascript = (output / "assets/app.js").read_text(encoding="utf-8")
 
     assert "classList.add" in javascript
-    assert "js" in javascript
+    assert "[data-search-page]" in javascript
+    assert "if (!searchPage)" in javascript
+    assert "fetch(" in javascript
+    assert "createElement" in javascript
+    assert "textContent" in javascript
     assert "innerHTML" not in javascript
-    assert "textContent" not in javascript
     assert "eval(" not in javascript
     assert "new Function" not in javascript
     assert f"{BASE_PATH}search.json" not in javascript
+
+    homepage = (output / "index.html").read_text(encoding="utf-8")
+    search_page = (output / "search/index.html").read_text(encoding="utf-8")
+    assert "search-core.js" not in homepage
+    assert f"{BASE_PATH}assets/search-core.js" in search_page
+    assert f'data-index-url="{BASE_PATH}search.json"' in search_page
