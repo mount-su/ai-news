@@ -1,132 +1,7 @@
 {
-  "candidate_count": 16,
+  "cutoff_at": "2026-08-21T15:59:59.999999Z",
   "date": "2026-08-21",
-  "degraded": false,
-  "generated_at": "2026-08-21T15:59:59.999999Z",
-  "items": [
-    {
-      "canonical_url": "https://openai.com/index/stampli",
-      "category": "AI 工具",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "ad89fb510e3c78c2",
-      "importance": 7,
-      "is_official": true,
-      "marketing_risk": "medium",
-      "original_title": "Stampli cuts launch hours by 68% using ChatGPT Work",
-      "published_at": "2026-08-20T00:00:00Z",
-      "source": "OpenAI",
-      "source_id": "openai",
-      "source_role": "primary",
-      "summary": "Stampli 在固定截止日期和设计资源受限的情况下，使用 Codex 和 ChatGPT Work 将原本需要数周的发布制作压缩到数天，发布工时减少 68%。",
-      "tags": [
-        "ChatGPT Work",
-        "Codex",
-        "企业提效"
-      ],
-      "title": "Stampli 使用 ChatGPT Work 将发布工时压缩 68%",
-      "tracking_signal": "关注 Stampli 后续是否公开具体工作流配置和可复用模板。",
-      "why_it_matters": "展示了 ChatGPT Work 和 Codex 在真实企业生产环境中的提效能力，为面临资源紧张和紧迫工期的团队提供了可参考的落地路径。"
-    },
-    {
-      "canonical_url": "https://huggingface.co/blog/LiquidAI/lfm25-dspark",
-      "category": "开源项目",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "eab5285cfdebeb65",
-      "importance": 6,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Up to 3.2x Faster Inference with LFM2.5-DSpark",
-      "published_at": "2026-08-20T16:52:57Z",
-      "source": "Hugging Face",
-      "source_id": "hugging-face",
-      "source_role": "primary",
-      "summary": "Hugging Face 发布 LFM2.5-DSpark，推理速度相比此前方案最高提升 3.2 倍。",
-      "tags": [
-        "推理加速",
-        "Hugging Face",
-        "性能优化"
-      ],
-      "title": "LFM2.5-DSpark 推理速度最高提升 3.2 倍",
-      "tracking_signal": "在 Hugging Face 上测试 LFM2.5-DSpark 并对比现有推理端点的延迟和成本。",
-      "why_it_matters": "推理速度提升直接降低部署成本和延迟，对使用 Hugging Face 推理服务的开发者和企业有实际性能收益。"
-    },
-    {
-      "canonical_url": "https://openai.com/index/nvidia/chatgpt-work",
-      "category": "AI 工具",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "baf07daff59f271b",
-      "importance": 6,
-      "is_official": true,
-      "marketing_risk": "medium",
-      "original_title": "How NVIDIA scales expertise with ChatGPT Work",
-      "published_at": "2026-08-18T00:00:00Z",
-      "source": "OpenAI",
-      "source_id": "openai",
-      "source_role": "primary",
-      "summary": "NVIDIA 团队使用 ChatGPT Work 减少手动任务、连接快速变化的信号，并将成功的工作流在全球范围内规模化复制。",
-      "tags": [
-        "ChatGPT Work",
-        "NVIDIA",
-        "工作流自动化"
-      ],
-      "title": "NVIDIA 使用 ChatGPT Work 规模化复制高效工作流",
-      "tracking_signal": "观察 NVIDIA 是否发布可量化的效率数据或内部推广案例。",
-      "why_it_matters": "大型科技公司内部采用 ChatGPT Work 表明该工具已进入规模化企业部署阶段，对评估其稳定性和团队协作能力有实际参考价值。"
-    },
-    {
-      "canonical_url": "https://sourcegraph.com/blog/claude-code-file-picker-symbol-ranking",
-      "category": "Coding Agent",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "234c7c34d4dc5db3",
-      "importance": 5,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Make Claude Code's @ picker search symbols, not filenames",
-      "published_at": "2026-08-20T00:00:00Z",
-      "source": "Sourcegraph Blog",
-      "source_id": "sourcegraph-blog",
-      "source_role": "primary",
-      "summary": "Claude Code 的 @ 选择器此前只匹配路径中的字符，输入函数名无法返回结果；现在改为搜索代码定义中的符号。",
-      "tags": [
-        "Claude Code",
-        "代码导航",
-        "开发体验"
-      ],
-      "title": "Claude Code 的 @ 选择器改为搜索代码符号而非文件名",
-      "tracking_signal": "在 Claude Code 中测试 @ 选择器对函数名、类名等符号的搜索准确性和响应速度。",
-      "why_it_matters": "改善开发者在使用 Claude Code 时的代码导航体验，减少查找函数和符号的摩擦，提升编码效率。"
-    },
-    {
-      "canonical_url": "https://huggingface.co/blog/Dharma-AI/gpu-management-pt2",
-      "category": "开源项目",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "bf50ec5ce617ac83",
-      "importance": 5,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Same Cluster, 33 Points More Utilization: What Changed Was the Order",
-      "published_at": "2026-08-17T19:46:21Z",
-      "source": "Hugging Face",
-      "source_id": "hugging-face",
-      "source_role": "primary",
-      "summary": "在相同集群上，仅通过改变任务执行顺序，Hugging Face 将集群利用率提升了 33 个百分点。",
-      "tags": [
-        "集群调度",
-        "资源利用率",
-        "成本优化"
-      ],
-      "title": "Hugging Face 通过调整任务顺序提升集群利用率 33 个百分点",
-      "tracking_signal": "关注 Hugging Face 是否公开具体的调度策略或排序算法细节。",
-      "why_it_matters": "无需增加硬件投入即可显著提升算力利用率，对运行大规模推理或训练任务、关注成本控制的团队有直接借鉴意义。"
-    }
-  ],
-  "model": "deepseek-v4-pro",
-  "schema_version": "1.3",
+  "safe_error_code": "none",
   "source_runs": [
     {
       "candidate_count": 6,
@@ -464,5 +339,6 @@
       "source_name": "GitHub Blog AI",
       "success": true
     }
-  ]
+  ],
+  "status": "published"
 }
