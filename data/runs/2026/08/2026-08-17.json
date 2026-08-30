@@ -1,132 +1,7 @@
 {
-  "candidate_count": 13,
+  "cutoff_at": "2026-08-17T15:59:59.999999Z",
   "date": "2026-08-17",
-  "degraded": false,
-  "generated_at": "2026-08-17T15:59:59.999999Z",
-  "items": [
-    {
-      "canonical_url": "https://deepmind.google/blog/introducing-gemini-3-7-flash",
-      "category": "大模型",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "d8531b3bebbaf664",
-      "importance": 8,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Introducing Gemini 3.7 Flash",
-      "published_at": "2026-08-13T17:04:18Z",
-      "source": "DeepMind",
-      "source_id": "deepmind",
-      "source_role": "primary",
-      "summary": "DeepMind 于 2026 年 8 月 13 日发布 Gemini 3.7 Flash 模型。",
-      "tags": [
-        "Gemini",
-        "DeepMind",
-        "模型发布"
-      ],
-      "title": "DeepMind 发布 Gemini 3.7 Flash",
-      "tracking_signal": "关注 DeepMind 官方文档中 Gemini 3.7 Flash 的定价、上下文窗口与可用区域。",
-      "why_it_matters": "Gemini 3.7 Flash 作为新一代模型发布，直接影响使用 Gemini API 的开发者与终端用户，可能带来性能、成本或能力上的变化。"
-    },
-    {
-      "canonical_url": "https://cursor.com/changelog/origin-code-hosting",
-      "category": "Coding Agent",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "807cadab757a2d4d",
-      "importance": 7,
-      "is_official": true,
-      "marketing_risk": "medium",
-      "original_title": "Origin Code Hosting",
-      "published_at": "2026-08-17T00:00:00Z",
-      "source": "Cursor Changelog",
-      "source_id": "cursor-changelog",
-      "source_role": "primary",
-      "summary": "Cursor 现在可以托管用户代码，推出 Origin Code Hosting 功能。",
-      "tags": [
-        "Cursor",
-        "代码托管",
-        "开发工具"
-      ],
-      "title": "Cursor 推出 Origin Code Hosting 代码托管",
-      "tracking_signal": "查看 Cursor 官方文档中 Origin Code Hosting 的存储限制、协作功能与定价。",
-      "why_it_matters": "Cursor 用户可直接在 Cursor 内托管代码，减少对 GitHub 等外部平台的依赖，可能改变 AI 编码工作流。"
-    },
-    {
-      "canonical_url": "https://blog.google/products-and-platforms/products/workspace/sheets-canvas-for-google-sheets-spreadsheets",
-      "category": "AI 工具",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "e546c9507c4bdece",
-      "importance": 6,
-      "is_official": true,
-      "marketing_risk": "medium",
-      "original_title": "Bring your spreadsheet data to life with Sheets canvas",
-      "published_at": "2026-08-13T16:45:00Z",
-      "source": "Google AI",
-      "source_id": "google-ai",
-      "source_role": "primary",
-      "summary": "Google AI 为 Sheets 推出 canvas 功能，可将电子表格数据可视化呈现。",
-      "tags": [
-        "Google Sheets",
-        "数据可视化",
-        "AI 工具"
-      ],
-      "title": "Google Sheets 推出 canvas 功能",
-      "tracking_signal": "在 Google Sheets 中查找 canvas 入口，测试其支持的数据类型与分享方式。",
-      "why_it_matters": "Sheets 用户可直接在表格内将数据转化为可视化画布，降低数据展示与协作门槛。"
-    },
-    {
-      "canonical_url": "https://cursor.com/changelog/08-13-26",
-      "category": "Coding Agent",
-      "discovery_verified": false,
-      "editorial_lane": "产品与应用",
-      "id": "6513f392a2d6804b",
-      "importance": 6,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "Cloud Agents Start 3x Faster with Builds",
-      "published_at": "2026-08-13T00:00:00Z",
-      "source": "Cursor Changelog",
-      "source_id": "cursor-changelog",
-      "source_role": "primary",
-      "summary": "Cursor 云代理现在通过预构建环境，使代理启动速度提升 3 倍，仓库已克隆、依赖已安装、安装脚本已运行。",
-      "tags": [
-        "Cursor",
-        "Cloud Agents",
-        "性能优化"
-      ],
-      "title": "Cursor Cloud Agents 通过 Builds 实现 3 倍启动加速",
-      "tracking_signal": "在 Cursor 中启用 Builds 功能，对比启用前后 Cloud Agents 的启动耗时。",
-      "why_it_matters": "使用 Cursor Cloud Agents 的开发者可显著减少等待时间，提升自动化编码任务的执行效率。"
-    },
-    {
-      "canonical_url": "https://openai.com/index/dali-rajic-chief-revenue-officer",
-      "category": "大模型",
-      "discovery_verified": false,
-      "editorial_lane": "商业与市场",
-      "id": "6eaab463a55def87",
-      "importance": 5,
-      "is_official": true,
-      "marketing_risk": "low",
-      "original_title": "OpenAI appoints Dali Rajic as Chief Revenue Officer",
-      "published_at": "2026-08-13T09:00:00Z",
-      "source": "OpenAI",
-      "source_id": "openai",
-      "source_role": "primary",
-      "summary": "OpenAI 任命 Dali Rajic 为首席营收官，负责全球营收组织并帮助企业实现 AI 价值。",
-      "tags": [
-        "OpenAI",
-        "人事任命",
-        "商业化"
-      ],
-      "title": "OpenAI 任命 Dali Rajic 为首席营收官",
-      "tracking_signal": "关注 OpenAI 后续企业产品定价、销售政策或客户案例的发布。",
-      "why_it_matters": "OpenAI 强化企业销售与营收团队，可能加速其企业级 AI 产品的市场推广与商业化进程。"
-    }
-  ],
-  "model": "deepseek-v4-pro",
-  "schema_version": "1.3",
+  "safe_error_code": "none",
   "source_runs": [
     {
       "candidate_count": 4,
@@ -464,5 +339,6 @@
       "source_name": "GitHub Blog AI",
       "success": true
     }
-  ]
+  ],
+  "status": "published"
 }
