@@ -219,7 +219,26 @@ def _public_search_entry(
     report_date: str,
     page_url: Callable[[str], str],
 ) -> dict[str, object]:
-    payload = item.model_dump(mode="json")
+    payload = item.model_dump(
+        mode="json",
+        include={
+            "id",
+            "canonical_url",
+            "original_title",
+            "source",
+            "published_at",
+            "title",
+            "category",
+            "summary",
+            "importance",
+            "why_it_matters",
+            "tags",
+            "is_official",
+            "marketing_risk",
+            "tracking_signal",
+            "editorial_lane",
+        },
+    )
     payload["date"] = report_date
     payload["page_url"] = page_url(f"days/{report_date}")
     return payload

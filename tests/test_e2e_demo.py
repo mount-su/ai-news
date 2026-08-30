@@ -57,8 +57,8 @@ def test_demo_cli_is_network_free_complete_and_deterministic(
     report_path = first_root / "data/2026/07/2026-07-26.json"
     report = DailyReport.model_validate_json(report_path.read_bytes())
     assert report.date.isoformat() == contract["date"]
-    assert len(report.items) == contract["item_count"] == 9
-    assert report.schema_version == "1.1"
+    assert len(report.items) == contract["item_count"] == 7
+    assert report.schema_version == "1.3"
     lane_counts = Counter(item.editorial_lane for item in report.items)
     assert set(lane_counts) == {
         EditorialLane.PRODUCT_APPLICATION,
@@ -66,7 +66,7 @@ def test_demo_cli_is_network_free_complete_and_deterministic(
         EditorialLane.PLATFORM_POLICY,
     }
     assert max(lane_counts.values()) <= 4
-    assert max(Counter(item.source for item in report.items).values()) <= 3
+    assert max(Counter(item.source for item in report.items).values()) <= 2
     assert [item.title for item in report.items] == contract["expected_titles"]
     assert all(
         item.summary and item.why_it_matters and item.tracking_signal for item in report.items

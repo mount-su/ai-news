@@ -88,6 +88,7 @@ def _demo_report() -> DailyReport:
         ("demo-product", "Offline Product"),
         ("demo-business", "Offline Business"),
         ("demo-platform", "Offline Platform"),
+        ("demo-ecosystem", "Offline Ecosystem"),
     ]
     lanes = [
         EditorialLane.PRODUCT_APPLICATION,
@@ -95,8 +96,6 @@ def _demo_report() -> DailyReport:
         EditorialLane.PRODUCT_APPLICATION,
         EditorialLane.BUSINESS_MARKET,
         EditorialLane.BUSINESS_MARKET,
-        EditorialLane.BUSINESS_MARKET,
-        EditorialLane.PLATFORM_POLICY,
         EditorialLane.PLATFORM_POLICY,
         EditorialLane.PLATFORM_POLICY,
     ]
@@ -132,6 +131,7 @@ def _demo_report() -> DailyReport:
         items.append(NewsItem.from_candidate_analysis(candidate, analysis))
 
     return DailyReport(
+        schema_version="1.3",
         date=_DEMO_DATE,
         generated_at=_DEMO_GENERATED_AT,
         model="offline-demo",
@@ -142,7 +142,7 @@ def _demo_report() -> DailyReport:
             SourceRun.succeeded(
                 source_id=source_id,
                 source_name=source_name,
-                item_count=3,
+                item_count=sum(item.source_id == source_id for item in items),
                 elapsed_ms=0,
             )
             for source_id, source_name in sources

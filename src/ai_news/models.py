@@ -369,6 +369,13 @@ class NewsItem(BaseModel):
     canonical_url: HttpUrl
     original_title: str = Field(min_length=1, max_length=1000)
     source: str = Field(min_length=1, max_length=300)
+    source_id: str | None = Field(
+        default=None,
+        pattern=r"^[a-z0-9][a-z0-9-]+$",
+        max_length=100,
+    )
+    source_role: SourceRole | None = None
+    discovery_verified: bool | None = None
     published_at: datetime
     title: str = Field(min_length=1, max_length=1000)
     category: Category
@@ -453,6 +460,9 @@ class NewsItem(BaseModel):
             canonical_url=candidate.canonical_url,
             original_title=candidate.raw.title,
             source=candidate.raw.source_name,
+            source_id=candidate.raw.source_id,
+            source_role=candidate.raw.source_role,
+            discovery_verified=candidate.raw.discovery_verified,
             published_at=candidate.raw.published_at,
             title=analysis.title,
             category=analysis.category,
@@ -461,7 +471,7 @@ class NewsItem(BaseModel):
             importance=analysis.importance,
             why_it_matters=analysis.why_it_matters,
             tags=analysis.tags,
-            is_official=analysis.is_official,
+            is_official=candidate.raw.is_official_source,
             marketing_risk=analysis.marketing_risk,
             tracking_signal=analysis.tracking_signal,
         )
@@ -559,7 +569,7 @@ class SourceRun(BaseModel):
 class DailyReport(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["1.0", "1.1", "1.2"] = "1.1"
+    schema_version: Literal["1.0", "1.1", "1.2", "1.3"] = "1.1"
     date: date
     generated_at: datetime
     model: str = Field(min_length=1, max_length=300)
@@ -599,4 +609,9 @@ class DailyReport(BaseModel):
         source_ids = [source_run.source_id for source_run in self.source_runs]
         if len(source_ids) != len(set(source_ids)):
             raise ValueError("source_runs must contain unique source ids")
+        if self.schema_version == "1.3" and any(
+            item.source_id is None or item.source_role is None or item.discovery_verified is None
+            for item in self.items
+        ):
+            raise ValueError("schema 1.3 items require complete source provenance")
         return self

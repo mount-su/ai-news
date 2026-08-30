@@ -75,6 +75,7 @@ def _raw(
     source: SourceSpec | None = None,
     published_at: datetime = NOW,
     query: str = "",
+    discovery_verified: bool = False,
 ) -> RawItem:
     selected_source = source or _source(0)
     return RawItem(
@@ -87,6 +88,8 @@ def _raw(
         excerpt=f"Factual excerpt {number}",
         category_hint=selected_source.category,
         is_official_source=selected_source.official,
+        source_role=selected_source.role,
+        discovery_verified=discovery_verified,
     )
 
 
@@ -116,6 +119,20 @@ def _updated_raw(raw: RawItem, **updates: Any) -> RawItem:
     return RawItem.model_validate(raw_data)
 
 
+def _select_with_source_cap(items: list[Any], *, limit: int = 7) -> list[Any]:
+    source_counts: dict[str, int] = {}
+    selected: list[Any] = []
+    for item in items:
+        source_id = item.raw.source_id
+        if source_counts.get(source_id, 0) >= 2:
+            continue
+        source_counts[source_id] = source_counts.get(source_id, 0) + 1
+        selected.append(item)
+        if len(selected) == limit:
+            break
+    return selected
+
+
 class _Analyzer:
     def __init__(
         self,
@@ -132,16 +149,15 @@ class _Analyzer:
             EditorialLane.PRODUCT_ENGINEERING,
             EditorialLane.PRODUCT_ENGINEERING,
             EditorialLane.PRODUCT_ENGINEERING,
-            EditorialLane.PRODUCT_ENGINEERING,
             EditorialLane.BUSINESS,
             EditorialLane.BUSINESS,
             EditorialLane.BUSINESS,
-            EditorialLane.RESEARCH,
             EditorialLane.RESEARCH,
         ]
+        selected = _select_with_source_cap(items)
         return {
             item.id: _analysis(index, editorial_lane=lane)
-            for index, (item, lane) in enumerate(zip(items[:9], lanes, strict=False))
+            for index, (item, lane) in enumerate(zip(selected, lanes, strict=False))
         }
 
 
@@ -487,7 +503,7 @@ def test_source_collection_concurrency_never_exceeds_six() -> None:
     assert peak == 6
 
 
-def test_pipeline_publishes_available_quality_items_below_nine() -> None:
+def test_pipeline_publishes_available_quality_items_below_seven() -> None:
     primary_source = _source(0)
     source_config, collector = _with_filler_sources(
         primary_source,
@@ -783,7 +799,7 @@ def test_history_deduplication_and_pretrim_build_balanced_thirty_six_item_pool()
     assert report.candidate_count == 36
 
 
-def test_fewer_than_nine_valid_candidates_publishes_available_items(
+def test_eight_valid_candidates_publish_at_most_seven_items(
     tmp_path: Path,
 ) -> None:
     sources = [_source(index) for index in range(3)]
@@ -806,14 +822,14 @@ def test_fewer_than_nine_valid_candidates_publishes_available_items(
         )
     )
 
-    assert len(report.items) == 8
+    assert len(report.items) == 6
     assert len(analyzer.calls) == 1
 
 
-def test_nine_valid_items_build_and_persist_schema_1_2_report(tmp_path: Path) -> None:
-    sources = [_source(index) for index in range(3)]
+def test_seven_valid_items_build_and_persist_schema_1_3_report(tmp_path: Path) -> None:
+    sources = [_source(index) for index in range(4)]
     items_by_source = {
-        source.id: [_raw(source_index * 100 + index, source=source) for index in range(3)]
+        source.id: [_raw(source_index * 100 + index, source=source) for index in range(2)]
         for source_index, source in enumerate(sources)
     }
     report = asyncio.run(
@@ -832,14 +848,105 @@ def test_nine_valid_items_build_and_persist_schema_1_2_report(tmp_path: Path) ->
     markdown_path = tmp_path / "content/2026-07-26.md"
     index_path = tmp_path / "data/index.json"
     assert DailyReport.model_validate_json(report_path.read_bytes()) == report
-    assert report.schema_version == "1.2"
-    assert len(report.items) == 9
+    assert report.schema_version == "1.3"
+    assert len(report.items) == 7
+    assert all(item.source_id is not None for item in report.items)
+    assert all(item.source_role is not None for item in report.items)
+    assert all(item.discovery_verified is not None for item in report.items)
     assert markdown_path.is_file()
     assert index_path.is_file()
 
 
-def test_final_nine_items_are_stably_sorted() -> None:
-    sources = [_source(source_index) for source_index in range(3)]
+def test_news_item_provenance_comes_from_raw_source_not_model_claims() -> None:
+    official = _source(0, official=True, role="primary")
+    media = _source(1, official=False, role="trusted_media")
+    fillers = [_source(2), _source(3)]
+    items_by_source = {
+        official.id: [_raw(10, source=official)],
+        media.id: [_raw(11, source=media)],
+        **{
+            source.id: [_raw(20 + index, source=source) for index in range(2)]
+            for index, source in enumerate(fillers)
+        },
+    }
+
+    def analyses(candidates: list[Any]) -> dict[str, Analysis]:
+        selected = {
+            candidate.raw.source_id: candidate
+            for candidate in candidates
+            if candidate.raw.source_id in {official.id, media.id}
+        }
+        return {
+            selected[official.id].id: _analysis(0).model_copy(update={"is_official": False}),
+            selected[media.id].id: _analysis(1).model_copy(update={"is_official": True}),
+        }
+
+    report = _run(
+        source_config=SourceConfig(sources=[official, media, *fillers]),
+        collector=_collector(items_by_source),
+        analyzer=_Analyzer(analyses),
+    )
+    items_by_source_id = {item.source_id: item for item in report.items}
+
+    assert items_by_source_id[official.id].is_official is True
+    assert items_by_source_id[official.id].source_role.value == "primary"
+    assert items_by_source_id[official.id].discovery_verified is False
+    assert items_by_source_id[media.id].is_official is False
+    assert items_by_source_id[media.id].source_role.value == "trusted_media"
+    assert items_by_source_id[media.id].discovery_verified is False
+
+
+def test_non_primary_high_marketing_risk_is_removed_but_primary_is_retained() -> None:
+    primary = _source(0, official=True, role="primary")
+    media = _source(1, official=False, role="trusted_media")
+    filler = _source(2)
+    items_by_source = {
+        primary.id: [_raw(30, source=primary)],
+        media.id: [_raw(31, source=media)],
+        filler.id: [_raw(32, source=filler)],
+    }
+
+    def analyses(candidates: list[Any]) -> dict[str, Analysis]:
+        return {
+            candidate.id: _analysis(index).model_copy(
+                update={
+                    "marketing_risk": (
+                        "high" if candidate.raw.source_id in {primary.id, media.id} else "low"
+                    )
+                }
+            )
+            for index, candidate in enumerate(candidates)
+        }
+
+    report = _run(
+        source_config=SourceConfig(sources=[primary, media, filler]),
+        collector=_collector(items_by_source),
+        analyzer=_Analyzer(analyses),
+    )
+
+    assert {item.source_id for item in report.items} == {primary.id, filler.id}
+    retained_primary = next(item for item in report.items if item.source_id == primary.id)
+    assert retained_primary.marketing_risk == "high"
+
+
+def test_empty_model_selection_publishes_no_report() -> None:
+    source = _source(0)
+    items = [_raw(index, source=source) for index in range(3)]
+    saves: list[DailyReport] = []
+
+    with pytest.raises(PublicationThresholdError, match="no valid editorial items"):
+        _run(
+            source_config=SourceConfig(sources=[source]),
+            collector=_collector({source.id: items}),
+            analyzer=_Analyzer(lambda _candidates: {}),
+            report_saver=lambda _root, report: saves.append(report),
+        )
+
+    assert saves == []
+
+
+def test_final_seven_items_are_stably_sorted() -> None:
+    sources = [_source(source_index) for source_index in range(4)]
     items_by_source = {
         source.id: [
             _raw(
@@ -857,20 +964,19 @@ def test_final_nine_items_are_stably_sorted() -> None:
             EditorialLane.PRODUCT_ENGINEERING,
             EditorialLane.PRODUCT_ENGINEERING,
             EditorialLane.PRODUCT_ENGINEERING,
-            EditorialLane.PRODUCT_ENGINEERING,
             EditorialLane.BUSINESS,
             EditorialLane.BUSINESS,
             EditorialLane.BUSINESS,
-            EditorialLane.RESEARCH,
             EditorialLane.RESEARCH,
         ]
+        selected = _select_with_source_cap(candidates)
         return {
             candidate.id: _analysis(
                 index,
                 importance=(index % 4) + 7,
                 editorial_lane=lane,
             )
-            for index, (candidate, lane) in enumerate(zip(candidates[:9], lanes, strict=True))
+            for index, (candidate, lane) in enumerate(zip(selected, lanes, strict=True))
         }
 
     report = _run(
@@ -887,11 +993,11 @@ def test_final_nine_items_are_stably_sorted() -> None:
         ),
     )
 
-    assert len(report.items) == 9
+    assert len(report.items) == 7
     assert report.items == expected
 
 
-def test_pipeline_accepts_eight_analyzed_items() -> None:
+def test_pipeline_rejects_more_than_seven_analyzed_items() -> None:
     sources = [_source(index) for index in range(3)]
     items_by_source = {
         source.id: [_raw(source_index * 100 + index, source=source) for index in range(3)]
@@ -901,23 +1007,21 @@ def test_pipeline_accepts_eight_analyzed_items() -> None:
     def eight_analyses(candidates: list[Any]) -> dict[str, Analysis]:
         return {candidate.id: _analysis(index) for index, candidate in enumerate(candidates[:8])}
 
-    report = _run(
-        source_config=SourceConfig(sources=sources),
-        collector=_collector(items_by_source),
-        analyzer=_Analyzer(eight_analyses),
-    )
-    assert len(report.items) == 8
+    with pytest.raises(ReportValidationError, match="distribution"):
+        _run(
+            source_config=SourceConfig(sources=sources),
+            collector=_collector(items_by_source),
+            analyzer=_Analyzer(eight_analyses),
+        )
 
 
 def test_pipeline_allows_unbalanced_editorial_lanes() -> None:
-    sources = [_source(index) for index in range(3)]
+    sources = [_source(index) for index in range(4)]
     items_by_source = {
         source.id: [_raw(source_index * 100 + index, source=source) for index in range(3)]
         for source_index, source in enumerate(sources)
     }
     lanes = [
-        EditorialLane.PRODUCT_ENGINEERING,
-        EditorialLane.PRODUCT_ENGINEERING,
         EditorialLane.PRODUCT_ENGINEERING,
         EditorialLane.PRODUCT_ENGINEERING,
         EditorialLane.PRODUCT_ENGINEERING,
@@ -928,9 +1032,10 @@ def test_pipeline_allows_unbalanced_editorial_lanes() -> None:
     ]
 
     def invalid_lanes(candidates: list[Any]) -> dict[str, Analysis]:
+        selected = _select_with_source_cap(candidates)
         return {
             candidate.id: _analysis(index, editorial_lane=lane)
-            for index, (candidate, lane) in enumerate(zip(candidates[:9], lanes, strict=True))
+            for index, (candidate, lane) in enumerate(zip(selected, lanes, strict=True))
         }
 
     report = _run(
@@ -938,12 +1043,12 @@ def test_pipeline_allows_unbalanced_editorial_lanes() -> None:
         collector=_collector(items_by_source),
         analyzer=_Analyzer(invalid_lanes),
     )
-    assert len(report.items) == 9
+    assert len(report.items) == 7
 
 
-def test_pipeline_rejects_more_than_three_final_items_from_one_source() -> None:
+def test_pipeline_rejects_more_than_two_final_items_from_one_source() -> None:
     sources = [_source(index) for index in range(3)]
-    source_sizes = (4, 3, 2)
+    source_sizes = (3, 2, 2)
     items_by_source = {
         source.id: [
             _raw(source_index * 100 + index, source=source)
@@ -952,11 +1057,14 @@ def test_pipeline_rejects_more_than_three_final_items_from_one_source() -> None:
         for source_index, source in enumerate(sources)
     }
 
+    def invalid_distribution(candidates: list[Any]) -> dict[str, Analysis]:
+        return {candidate.id: _analysis(index) for index, candidate in enumerate(candidates[:7])}
+
     with pytest.raises(ReportValidationError, match="distribution"):
         _run(
             source_config=SourceConfig(sources=sources),
             collector=_collector(items_by_source),
-            analyzer=_Analyzer(),
+            analyzer=_Analyzer(invalid_distribution),
         )
 
 
@@ -1184,8 +1292,48 @@ def test_duplicate_canonical_urls_are_folded_before_bounded_pretrim() -> None:
     )
 
     assert report.candidate_count == 15
-    assert len(report.items) == 9
+    assert len(report.items) == 7
     assert sum(str(item.canonical_url) == duplicate_url for item in analyzer.calls[0]) == 1
+
+
+def test_exact_accumulator_prefers_primary_over_higher_weight_media_duplicate() -> None:
+    primary = _source(0, official=True, role="primary")
+    media = _source(1, official=False, role="trusted_media")
+    fillers = [_source(2), _source(3), _source(4)]
+    duplicate_url = "https://example.com/news/shared-official-event"
+    primary_item = _updated_raw(
+        _raw(100, source=primary),
+        url=duplicate_url,
+        title="Official product launch",
+        source_weight=1,
+        published_at=NOW - timedelta(hours=2),
+    )
+    media_item = _updated_raw(
+        _raw(101, source=media),
+        url=duplicate_url,
+        title="Media product launch",
+        source_weight=10,
+        published_at=NOW,
+    )
+    items_by_source = {
+        primary.id: [primary_item],
+        media.id: [media_item],
+        **{
+            source.id: [_raw(200 + index, source=source) for index in range(3)]
+            for index, source in enumerate(fillers)
+        },
+    }
+    analyzer = _Analyzer()
+
+    _run(
+        source_config=SourceConfig(sources=[primary, media, *fillers]),
+        collector=_collector(items_by_source),
+        analyzer=analyzer,
+    )
+
+    duplicate = [item for item in analyzer.calls[0] if str(item.canonical_url) == duplicate_url]
+    assert len(duplicate) == 1
+    assert duplicate[0].raw.source_id == primary.id
 
 
 def test_same_host_exact_titles_are_folded_before_bounded_pretrim() -> None:
@@ -1218,7 +1366,7 @@ def test_same_host_exact_titles_are_folded_before_bounded_pretrim() -> None:
     )
 
     assert report.candidate_count == 15
-    assert len(report.items) == 9
+    assert len(report.items) == 7
     primary_titles = [
         item.raw.title for item in analyzer.calls[0] if item.raw.source_id == source.id
     ]
@@ -1276,7 +1424,7 @@ def test_exact_key_bridge_merges_both_existing_groups(
 
     assert dedupe_sizes == [6]
     assert report.candidate_count == 15
-    assert len(report.items) == 9
+    assert len(report.items) == 7
 
 
 def test_large_exact_title_alias_state_is_bounded_and_order_independent(

@@ -245,6 +245,9 @@ def test_news_item_factory_is_flat_json_safe_and_preserves_public_fields() -> No
         "canonical_url": str(candidate.canonical_url),
         "original_title": candidate.raw.title,
         "source": candidate.raw.source_name,
+        "source_id": candidate.raw.source_id,
+        "source_role": "primary",
+        "discovery_verified": False,
         "published_at": "2026-07-26T08:30:00Z",
         "title": analysis.title,
         "category": Category.MODEL.value,
@@ -270,6 +273,28 @@ def test_news_item_infers_legacy_editorial_lane_from_category() -> None:
     item = NewsItem.model_validate(payload)
 
     assert item.editorial_lane.value == "前沿研究"
+
+
+def test_legacy_news_item_without_source_provenance_remains_loadable() -> None:
+    payload = _item("legacy-provenance").model_dump(mode="json")
+    for field_name in ("source_id", "source_role", "discovery_verified"):
+        payload.pop(field_name, None)
+
+    item = NewsItem.model_validate(payload)
+
+    assert item.source_id is None
+    assert item.source_role is None
+    assert item.discovery_verified is None
+
+
+@pytest.mark.parametrize("missing_field", ["source_id", "source_role", "discovery_verified"])
+def test_schema_1_3_report_requires_complete_item_provenance(missing_field: str) -> None:
+    payload = _report(slugs=("v13",)).model_dump(mode="json")
+    payload["schema_version"] = "1.3"
+    payload["items"][0].pop(missing_field, None)
+
+    with pytest.raises(ValidationError, match="provenance"):
+        DailyReport.model_validate(payload)
 
 
 def test_new_daily_report_serializes_schema_1_1() -> None:

@@ -6,7 +6,7 @@ from itertools import pairwise, permutations
 
 import pytest
 
-from ai_news.models import Candidate, Category, RawItem
+from ai_news.models import Candidate, Category, RawItem, SourceRole
 from ai_news.pipeline.dedupe import deduplicate
 from ai_news.pipeline.normalize import to_candidate
 
@@ -24,6 +24,9 @@ def _candidate(
     source_id: str | None = None,
     source_name: str | None = None,
     excerpt: str = "Summary",
+    official: bool = False,
+    source_role: SourceRole | None = None,
+    discovery_verified: bool = False,
 ) -> Candidate:
     return to_candidate(
         RawItem(
@@ -35,7 +38,9 @@ def _candidate(
             published_at=published_at,
             excerpt=excerpt,
             category_hint=Category.MODEL,
-            is_official_source=False,
+            is_official_source=official,
+            source_role=source_role,
+            discovery_verified=discovery_verified,
         )
     )
 
@@ -250,3 +255,89 @@ def test_deduplicate_rejects_more_than_500_candidates() -> None:
 
     with pytest.raises(ValueError, match="500"):
         deduplicate([candidate] * 501, set())
+
+
+def test_deduplicate_prefers_primary_then_trusted_media_then_discovery() -> None:
+    primary = _candidate(
+        "primary",
+        "Official launch details",
+        url_slug="shared-event",
+        weight=1,
+        published_at=BASE_TIME - timedelta(hours=2),
+        official=True,
+        source_role=SourceRole.PRIMARY,
+    )
+    trusted = _candidate(
+        "trusted",
+        "Media launch details",
+        url_slug="shared-event",
+        weight=10,
+        published_at=BASE_TIME + timedelta(hours=1),
+        source_role=SourceRole.TRUSTED_MEDIA,
+    )
+    discovery = _candidate(
+        "discovery",
+        "Community launch details",
+        url_slug="shared-event",
+        weight=10,
+        published_at=BASE_TIME + timedelta(hours=2),
+        source_role=SourceRole.DISCOVERY,
+        discovery_verified=True,
+    )
+
+    assert deduplicate([discovery, trusted, primary], set()) == [primary]
+    assert deduplicate([discovery, trusted], set()) == [trusted]
+
+
+def test_deduplicate_collapses_cross_source_product_launch_event_to_primary() -> None:
+    primary = _candidate(
+        "gpt5-primary",
+        "OpenAI launches GPT-5",
+        host="openai.example",
+        weight=1,
+        official=True,
+        source_role=SourceRole.PRIMARY,
+    )
+    trusted = _candidate(
+        "gpt5-media",
+        "GPT-5 officially released by OpenAI",
+        host="media.example",
+        weight=10,
+        source_role=SourceRole.TRUSTED_MEDIA,
+    )
+    discovery = _candidate(
+        "gpt5-community",
+        "GPT-5 正式发布",
+        host="community.example",
+        weight=10,
+        source_role=SourceRole.DISCOVERY,
+        discovery_verified=True,
+    )
+
+    assert deduplicate([trusted, discovery, primary], set()) == [primary]
+
+
+def test_deduplicate_event_key_does_not_merge_different_products_or_actions() -> None:
+    gpt5_launch = _candidate(
+        "gpt5-launch",
+        "OpenAI launches GPT-5",
+        host="first.example",
+        official=True,
+    )
+    gpt4_launch = _candidate(
+        "gpt4-launch",
+        "OpenAI launches GPT-4.1",
+        host="second.example",
+        official=True,
+    )
+    gpt5_price = _candidate(
+        "gpt5-price",
+        "OpenAI changes GPT-5 pricing",
+        host="third.example",
+        official=True,
+    )
+
+    assert deduplicate([gpt5_launch, gpt4_launch, gpt5_price], set()) == sorted(
+        [gpt5_launch, gpt4_launch, gpt5_price],
+        key=lambda item: item.id,
+    )

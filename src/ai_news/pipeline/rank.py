@@ -4,7 +4,7 @@ import re
 from collections import Counter
 from datetime import datetime
 
-from ai_news.models import Candidate
+from ai_news.models import Candidate, Category, SourceRole
 from ai_news.pipeline.normalize import ensure_utc, normalize_title
 
 _ENGLISH_KEYWORD = re.compile(r"\b(?:release|launch|introducing)\b")
@@ -20,6 +20,8 @@ def _recency_score(item: Candidate, now: datetime) -> int:
         (24, 12),
         (36, 8),
         (72, 4),
+        (96, 2),
+        (120, 1),
     ):
         if age_hours <= boundary:
             return score
@@ -35,20 +37,46 @@ def _has_keyword(title: str) -> bool:
 
 def candidate_score(item: Candidate, now: datetime) -> int:
     normalized_now = ensure_utc(now)
+    role_bonus = {
+        SourceRole.PRIMARY: 14,
+        SourceRole.TRUSTED_MEDIA: 8,
+        SourceRole.DISCOVERY: 0,
+    }[item.raw.source_role]
+    completeness = min(12, len(item.raw.excerpt.strip()) // 80)
     return (
-        item.raw.source_weight * 10
+        item.raw.source_weight * 4
         + _recency_score(item, normalized_now)
-        + (10 if item.raw.is_official_source else 0)
-        + (10 if _has_keyword(item.raw.title) else 0)
+        + role_bonus
+        + (8 if item.raw.is_official_source else 0)
+        + completeness
+        + (6 if _has_keyword(item.raw.title) else 0)
     )
+
+
+def _channel_key(category: Category) -> Category | None:
+    if category == Category.CODING_AGENT:
+        return Category.AGENT
+    if category == Category.RESEARCH:
+        return None
+    return category
 
 
 def _ranked_candidates(items: list[Candidate], now: datetime) -> list[Candidate]:
     normalized_now = ensure_utc(now)
+    channel_counts = Counter(
+        channel for item in items if (channel := _channel_key(item.raw.category_hint)) is not None
+    )
+
+    def scarcity_bonus(item: Candidate) -> int:
+        channel = _channel_key(item.raw.category_hint)
+        if channel is None:
+            return 0
+        return max(0, 6 - min(channel_counts[channel], 6))
+
     return sorted(
         items,
         key=lambda item: (
-            -candidate_score(item, normalized_now),
+            -(candidate_score(item, normalized_now) + scarcity_bonus(item)),
             -ensure_utc(item.raw.published_at).timestamp(),
             item.id,
         ),

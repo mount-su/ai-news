@@ -24,6 +24,11 @@ from ai_news.collectors.feed import parse_feed
 from ai_news.collectors.github import collect_github_releases
 from ai_news.collectors.official_pages import collect_official_page
 from ai_news.collectors.reddit_rss import collect_reddit_rss
+from ai_news.editorial_policy import (
+    MAX_ITEMS_PER_SOURCE,
+    MAX_REPORT_ITEMS,
+    MIN_PUBLISHED_ITEMS,
+)
 from ai_news.http import get_bytes
 from ai_news.llm.base import AnalysisError
 from ai_news.llm.factory import create_analyzer
@@ -39,11 +44,10 @@ from ai_news.models import (
     SourceRun,
     SourceSpec,
 )
-from ai_news.pipeline.dedupe import deduplicate
+from ai_news.pipeline.dedupe import deduplicate, duplicate_preference_key
 from ai_news.pipeline.editorial import is_editorially_eligible
 from ai_news.pipeline.normalize import ensure_utc, normalize_title, to_candidate
 from ai_news.pipeline.rank import (
-    candidate_score,
     select_balanced_candidates,
     select_diversity_preserving_candidates,
 )
@@ -55,8 +59,6 @@ _DEDUPLICATION_SOURCE_FLOOR = 6
 _EDITORIAL_CANDIDATE_LIMIT = 36
 _EDITORIAL_SOURCE_LIMIT = 6
 _EDITORIAL_UNOFFICIAL_SOURCE_LIMIT = 3
-_MAX_PUBLICATION_COUNT = 9
-_MAX_FINAL_SOURCE_ITEMS = 3
 _WINDOW = timedelta(hours=120)
 _ANALYSIS_FIELDS = frozenset(Analysis.model_fields)
 _EXACT_STATE_LIMIT = _DEDUPLICATION_LIMIT * 6
@@ -211,19 +213,8 @@ async def _collect_one(
 
 
 def _candidate_preference_key(candidate: Candidate, now: datetime) -> tuple[object, ...]:
-    raw = candidate.raw
-    return (
-        -candidate_score(candidate, now),
-        -ensure_utc(raw.published_at).timestamp(),
-        candidate.id,
-        raw.source_id,
-        raw.source_name,
-        raw.title,
-        raw.excerpt,
-        raw.category_hint.value,
-        raw.is_official_source,
-        str(raw.url),
-    )
+    del now
+    return duplicate_preference_key(candidate)
 
 
 def _exact_title_key(candidate: Candidate) -> tuple[str | None, str]:
@@ -478,6 +469,8 @@ def _build_items(
         analysis = analyses.get(candidate.id)
         if analysis is None:
             continue
+        if candidate.raw.source_role != SourceRole.PRIMARY and analysis.marketing_risk == "high":
+            continue
         try:
             items.append(NewsItem.from_candidate_analysis(candidate, analysis))
         except (TypeError, ValueError, ValidationError):
@@ -496,9 +489,9 @@ def _validate_editorial_distribution(
     items: list[NewsItem],
     selected: list[Candidate],
 ) -> None:
-    if not items:
+    if len(items) < MIN_PUBLISHED_ITEMS:
         raise PublicationThresholdError("no valid editorial items")
-    if len(items) > _MAX_PUBLICATION_COUNT:
+    if len(items) > MAX_REPORT_ITEMS:
         raise ReportValidationError("editorial distribution invalid")
 
     candidate_by_id = {candidate.id: candidate for candidate in selected}
@@ -506,7 +499,7 @@ def _validate_editorial_distribution(
         source_counts = Counter(candidate_by_id[item.id].raw.source_id for item in items)
     except KeyError:
         raise ReportValidationError("editorial distribution invalid") from None
-    if any(count > _MAX_FINAL_SOURCE_ITEMS for count in source_counts.values()):
+    if any(count > MAX_ITEMS_PER_SOURCE for count in source_counts.values()):
         raise ReportValidationError("editorial distribution invalid")
 
 
@@ -619,7 +612,7 @@ async def _run_with_client(
 
     try:
         report = DailyReport(
-            schema_version="1.2",
+            schema_version="1.3",
             date=run_date,
             generated_at=now,
             model=model,

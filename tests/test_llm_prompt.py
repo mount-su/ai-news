@@ -1,3 +1,5 @@
+# ruff: noqa: RUF001
+
 from __future__ import annotations
 
 import json
@@ -82,9 +84,13 @@ def test_prompt_marks_each_item_untrusted_and_lists_all_six_categories_and_schem
     assert "只能依据所给事实" in prompt
     assert "仅输出 JSON array" in prompt
     assert "同一事件只保留" in prompt
-    assert "单一来源最多 3 条" in prompt
+    assert "单一来源最多 2 条" in prompt
     assert "具有重要意义" in prompt
-    assert "选择 1 至 1 条" in prompt
+    assert "目标 3–7 条" in prompt
+    assert "质量不足时允许少于 3 条" in prompt
+    assert "全部不合格时返回空数组" in prompt
+    assert "最多选择 1 条" in prompt
+    assert "必须选择 5" not in prompt
     assert "恰好" not in prompt
     for category in Category:
         assert category.value in prompt
@@ -155,6 +161,9 @@ def test_thirty_six_item_prompt_has_a_conservative_utf8_byte_bound() -> None:
 
     prompt = build_analysis_prompt(items)
 
-    assert "候选不少于 5 条时" in prompt
-    assert "必须选择 5 至 9 条" in prompt
+    assert "目标 3–7 条" in prompt
+    assert "最多选择 7 条" in prompt
+    assert "全部不合格时返回空数组" in prompt
+    assert "候选不少于 5 条时" not in prompt
+    assert "必须选择 5" not in prompt
     assert len(prompt.encode("utf-8")) < 250_000
