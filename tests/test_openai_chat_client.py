@@ -318,26 +318,29 @@ def test_openai_normalizes_safe_provider_schema_drift() -> None:
     assert analysis.tags == ["AI 工具", "产品更新"]
 
 
-def test_editorial_source_distribution_violation_repairs_once_then_fails() -> None:
-    error_kind = "source_distribution"
-    shared_sources = ["source-shared"] * 3 + [f"source-{index}" for index in range(4)]
+def test_editorial_valid_rows_are_bounded_by_report_and_source_limits_without_repair() -> None:
+    shared_sources = ["openai"] * 6 + ["google-ai"] + ["hugging-face"] * 4
     candidates = [
-        _candidate(f"{error_kind}-{index}", source_id=source_id)
+        _candidate(f"bounded-{index}", source_id=source_id)
         for index, source_id in enumerate(shared_sources)
     ]
-    rows = _editorial_rows(candidates)
+    rows = [_analysis_row(candidate) for candidate in candidates]
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
         return httpx.Response(200, content=_openai_response(rows))
 
-    with pytest.raises(AnalysisError, match="invalid"):
-        _run_analyze(handler, candidates)
+    result = _run_analyze(handler, candidates)
 
-    assert len(requests) == 2
-    repair_prompt = json.loads(requests[1].content)["messages"][1]["content"]
-    assert f"错误种类：{error_kind}" in repair_prompt
+    assert list(result) == [
+        candidates[0].id,
+        candidates[1].id,
+        candidates[6].id,
+        candidates[7].id,
+        candidates[8].id,
+    ]
+    assert len(requests) == 1
 
 
 def test_request_uses_exact_ark_coding_plan_contract() -> None:
