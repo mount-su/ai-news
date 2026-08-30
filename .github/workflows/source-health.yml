@@ -10,6 +10,9 @@ on:
       - src/ai_news/source_health.py
       - scripts/check_source_health.py
       - .github/workflows/source-health.yml
+  schedule:
+    - cron: "17 7 * * *"
+      timezone: "Asia/Shanghai"
   workflow_dispatch: {}
 
 permissions:
