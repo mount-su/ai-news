@@ -457,6 +457,7 @@ def test_daily_build_reads_fresh_main_after_generate_success_or_skip() -> None:
     assert "AI_NEWS_BUILD_RUN_ID" in provenance_command
     assert "$GITHUB_ENV" in provenance_command
     assert "$GITHUB_STEP_SUMMARY" in provenance_command
+    assert "Build SHA: %s" in provenance_command
     upload = next(
         step
         for step in steps

@@ -152,7 +152,7 @@ jobs:
           printf 'AI_NEWS_BUILD_RUN_ID=%s\n' "$GITHUB_RUN_ID" >> "$GITHUB_ENV"
           {
             printf '### Build revision\n\n'
-            printf '`%s`\n' "$build_sha"
+            printf 'Build SHA: %s\n' "$build_sha"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build static site
