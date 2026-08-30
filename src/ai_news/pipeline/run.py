@@ -9,6 +9,7 @@ import time
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import AbstractAsyncContextManager
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Protocol
@@ -59,6 +60,16 @@ _WINDOW = timedelta(hours=120)
 _ANALYSIS_FIELDS = frozenset(Analysis.model_fields)
 _EXACT_STATE_LIMIT = _DEDUPLICATION_LIMIT * 6
 _EXACT_STATE_TARGET = _DEDUPLICATION_LIMIT * 4
+
+
+@dataclass(frozen=True)
+class _PreparedCandidates:
+    selected: list[Candidate]
+    latest_by_source: dict[str, datetime]
+    recent_counts: Counter[str]
+    new_counts: Counter[str]
+    eligible_counts: Counter[str]
+    candidate_counts: Counter[str]
 
 
 class PipelineError(RuntimeError):
@@ -344,31 +355,6 @@ class _ExactCandidateAccumulator:
         )
 
 
-def _normalize_in_window(
-    collection_results: Iterable[tuple[SourceRun, list[RawItem]]],
-    now: datetime,
-    historical_urls: set[str],
-) -> list[Candidate]:
-    window_start = now - _WINDOW
-    historical = {str(url) for url in historical_urls}
-    accumulator = _ExactCandidateAccumulator(now)
-    for source_run, raw_items in collection_results:
-        if not source_run.success:
-            continue
-        for raw_item in raw_items:
-            try:
-                candidate = to_candidate(raw_item)
-                published_at = ensure_utc(candidate.raw.published_at)
-            except Exception:
-                continue
-            if (
-                window_start <= published_at <= now
-                and str(candidate.canonical_url) not in historical
-            ):
-                accumulator.add(candidate)
-    return accumulator.selected()
-
-
 def _prepare_candidates(
     candidates: list[Candidate],
     historical_urls: set[str],
@@ -385,6 +371,55 @@ def _prepare_candidates(
         limit=_EDITORIAL_CANDIDATE_LIMIT,
         per_source=_EDITORIAL_SOURCE_LIMIT,
         unofficial_per_source=_EDITORIAL_UNOFFICIAL_SOURCE_LIMIT,
+    )
+
+
+def _prepare_collected_candidates(
+    collection_results: Iterable[tuple[SourceRun, list[RawItem]]],
+    historical_urls: set[str],
+    now: datetime,
+) -> _PreparedCandidates:
+    window_start = now - _WINDOW
+    historical = {str(url) for url in historical_urls}
+    latest_by_source: dict[str, datetime] = {}
+    recent_counts: Counter[str] = Counter()
+    new_counts: Counter[str] = Counter()
+    eligible_counts: Counter[str] = Counter()
+    accumulator = _ExactCandidateAccumulator(now)
+    for source_run, raw_items in collection_results:
+        if not source_run.success:
+            continue
+        for raw_item in raw_items:
+            try:
+                published_at = ensure_utc(raw_item.published_at)
+            except Exception:
+                continue
+            latest_by_source[source_run.source_id] = max(
+                latest_by_source.get(source_run.source_id, published_at),
+                published_at,
+            )
+            try:
+                candidate = to_candidate(raw_item)
+            except Exception:
+                continue
+            if not window_start <= published_at <= now:
+                continue
+            recent_counts[source_run.source_id] += 1
+            if str(candidate.canonical_url) in historical:
+                continue
+            new_counts[source_run.source_id] += 1
+            if is_editorially_eligible(candidate):
+                eligible_counts[source_run.source_id] += 1
+            accumulator.add(candidate)
+
+    selected = _prepare_candidates(accumulator.selected(), historical, now)
+    return _PreparedCandidates(
+        selected=selected,
+        latest_by_source=latest_by_source,
+        recent_counts=recent_counts,
+        new_counts=new_counts,
+        eligible_counts=eligible_counts,
+        candidate_counts=Counter(candidate.raw.source_id for candidate in selected),
     )
 
 
@@ -529,11 +564,11 @@ async def _run_with_client(
 
     try:
         historical_urls = history_loader(root, run_date, 30)
-        candidates = _normalize_in_window(collection_results, now, historical_urls)
-        selected = _prepare_candidates(candidates, historical_urls, now)
+        prepared = _prepare_collected_candidates(collection_results, historical_urls, now)
     except Exception:
         raise DataPipelineError("candidate preparation failed") from None
 
+    selected = prepared.selected
     if not selected:
         raise PublicationThresholdError("no eligible candidates")
 
@@ -563,6 +598,21 @@ async def _run_with_client(
     analyses = _validated_analyses(raw_analyses, selected)
     items = _build_items(selected, analyses)
     _validate_editorial_distribution(items, selected)
+    candidate_by_id = {candidate.id: candidate for candidate in selected}
+    selected_counts = Counter(candidate_by_id[item.id].raw.source_id for item in items)
+    source_runs = [
+        source_run.with_diagnostics(
+            recent_count=prepared.recent_counts[source_run.source_id],
+            new_count=prepared.new_counts[source_run.source_id],
+            eligible_count=prepared.eligible_counts[source_run.source_id],
+            candidate_count=prepared.candidate_counts[source_run.source_id],
+            selected_count=selected_counts[source_run.source_id],
+            latest_published_at=prepared.latest_by_source.get(source_run.source_id),
+        )
+        if source_run.success
+        else source_run
+        for source_run in source_runs
+    ]
 
     try:
         report = DailyReport(

@@ -367,11 +367,25 @@ def test_source_run_factories_enforce_safe_error_metadata() -> None:
         "source_id": "official-feed",
         "source_name": "Official Feed",
         "success": False,
-        "item_count": 0,
+        "item_count": None,
         "elapsed_ms": 12,
         "error_type": "RuntimeError",
+        "recent_count": None,
+        "new_count": None,
+        "eligible_count": None,
+        "candidate_count": None,
+        "selected_count": None,
+        "latest_published_at": None,
     }
     assert "do-not-copy" not in failure.model_dump_json()
+    with pytest.raises(TypeError, match="item_count"):
+        SourceRun.failed(
+            source_id="official-feed",
+            source_name="Official Feed",
+            elapsed_ms=12,
+            error=RuntimeError("safe"),
+            item_count=0,
+        )
     with pytest.raises(ValidationError):
         SourceRun(
             source_id="official-feed",
@@ -390,6 +404,151 @@ def test_source_run_factories_enforce_safe_error_metadata() -> None:
             elapsed_ms=10,
             error_type="RuntimeError: token=secret",
         )
+
+
+@pytest.mark.parametrize("item_count", [None, "missing"])
+def test_successful_source_run_requires_an_item_count(item_count: object) -> None:
+    payload = {
+        "source_id": "official-feed",
+        "source_name": "Official Feed",
+        "success": True,
+        "elapsed_ms": 10,
+        "error_type": None,
+    }
+    if item_count != "missing":
+        payload["item_count"] = item_count
+
+    with pytest.raises(ValidationError, match="successful source runs require an item_count"):
+        SourceRun.model_validate(payload)
+
+
+def test_legacy_source_run_payloads_default_new_diagnostics_to_none() -> None:
+    source_run = SourceRun.model_validate(
+        {
+            "source_id": "official-feed",
+            "source_name": "Official Feed",
+            "success": True,
+            "item_count": 3,
+            "elapsed_ms": 10,
+            "error_type": None,
+        }
+    )
+    failed_source_run = SourceRun.model_validate(
+        {
+            "source_id": "legacy-failure",
+            "source_name": "Legacy Failure",
+            "success": False,
+            "item_count": 0,
+            "elapsed_ms": 12,
+            "error_type": "RuntimeError",
+        }
+    )
+
+    assert source_run.item_count == 3
+    assert source_run.recent_count is None
+    assert source_run.new_count is None
+    assert source_run.eligible_count is None
+    assert source_run.candidate_count is None
+    assert source_run.selected_count is None
+    assert source_run.latest_published_at is None
+    assert failed_source_run.item_count == 0
+    assert failed_source_run.recent_count is None
+    assert failed_source_run.new_count is None
+    assert failed_source_run.eligible_count is None
+    assert failed_source_run.candidate_count is None
+    assert failed_source_run.selected_count is None
+    assert failed_source_run.latest_published_at is None
+
+
+def test_source_run_with_diagnostics_returns_a_validated_immutable_copy() -> None:
+    source_run = SourceRun.succeeded(
+        source_id="official-feed",
+        source_name="Official Feed",
+        item_count=4,
+        elapsed_ms=10,
+    )
+    latest = datetime(2026, 8, 30, 1, tzinfo=UTC)
+
+    enriched = source_run.with_diagnostics(
+        recent_count=3,
+        new_count=2,
+        eligible_count=1,
+        candidate_count=1,
+        selected_count=1,
+        latest_published_at=latest,
+    )
+
+    assert source_run.recent_count is None
+    assert source_run.latest_published_at is None
+    assert enriched.model_dump(mode="json") == {
+        "source_id": "official-feed",
+        "source_name": "Official Feed",
+        "success": True,
+        "item_count": 4,
+        "elapsed_ms": 10,
+        "error_type": None,
+        "recent_count": 3,
+        "new_count": 2,
+        "eligible_count": 1,
+        "candidate_count": 1,
+        "selected_count": 1,
+        "latest_published_at": "2026-08-30T01:00:00Z",
+    }
+    with pytest.raises(ValidationError, match="frozen"):
+        enriched.recent_count = 2
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        source_run.with_diagnostics(unknown_count=1)
+    with pytest.raises(ValidationError, match="greater than or equal to 0"):
+        source_run.with_diagnostics(recent_count=-1)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "item_count",
+        "recent_count",
+        "new_count",
+        "eligible_count",
+        "candidate_count",
+        "selected_count",
+    ],
+)
+def test_source_run_rejects_negative_diagnostic_counts(field_name: str) -> None:
+    payload = {
+        "source_id": "official-feed",
+        "source_name": "Official Feed",
+        "success": True,
+        "item_count": 1,
+        "elapsed_ms": 10,
+        "error_type": None,
+        field_name: -1,
+    }
+
+    with pytest.raises(ValidationError, match="greater than or equal to 0"):
+        SourceRun.model_validate(payload)
+
+
+def test_source_run_rejects_naive_latest_published_at_on_create_and_copy() -> None:
+    payload = {
+        "source_id": "official-feed",
+        "source_name": "Official Feed",
+        "success": True,
+        "item_count": 1,
+        "elapsed_ms": 10,
+        "error_type": None,
+        "latest_published_at": datetime(2026, 8, 30, 1),
+    }
+    source_run = SourceRun.succeeded(
+        source_id="official-feed",
+        source_name="Official Feed",
+        item_count=1,
+        elapsed_ms=10,
+    )
+
+    with pytest.raises(ValidationError, match="timezone"):
+        SourceRun.model_validate(payload)
+    with pytest.raises(ValidationError, match="timezone"):
+        source_run.with_diagnostics(latest_published_at=datetime(2026, 8, 30, 1))
 
 
 def test_save_report_writes_utf8_valid_json_markdown_and_index(tmp_path: Path) -> None:

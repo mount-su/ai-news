@@ -188,6 +188,23 @@ def _run(**kwargs: Any) -> DailyReport:
     return asyncio.run(run_daily(**defaults))
 
 
+def _source_diagnostics(report: DailyReport) -> dict[str, dict[str, Any]]:
+    return {
+        source_run.source_id: source_run.model_dump(
+            include={
+                "item_count",
+                "recent_count",
+                "new_count",
+                "eligible_count",
+                "candidate_count",
+                "selected_count",
+                "latest_published_at",
+            }
+        )
+        for source_run in report.source_runs
+    }
+
+
 def test_source_failure_does_not_block_healthy_source_and_marks_degraded() -> None:
     failed_source = _source(0)
     healthy_sources = [_source(index) for index in range(1, 4)]
@@ -211,10 +228,210 @@ def test_source_failure_does_not_block_healthy_source_and_marks_degraded() -> No
     ]
     assert report.source_runs[0].success is False
     assert report.source_runs[0].error_type == "RuntimeError"
-    assert report.source_runs[0].item_count == 0
+    assert report.source_runs[0].item_count is None
     assert report.source_runs[1].success is True
     assert all(run.item_count == 3 for run in report.source_runs[1:])
     assert "private-token" not in report.model_dump_json()
+
+
+def test_source_diagnostics_record_each_pipeline_stage_and_are_order_independent() -> None:
+    first_source = _source(0)
+    second_source = _source(1)
+    historical_url = "https://example.com/diagnostics/historical"
+    exact_url = "https://example.com/diagnostics/exact"
+    first_latest = NOW + timedelta(hours=1)
+    second_latest = NOW - timedelta(minutes=1)
+    first_items = [
+        _updated_raw(
+            _raw(1_000, source=first_source),
+            url="https://example.com/diagnostics/outside",
+            published_at=NOW - timedelta(hours=121),
+        ),
+        _updated_raw(
+            _raw(1_001, source=first_source),
+            url="https://example.com/diagnostics/future",
+            published_at=first_latest,
+        ),
+        _updated_raw(
+            _raw(1_002, source=first_source),
+            url=historical_url,
+            published_at=NOW - timedelta(hours=2),
+        ),
+        _updated_raw(
+            _raw(1_003, source=first_source),
+            url="https://example.com/diagnostics/rejected",
+            title="Generic tutorial template for teams",
+            published_at=NOW - timedelta(hours=3),
+        ),
+        _updated_raw(
+            _raw(1_004, source=first_source),
+            url=exact_url,
+            title="Shared exact enterprise assistant",
+            source_weight=10,
+            published_at=NOW - timedelta(minutes=4),
+        ),
+        _updated_raw(
+            _raw(1_005, source=first_source),
+            url="https://example.com/diagnostics/fuzzy-first",
+            title="Launch Aurora Enterprise AI Assistant for Teams",
+            source_weight=10,
+            published_at=NOW - timedelta(minutes=5),
+        ),
+        _updated_raw(
+            _raw(1_006, source=first_source),
+            url="https://example.com/diagnostics/first-selected",
+            title="Product availability expands to teams",
+            published_at=NOW - timedelta(minutes=6),
+        ),
+    ]
+    second_items = [
+        _updated_raw(
+            _raw(2_000, source=second_source),
+            url=exact_url,
+            title="Exact duplicate from the second source",
+            source_weight=1,
+            published_at=second_latest,
+        ),
+        _updated_raw(
+            _raw(2_001, source=second_source),
+            url="https://example.com/diagnostics/fuzzy-second",
+            title="Launch Aurora Enterprise AI Assistant for Team",
+            source_weight=1,
+            published_at=NOW - timedelta(minutes=7),
+        ),
+        _updated_raw(
+            _raw(2_002, source=second_source),
+            url="https://example.com/diagnostics/second-selected-a",
+            title="New assistant access for customers",
+            published_at=NOW - timedelta(minutes=8),
+        ),
+        _updated_raw(
+            _raw(2_003, source=second_source),
+            url="https://example.com/diagnostics/second-selected-b",
+            title="New assistant service for businesses",
+            published_at=NOW - timedelta(minutes=9),
+        ),
+    ]
+
+    def analyzed_items(candidates: list[Any]) -> dict[str, Analysis]:
+        return {
+            candidate.id: _analysis(index)
+            for index, candidate in enumerate(candidates)
+            if candidate.raw.title != "Launch Aurora Enterprise AI Assistant for Teams"
+        }
+
+    def run_with_order(
+        sources: list[SourceSpec],
+        items_by_source: dict[str, list[RawItem]],
+        delays: dict[str, float],
+    ) -> tuple[DailyReport, list[str]]:
+        completion_order: list[str] = []
+
+        async def collect(_client: Any, source: SourceSpec) -> list[RawItem]:
+            await asyncio.sleep(delays[source.id])
+            completion_order.append(source.id)
+            return items_by_source[source.id]
+
+        report = _run(
+            source_config=SourceConfig(sources=sources),
+            collector=collect,
+            analyzer=_Analyzer(analyzed_items),
+            history_loader=lambda _root, _date, _days: {historical_url},
+            monotonic=lambda: 100.0,
+        )
+        return report, completion_order
+
+    first_report, first_completion = run_with_order(
+        [first_source, second_source],
+        {first_source.id: first_items, second_source.id: second_items},
+        {first_source.id: 0.01, second_source.id: 0.0},
+    )
+    second_report, second_completion = run_with_order(
+        [second_source, first_source],
+        {
+            first_source.id: list(reversed(first_items)),
+            second_source.id: list(reversed(second_items)),
+        },
+        {first_source.id: 0.0, second_source.id: 0.01},
+    )
+
+    expected = {
+        first_source.id: {
+            "item_count": 7,
+            "recent_count": 5,
+            "new_count": 4,
+            "eligible_count": 3,
+            "candidate_count": 3,
+            "selected_count": 2,
+            "latest_published_at": first_latest,
+        },
+        second_source.id: {
+            "item_count": 4,
+            "recent_count": 4,
+            "new_count": 4,
+            "eligible_count": 4,
+            "candidate_count": 2,
+            "selected_count": 2,
+            "latest_published_at": second_latest,
+        },
+    }
+    assert first_completion == [second_source.id, first_source.id]
+    assert second_completion == [first_source.id, second_source.id]
+    assert _source_diagnostics(first_report) == expected
+    assert _source_diagnostics(second_report) == expected
+    assert first_report.candidate_count == second_report.candidate_count == 5
+    assert len(first_report.items) == len(second_report.items) == 4
+
+
+def test_source_diagnostics_leave_failed_collection_unknown() -> None:
+    failed_source = _source(0)
+    healthy_source = _source(1)
+
+    async def collect(_client: Any, source: SourceSpec) -> list[RawItem]:
+        if source.id == failed_source.id:
+            raise RuntimeError("private failure details")
+        return [_raw(3_000 + index, source=source) for index in range(3)]
+
+    report = _run(
+        source_config=SourceConfig(sources=[failed_source, healthy_source]),
+        collector=collect,
+        analyzer=_Analyzer(),
+    )
+
+    assert _source_diagnostics(report)[failed_source.id] == {
+        "item_count": None,
+        "recent_count": None,
+        "new_count": None,
+        "eligible_count": None,
+        "candidate_count": None,
+        "selected_count": None,
+        "latest_published_at": None,
+    }
+
+
+def test_source_diagnostics_record_successful_empty_collection_as_zero() -> None:
+    empty_source = _source(0)
+    healthy_source = _source(1)
+    items_by_source = {
+        empty_source.id: [],
+        healthy_source.id: [_raw(4_000 + index, source=healthy_source) for index in range(3)],
+    }
+
+    report = _run(
+        source_config=SourceConfig(sources=[empty_source, healthy_source]),
+        collector=_collector(items_by_source),
+        analyzer=_Analyzer(),
+    )
+
+    assert _source_diagnostics(report)[empty_source.id] == {
+        "item_count": 0,
+        "recent_count": 0,
+        "new_count": 0,
+        "eligible_count": 0,
+        "candidate_count": 0,
+        "selected_count": 0,
+        "latest_published_at": None,
+    }
 
 
 def test_source_collection_concurrency_never_exceeds_six() -> None:
@@ -732,6 +949,8 @@ def test_missing_or_invalid_analysis_is_not_fabricated(
         analyzer=_Analyzer(result),
     )
     assert len(report.items) == 2
+    assert report.source_runs[0].candidate_count == 3
+    assert report.source_runs[0].selected_count == 2
 
 
 @pytest.mark.parametrize(

@@ -473,12 +473,18 @@ class SourceRun(BaseModel):
     source_id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]+$", max_length=100)
     source_name: str = Field(min_length=1, max_length=300)
     success: bool
-    item_count: int = Field(ge=0)
+    item_count: int | None = Field(default=None, ge=0)
     elapsed_ms: int = Field(ge=0)
     error_type: str | None = Field(
         default=None,
         pattern=r"^[A-Za-z][A-Za-z0-9_]{0,127}$",
     )
+    recent_count: int | None = Field(default=None, ge=0)
+    new_count: int | None = Field(default=None, ge=0)
+    eligible_count: int | None = Field(default=None, ge=0)
+    candidate_count: int | None = Field(default=None, ge=0)
+    selected_count: int | None = Field(default=None, ge=0)
+    latest_published_at: datetime | None = None
 
     @field_validator("source_name")
     @classmethod
@@ -487,8 +493,20 @@ class SourceRun(BaseModel):
             raise ValueError("source_name must not be blank")
         return value
 
+    @field_validator("latest_published_at")
+    @classmethod
+    def require_aware_latest_published_at(
+        cls,
+        value: datetime | None,
+    ) -> datetime | None:
+        if value is None:
+            return None
+        return _require_aware_datetime(value)
+
     @model_validator(mode="after")
     def require_consistent_error_state(self) -> SourceRun:
+        if self.success and self.item_count is None:
+            raise ValueError("successful source runs require an item_count")
         if self.success and self.error_type is not None:
             raise ValueError("successful source runs must not contain an error_type")
         if not self.success and self.error_type is None:
@@ -521,7 +539,6 @@ class SourceRun(BaseModel):
         source_name: str,
         elapsed_ms: int,
         error: BaseException,
-        item_count: int = 0,
     ) -> SourceRun:
         error_name = type(error).__name__
         if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,127}", error_name) is None:
@@ -530,10 +547,13 @@ class SourceRun(BaseModel):
             source_id=source_id,
             source_name=source_name,
             success=False,
-            item_count=item_count,
+            item_count=None,
             elapsed_ms=elapsed_ms,
             error_type=error_name,
         )
+
+    def with_diagnostics(self, **values: object) -> SourceRun:
+        return SourceRun.model_validate({**self.model_dump(), **values})
 
 
 class DailyReport(BaseModel):
