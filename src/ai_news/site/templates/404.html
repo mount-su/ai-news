@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block main %}
+  <main id="main-content" class="page-shell page-shell--message">
+    <section class="message-page" aria-labelledby="not-found-title">
+      <p class="eyebrow">404 / EDITION NOT FOUND</p>
+      <h1 id="not-found-title">这一页没有收录</h1>
+      <p>链接可能已过期，或这一天没有达到发布标准的内容。</p>
+      <p class="message-actions"><a href="{{ page_url() }}">返回今日头版</a><a href="{{ page_url('archive') }}">浏览日期归档</a></p>
+    </section>
+  </main>
+{% endblock %}

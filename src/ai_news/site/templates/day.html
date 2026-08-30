@@ -1,31 +1,39 @@
 {% extends "base.html" %}
-{% from "_card.html" import news_card %}
+{% from "_story.html" import edition_story %}
 
 {% block main %}
   <main id="main-content" class="page-shell">
-    <section class="edition-heading" aria-labelledby="day-title">
-      <p class="eyebrow">DAILY RECORD / {{ report.date }}</p>
-      <h1 id="day-title">{{ report.date }} 情报档案</h1>
-      <p>这一天经编辑筛选后的精炼情报。</p>
-      <p class="edition-health">{{ report.included_count }} 条入选</p>
+    <header class="edition-heading">
+      <p class="eyebrow">EDITION / {{ report.date }}</p>
+      <h1>{{ report.date }} 日报</h1>
+      <div class="edition-heading__meta">
+        <p>第 {{ '%03d'|format(report.issue_number) }} 期 · {{ report.included_count }} 条入选</p>
+        <p><time datetime="{{ report.generated_at.isoformat() }}">收录完成于 {{ report.generated_at|beijing_datetime }}</time></p>
+      </div>
+    </header>
+
+    <section class="edition-list" aria-labelledby="edition-list-title">
+      <header class="section-heading">
+        <p>FULL EDITION</p>
+        <h2 id="edition-list-title">本期全部要闻</h2>
+      </header>
+      <ol>
+        {% for entry in entries %}<li>{{ edition_story(entry, report.generated_at, true) }}</li>{% endfor %}
+      </ol>
     </section>
-    <section class="brief-shell" aria-labelledby="feed-title">
-      <div class="section-heading section-heading--brief">
-        <p>DAILY SELECTION</p>
-        <h2 id="feed-title">当日简报</h2>
-      </div>
-      <div class="news-grid">
-        {% for entry in entries %}{{ news_card(entry, '#' ~ entry.fragment) }}{% endfor %}
-      </div>
-      <nav class="edition-navigation" aria-label="日报期次导航">
+
+    <nav class="edition-navigation" aria-label="日报期次导航">
+      <span>
         {% if older_report %}
-          <a href="{{ page_url('days/' ~ older_report.date) }}">← 上一期 {{ older_report.date }}</a>
+          <a rel="prev" href="{{ page_url('days/' ~ older_report.date) }}"><small>上一期</small>{{ older_report.date }}</a>
         {% endif %}
-        <a href="{{ page_url('archive') }}">返回归档</a>
+      </span>
+      <a class="edition-navigation__archive" href="{{ page_url('archive') }}">返回归档</a>
+      <span>
         {% if newer_report %}
-          <a href="{{ page_url('days/' ~ newer_report.date) }}">下一期 {{ newer_report.date }} →</a>
+          <a rel="next" href="{{ page_url('days/' ~ newer_report.date) }}"><small>下一期</small>{{ newer_report.date }}</a>
         {% endif %}
-      </nav>
-    </section>
+      </span>
+    </nav>
   </main>
 {% endblock %}

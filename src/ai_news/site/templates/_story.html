@@ -1,0 +1,84 @@
+{% macro source_meta(entry, collected_at=none) -%}
+  {% set item = entry.item %}
+  <p class="story-meta">
+    <span>{{ item.source }}</span>
+    <span aria-hidden="true">·</span>
+    <span>{% if item.is_official %}官方发布{% elif item.source_role and item.source_role.value == 'trusted_media' %}可信媒体{% else %}已验证线索{% endif %}</span>
+    <span aria-hidden="true">·</span>
+    <time datetime="{{ item.published_at.isoformat() }}">发布于 {{ item.published_at|beijing_datetime }}</time>
+    {% if collected_at %}
+      <span aria-hidden="true">·</span>
+      <time datetime="{{ collected_at.isoformat() }}">收录于 {{ collected_at|beijing_datetime }}</time>
+    {% endif %}
+  </p>
+{%- endmacro %}
+
+{% macro source_link(item) -%}
+  <a
+    class="source-link"
+    href="{{ item.canonical_url }}"
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="在新窗口打开 {{ item.source }} 的原始来源"
+  >原始来源 <span aria-hidden="true">↗</span><span class="visually-hidden">（新窗口）</span></a>
+{%- endmacro %}
+
+{% macro lead_story(entry) -%}
+  {% set item = entry.item %}
+  <article id="{{ entry.fragment }}" class="story story--lead" data-item-id="{{ item.id }}">
+    <header class="story-header">
+      <p class="story-kicker"><span class="story-number">{{ entry.number }}</span><span>{{ entry.channel_name }}</span></p>
+      <h2><a class="story-title-link" href="{{ entry.day_url }}">{{ item.title }}</a></h2>
+      {{ source_meta(entry) }}
+    </header>
+    <div class="story-analysis story-analysis--lead">
+      <section>
+        <h3>发生了什么</h3>
+        <p>{{ item.summary }}</p>
+      </section>
+      <section>
+        <h3>为什么重要</h3>
+        <p>{{ item.why_it_matters }}</p>
+      </section>
+    </div>
+    {{ source_link(item) }}
+  </article>
+{%- endmacro %}
+
+{% macro brief_story(entry) -%}
+  {% set item = entry.item %}
+  <article id="{{ entry.fragment }}" class="story story--brief" data-item-id="{{ item.id }}">
+    <p class="story-kicker"><span class="story-number">{{ entry.number }}</span><span>{{ entry.channel_name }}</span></p>
+    <h3><a class="story-title-link" href="{{ entry.day_url }}">{{ item.title }}</a></h3>
+    {{ source_meta(entry) }}
+    <p class="story-summary"><strong>发生了什么</strong> {{ item.summary }}</p>
+    <p class="story-impact"><strong>为什么重要</strong> {{ item.why_it_matters }}</p>
+    {{ source_link(item) }}
+  </article>
+{%- endmacro %}
+
+{% macro edition_story(entry, collected_at, self_link=false) -%}
+  {% set item = entry.item %}
+  <article id="{{ entry.fragment }}" class="story story--edition" data-item-id="{{ item.id }}">
+    <p class="story-kicker"><span class="story-number">{{ entry.number }}</span><span>{{ entry.channel_name }}</span></p>
+    <h3><a class="story-title-link" href="{% if self_link %}#{{ entry.fragment }}{% else %}{{ entry.day_url }}{% endif %}">{{ item.title }}</a></h3>
+    {{ source_meta(entry, collected_at) }}
+    <div class="story-analysis">
+      <section><h4>发生了什么</h4><p>{{ item.summary }}</p></section>
+      <section><h4>为什么重要</h4><p>{{ item.why_it_matters }}</p></section>
+    </div>
+    {{ source_link(item) }}
+  </article>
+{%- endmacro %}
+
+{% macro timeline_story(entry) -%}
+  {% set item = entry.item %}
+  <article id="{{ entry.fragment }}" class="story story--timeline" data-item-id="{{ item.id }}">
+    <p class="story-kicker"><span class="story-number">{{ entry.number }}</span><span>{{ entry.channel_name }}</span><time datetime="{{ entry.report_date }}">{{ entry.report_date }}</time></p>
+    <h3><a class="story-title-link" href="{{ entry.day_url }}">{{ item.title }}</a></h3>
+    {{ source_meta(entry) }}
+    <p class="story-summary"><strong>发生了什么</strong> {{ item.summary }}</p>
+    <p class="story-impact"><strong>为什么重要</strong> {{ item.why_it_matters }}</p>
+    {{ source_link(item) }}
+  </article>
+{%- endmacro %}

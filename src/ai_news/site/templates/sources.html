@@ -2,28 +2,35 @@
 
 {% block main %}
   <main id="main-content" class="page-shell">
-    <section class="edition-heading" aria-labelledby="sources-title">
+    <header class="channel-header">
       <p class="eyebrow">SOURCE DESK</p>
-      <h1 id="sources-title">来源状态</h1>
-      <p>展示最近七个运行日中，各来源从抓取到入选的真实贡献。</p>
-    </section>
-    <section class="source-ledger" aria-label="来源贡献明细">
+      <h1>来源透明度</h1>
+      <p>“能访问”不等于“有贡献”。这里展示最近七个运行日中，各来源从抓取到入选的真实漏斗。</p>
+    </header>
+    <section class="source-ledger" aria-labelledby="source-ledger-title">
+      <header class="section-heading">
+        <p>SEVEN-RUN WINDOW</p>
+        <h2 id="source-ledger-title">来源贡献明细</h2>
+      </header>
       <ol>
         {% for source in source_statuses %}
           <li>
-            <article>
+            <article class="source-row">
               <header>
-                <h2>{{ source.source_name }}</h2>
-                <span>{{ source.source_role.value }}</span>
+                <h3>{{ source.source_name }}</h3>
+                <p>{{ source.source_role.value }} · {% if source.request_status == 'ok' %}请求成功{% elif source.request_status == 'failed' %}请求失败{% else %}暂无运行{% endif %}</p>
               </header>
-              <p>
-                近窗 {{ source.recent_count if source.recent_count is not none else '—' }}
-                · 新增 {{ source.new_count if source.new_count is not none else '—' }}
-                · 合格 {{ source.eligible_count if source.eligible_count is not none else '—' }}
-                · 候选 {{ source.candidate_count if source.candidate_count is not none else '—' }}
-                · 入选 {{ source.selected_count if source.selected_count is not none else '—' }}
+              <dl>
+                <div><dt>近窗</dt><dd>{{ source.recent_count if source.recent_count is not none else '—' }}</dd></div>
+                <div><dt>新增</dt><dd>{{ source.new_count if source.new_count is not none else '—' }}</dd></div>
+                <div><dt>合格</dt><dd>{{ source.eligible_count if source.eligible_count is not none else '—' }}</dd></div>
+                <div><dt>候选</dt><dd>{{ source.candidate_count if source.candidate_count is not none else '—' }}</dd></div>
+                <div><dt>入选</dt><dd>{{ source.selected_count if source.selected_count is not none else '—' }}</dd></div>
+              </dl>
+              <p class="source-row__latest">
+                {% if source.latest_published_at %}<time datetime="{{ source.latest_published_at.isoformat() }}">最新内容 {{ source.latest_published_at|beijing_datetime }}</time>{% else %}尚无可确认的最新内容时间{% endif %}
+                {% if source.diagnostic_label %}<span>{{ source.diagnostic_label }}</span>{% endif %}
               </p>
-              {% if source.diagnostic_label %}<p>{{ source.diagnostic_label }}</p>{% endif %}
             </article>
           </li>
         {% endfor %}

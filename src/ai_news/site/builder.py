@@ -212,16 +212,20 @@ def _story_entries(
     *,
     start: int = 1,
 ) -> list[dict[str, object]]:
-    return [
-        {
-            "item": item,
-            "number": f"{index:02d}",
-            "report_date": report.date.isoformat(),
-            "fragment": item_fragment(item, report.date),
-            "day_url": item_day_url(item, report.date, base_path),
-        }
-        for index, item in enumerate(items, start=start)
-    ]
+    entries: list[dict[str, object]] = []
+    for index, item in enumerate(items, start=start):
+        channel = channel_for_item(item)
+        entries.append(
+            {
+                "item": item,
+                "number": f"{index:02d}",
+                "report_date": report.date.isoformat(),
+                "fragment": item_fragment(item, report.date),
+                "day_url": item_day_url(item, report.date, base_path),
+                "channel_name": channel.name if channel is not None else item.category.value,
+            }
+        )
+    return entries
 
 
 def _fallback_source_specs(
@@ -311,10 +315,15 @@ def _build_staging(
     issue_by_date = issue_numbers(reports)
     all_pairs = [(report, item) for report in reports for item in report.items]
     categories = _category_navigation()
+    source_rows = source_statuses(source_specs, run_records)
     common: dict[str, object] = {
         "site_name": "AI 情报雷达",
         "latest_report": _report_context(latest, issue_by_date[latest.date]),
         "categories": categories,
+        "fresh_source_count": sum(
+            source.recent_count is not None and source.recent_count > 0 for source in source_rows
+        ),
+        "configured_source_count": len(source_rows),
     }
 
     shutil.copytree(_STATIC_DIRECTORY, staging / "assets")
@@ -404,6 +413,7 @@ def _build_staging(
                     "number": f"{index:02d}",
                     "fragment": item_fragment(item, report.date),
                     "day_url": item_day_url(item, report.date, base_path),
+                    "channel_name": channel.name,
                 }
                 for index, (report, item) in enumerate(
                     page_pairs,
@@ -471,7 +481,7 @@ def _build_staging(
             **common,
             "page_title": "来源状态",
             "current_page": "sources",
-            "source_statuses": source_statuses(source_specs, run_records),
+            "source_statuses": source_rows,
         },
     )
 

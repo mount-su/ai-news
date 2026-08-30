@@ -377,7 +377,7 @@ def test_home_uses_latest_report_and_feed_category_order_is_stable(
 
     archive_text = (output / "archive/index.html").read_text(encoding="utf-8")
     assert archive_text.index("2026-07-26") < archive_text.index("2026-07-25")
-    assert "最后成功" in (output / "index.html").read_text(encoding="utf-8")
+    assert "最近生成" in (output / "index.html").read_text(encoding="utf-8")
     assert "北京时间" in (output / "index.html").read_text(encoding="utf-8")
 
 
@@ -504,7 +504,16 @@ def test_sources_page_uses_public_run_loader_and_keeps_configured_missing_source
     assert all(
         name in sources for name in ("Official Feed", "Secondary Feed", "Configured Missing")
     )
-    assert all(label in sources for label in ("近窗 3", "新增 2", "合格 2", "候选 1", "入选 1"))
+    assert all(
+        metric in sources
+        for metric in (
+            "<dt>近窗</dt><dd>3</dd>",
+            "<dt>新增</dt><dd>2</dd>",
+            "<dt>合格</dt><dd>2</dd>",
+            "<dt>候选</dt><dd>1</dd>",
+            "<dt>入选</dt><dd>1</dd>",
+        )
+    )
     assert "暂无运行数据" in sources
 
 

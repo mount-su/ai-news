@@ -28,8 +28,13 @@ class _AccessibilityParser(HTMLParser):
         self.summary_count = 0
         self.landmarks: set[str] = set()
         self.headings: list[int] = []
+        self.h1_count = 0
+        self.links: list[dict[str, str]] = []
+        self.article_links: list[dict[str, str]] = []
+        self.aria_live: list[str] = []
         self.text_parts: list[str] = []
         self._in_body = False
+        self._article_depth = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = {key: value or "" for key, value in attrs}
@@ -44,6 +49,12 @@ class _AccessibilityParser(HTMLParser):
             self.main_ids.append(attributes.get("id", ""))
         if tag in {"header", "nav", "section", "article", "footer"}:
             self.landmarks.add(tag)
+        if tag == "article":
+            self._article_depth += 1
+        if tag == "a":
+            self.links.append(attributes)
+            if self._article_depth:
+                self.article_links.append(attributes)
         if tag == "label":
             self.labels.append(attributes)
         if tag == "input":
@@ -56,10 +67,16 @@ class _AccessibilityParser(HTMLParser):
             self.summary_count += 1
         if tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
             self.headings.append(int(tag[1]))
+            if tag == "h1":
+                self.h1_count += 1
+        if live := attributes.get("aria-live"):
+            self.aria_live.append(live)
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "body":
             self._in_body = False
+        if tag == "article":
+            self._article_depth -= 1
 
     def handle_data(self, data: str) -> None:
         self.text_parts.append(data)
@@ -83,6 +100,7 @@ def test_all_pages_have_single_main_skip_link_landmarks_and_ordered_headings(
         parser = _parse(page)
         assert parser.html_lang == "zh-CN"
         assert parser.main_count == 1
+        assert parser.h1_count == 1
         assert parser.main_ids == ["main-content"]
         assert parser.body_start_tags[0][0] == "a"
         assert parser.body_start_tags[0][1].get("href") == "#main-content"
@@ -92,9 +110,15 @@ def test_all_pages_have_single_main_skip_link_landmarks_and_ordered_headings(
             current <= previous + 1
             for previous, current in zip(parser.headings, parser.headings[1:], strict=False)
         )
+        page_text = " ".join(parser.text_parts)
+        assert all(
+            channel in page_text
+            for channel in ("大模型", "Agent", "AI 产品", "开源生态", "行业政策")
+        )
+        assert any(link.get("aria-current") == "page" for link in parser.links)
 
 
-def test_concise_brief_cards_are_accessible_without_javascript(
+def test_story_titles_are_links_and_external_sources_announce_new_windows(
     accessibility_report_root: tuple[Path, object],
     tmp_path: Path,
 ) -> None:
@@ -109,14 +133,37 @@ def test_concise_brief_cards_are_accessible_without_javascript(
     ]:
         parser = _parse(page)
         visible_text = " ".join(parser.text_parts)
-        assert not parser.inputs
-        assert not parser.buttons
         assert parser.details_count == 0
         assert parser.summary_count == 0
-        assert "变化" in visible_text
-        assert "影响" in visible_text
+        assert "发生了什么" in visible_text
+        assert "为什么重要" in visible_text
         assert "行动" not in visible_text
-        assert "查看原始来源" in visible_text
+        assert "原始来源" in visible_text
+        assert "新窗口" in visible_text
+        assert any(link.get("class") == "story-title-link" for link in parser.article_links)
+        external_links = [link for link in parser.article_links if link.get("target") == "_blank"]
+        assert external_links
+        assert all("新窗口" in link.get("aria-label", "") for link in external_links)
+
+
+def test_search_controls_are_labelled_and_day_archive_navigation_is_explicit(
+    accessibility_report_root: tuple[Path, object],
+    tmp_path: Path,
+) -> None:
+    root, _items = accessibility_report_root
+    output = tmp_path / "dist"
+    build_site(root, output)
+
+    search = _parse(output / "search/index.html")
+    assert search.inputs
+    assert search.buttons
+    assert any(label.get("for") == "search-query" for label in search.labels)
+    assert "polite" in search.aria_live
+
+    day_text = (output / "days/2026-07-26/index.html").read_text(encoding="utf-8")
+    assert all(label in day_text for label in ("上一期", "返回归档"))
+    archive_text = (output / "archive/index.html").read_text(encoding="utf-8")
+    assert all(label in archive_text for label in ("条收录", "条候选"))
 
 
 def test_styles_define_visual_system_responsive_layout_and_accessibility_contract(
