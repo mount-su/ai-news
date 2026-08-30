@@ -9,9 +9,11 @@ import posixpath
 import re
 import stat
 import sys
+import xml.etree.ElementTree as ET
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import date, datetime
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urljoin, urlsplit
@@ -19,6 +21,41 @@ from urllib.parse import unquote, urljoin, urlsplit
 _INVALID_PERCENT = re.compile(r"%(?![0-9A-Fa-f]{2})")
 _URL_ATTRIBUTES = {"href", "src"}
 _ALLOWED_EXTERNAL_SCHEMES = {"http", "https", "mailto", "tel"}
+_BUILD_REVISION = re.compile(r"^(?:local|offline-demo|[0-9a-f]{40})$")
+_SEARCH_FIELDS = {
+    "id",
+    "title",
+    "summary",
+    "why_it_matters",
+    "tags",
+    "display_category",
+    "source",
+    "published_at",
+    "report_date",
+    "is_official",
+    "marketing_risk",
+    "page_url",
+}
+_REQUIRED_V2_ARTIFACTS = {
+    "index.html",
+    "404.html",
+    "archive/index.html",
+    "search/index.html",
+    "sources/index.html",
+    "categories/model/index.html",
+    "categories/agent/index.html",
+    "categories/ai-tools/index.html",
+    "categories/open-source/index.html",
+    "categories/industry-policy/index.html",
+    "assets/styles.css",
+    "assets/app.js",
+    "assets/favicon.svg",
+    "search.json",
+    "feed.xml",
+    "sitemap.xml",
+    "robots.txt",
+    "build-info.json",
+}
 
 
 @dataclass(frozen=True, order=True)
@@ -271,6 +308,151 @@ def _reference_issues(
     return []
 
 
+def _required_artifact_issues(files: set[str]) -> list[ValidationIssue]:
+    return [
+        ValidationIssue(path, "missing-v2-artifact", "required V2 site artifact is missing")
+        for path in sorted(_REQUIRED_V2_ARTIFACTS - files)
+    ]
+
+
+def _valid_search_entry(entry: object) -> bool:
+    if not isinstance(entry, dict) or set(entry) != _SEARCH_FIELDS:
+        return False
+    string_fields = (
+        "id",
+        "title",
+        "summary",
+        "why_it_matters",
+        "display_category",
+        "source",
+        "published_at",
+        "report_date",
+        "marketing_risk",
+        "page_url",
+    )
+    if any(not isinstance(entry[field], str) or not entry[field] for field in string_fields):
+        return False
+    if not isinstance(entry["tags"], list) or any(
+        not isinstance(tag, str) or not tag for tag in entry["tags"]
+    ):
+        return False
+    if not isinstance(entry["is_official"], bool):
+        return False
+    if entry["marketing_risk"] not in {"low", "medium", "high"}:
+        return False
+    try:
+        published_at = datetime.fromisoformat(entry["published_at"].replace("Z", "+00:00"))
+        report_date = date.fromisoformat(entry["report_date"])
+    except ValueError:
+        return False
+    if published_at.utcoffset() is None or report_date.isoformat() != entry["report_date"]:
+        return False
+    parsed_url = urlsplit(entry["page_url"])
+    return (
+        not parsed_url.scheme
+        and not parsed_url.netloc
+        and parsed_url.path.startswith("/")
+        and parsed_url.fragment.startswith("item-")
+    )
+
+
+def _search_index_issues(
+    root: Path,
+    files: set[str],
+    documents: dict[str, _Document],
+    base_path: str,
+) -> list[ValidationIssue]:
+    path = "search.json"
+    if path not in files:
+        return []
+    try:
+        payload = json.loads((root / path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return [ValidationIssue(path, "invalid-search-index", "search index is invalid")]
+    if not isinstance(payload, list) or any(not _valid_search_entry(entry) for entry in payload):
+        return [ValidationIssue(path, "invalid-search-index", "search index is invalid")]
+    issues: list[ValidationIssue] = []
+    for entry in payload:
+        issues.extend(
+            _reference_issues(
+                path,
+                _Reference(value=entry["page_url"]),
+                base_path,
+                files,
+                documents,
+            )
+        )
+    return issues
+
+
+def _xml_issues(root: Path, files: set[str]) -> list[ValidationIssue]:
+    expectations = {
+        "feed.xml": ("rss", "invalid-feed", "RSS feed is invalid"),
+        "sitemap.xml": (
+            "{http://www.sitemaps.org/schemas/sitemap/0.9}urlset",
+            "invalid-sitemap",
+            "sitemap is invalid",
+        ),
+    }
+    issues: list[ValidationIssue] = []
+    for path, (expected_root, code, message) in expectations.items():
+        if path not in files:
+            continue
+        try:
+            parsed_root = ET.parse(root / path).getroot()
+        except (OSError, ET.ParseError):
+            issues.append(ValidationIssue(path, code, message))
+            continue
+        if parsed_root.tag != expected_root:
+            issues.append(ValidationIssue(path, code, message))
+    return issues
+
+
+def _build_info_issues(root: Path, files: set[str]) -> list[ValidationIssue]:
+    path = "build-info.json"
+    if path not in files:
+        return []
+    try:
+        payload = json.loads((root / path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return [ValidationIssue(path, "invalid-build-info", "build metadata is invalid")]
+    if not isinstance(payload, dict) or set(payload) != {
+        "schema_version",
+        "revision",
+        "workflow_run_id",
+    }:
+        return [ValidationIssue(path, "invalid-build-info", "build metadata is invalid")]
+    revision = payload["revision"]
+    run_id = payload["workflow_run_id"]
+    if (
+        payload["schema_version"] != "1.0"
+        or not isinstance(revision, str)
+        or _BUILD_REVISION.fullmatch(revision) is None
+        or (
+            run_id is not None
+            and (isinstance(run_id, bool) or not isinstance(run_id, int) or run_id < 1)
+        )
+    ):
+        return [ValidationIssue(path, "invalid-build-info", "build metadata is invalid")]
+    return []
+
+
+def _robots_issues(root: Path, files: set[str]) -> list[ValidationIssue]:
+    path = "robots.txt"
+    if path not in files:
+        return []
+    try:
+        contents = (root / path).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return [ValidationIssue(path, "invalid-robots", "robots file is invalid")]
+    if (
+        "User-agent: *" not in contents
+        or "Sitemap: https://mount-su.github.io/ai-news/sitemap.xml" not in contents
+    ):
+        return [ValidationIssue(path, "invalid-robots", "robots file is invalid")]
+    return []
+
+
 def validate_site(dist: Path, base_path: str) -> list[ValidationIssue]:
     """Return deterministic validation findings for one static site directory."""
 
@@ -280,12 +462,17 @@ def validate_site(dist: Path, base_path: str) -> list[ValidationIssue]:
         raise ValueError("dist must be an existing non-symlink directory")
     root = root.resolve(strict=True)
     files, documents, issues = _inventory(root)
+    issues.extend(_required_artifact_issues(files))
     if not documents:
         issues.append(ValidationIssue(".", "missing-html", "site contains no HTML pages"))
     for path, document in documents.items():
         issues.extend(_document_issues(path, document))
         for reference in document.references:
             issues.extend(_reference_issues(path, reference, base_path, files, documents))
+    issues.extend(_search_index_issues(root, files, documents, base_path))
+    issues.extend(_xml_issues(root, files))
+    issues.extend(_build_info_issues(root, files))
+    issues.extend(_robots_issues(root, files))
     return sorted(issues)
 
 

@@ -18,17 +18,43 @@ validate_site = validate_site_module.validate_site
 BASE_PATH = "/ai-news/"
 
 
+def _page(body: str, *, main: bool = True) -> str:
+    content = f'<main id="main-content">{body}</main>' if main else body
+    return f"<!doctype html><html><body>{content}</body></html>"
+
+
 def _write_site(root: Path, files: dict[str, str]) -> Path:
-    for relative_path, content in files.items():
+    baseline = {
+        "index.html": _page("<p>Home</p>"),
+        "404.html": _page("<p>Not found</p>"),
+        "archive/index.html": _page("<p>Archive</p>"),
+        "search/index.html": _page("<p>Search</p>"),
+        "sources/index.html": _page("<p>Sources</p>"),
+        **{
+            f"categories/{slug}/index.html": _page(f"<p>{slug}</p>")
+            for slug in ("model", "agent", "ai-tools", "open-source", "industry-policy")
+        },
+        "assets/styles.css": "body { color: black; }\n",
+        "assets/app.js": '"use strict";\n',
+        "assets/favicon.svg": '<svg xmlns="http://www.w3.org/2000/svg"/>\n',
+        "search.json": "[]\n",
+        "feed.xml": '<?xml version="1.0"?><rss version="2.0"><channel/></rss>\n',
+        "sitemap.xml": (
+            '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"/>\n'
+        ),
+        "robots.txt": (
+            "User-agent: *\nAllow: /\nSitemap: https://mount-su.github.io/ai-news/sitemap.xml\n"
+        ),
+        "build-info.json": (
+            '{"revision":"offline-demo","schema_version":"1.0","workflow_run_id":null}\n'
+        ),
+    }
+    baseline.update(files)
+    for relative_path, content in baseline.items():
         path = root / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
     return root
-
-
-def _page(body: str, *, main: bool = True) -> str:
-    content = f'<main id="main-content">{body}</main>' if main else body
-    return f"<!doctype html><html><body>{content}</body></html>"
 
 
 def test_valid_site_handles_queries_fragments_directory_indexes_and_percent_encoding(
@@ -219,6 +245,75 @@ def test_validator_reports_missing_same_page_and_cross_page_fragments(tmp_path: 
 
     fragment_issues = [issue for issue in issues if issue.code == "missing-fragment"]
     assert len(fragment_issues) == 2
+
+
+def test_validator_rejects_malformed_v2_json_xml_and_provenance(tmp_path: Path) -> None:
+    dist = _write_site(
+        tmp_path / "dist",
+        {
+            "search.json": "{",
+            "feed.xml": "<rss>",
+            "sitemap.xml": "<urlset>",
+            "build-info.json": '{"revision":"main"}',
+        },
+    )
+
+    codes = {issue.code for issue in validate_site(dist, BASE_PATH)}
+
+    assert {
+        "invalid-search-index",
+        "invalid-feed",
+        "invalid-sitemap",
+        "invalid-build-info",
+    } <= codes
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "404.html",
+        "robots.txt",
+        "feed.xml",
+        "sitemap.xml",
+        "search.json",
+        "build-info.json",
+        "assets/favicon.svg",
+        "categories/industry-policy/index.html",
+        "sources/index.html",
+    ],
+)
+def test_validator_requires_complete_v2_artifacts(tmp_path: Path, relative_path: str) -> None:
+    dist = _write_site(tmp_path / "dist", {})
+    (dist / relative_path).unlink()
+
+    assert "missing-v2-artifact" in {issue.code for issue in validate_site(dist, BASE_PATH)}
+
+
+def test_validator_checks_search_result_fragments_against_day_pages(tmp_path: Path) -> None:
+    dist = _write_site(
+        tmp_path / "dist",
+        {
+            "days/2026-08-30/index.html": _page('<article id="item-present">Story</article>'),
+            "search.json": """[
+              {
+                "id": "entry",
+                "title": "Title",
+                "summary": "Summary",
+                "why_it_matters": "Impact",
+                "tags": ["AI"],
+                "display_category": "大模型",
+                "source": "Source",
+                "published_at": "2026-08-30T08:00:00+00:00",
+                "report_date": "2026-08-30",
+                "is_official": true,
+                "marketing_risk": "low",
+                "page_url": "/ai-news/days/2026-08-30/#item-missing"
+              }
+            ]""",
+        },
+    )
+
+    assert "missing-fragment" in {issue.code for issue in validate_site(dist, BASE_PATH)}
 
 
 def test_cli_prints_clear_paths_and_exits_one_for_invalid_site(
