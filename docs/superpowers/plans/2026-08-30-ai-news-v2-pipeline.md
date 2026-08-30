@@ -311,6 +311,8 @@ one final source contributes at most 2 items
 unverified discovery never becomes a NewsItem
 any non-primary item with marketing_risk=high never becomes a NewsItem
 NewsItem.is_official equals RawItem.is_official_source even if the model disagrees
+NewsItem persists source_id, source_role, and discovery_verified from RawItem
+legacy reports load those provenance fields as null while new reports use schema 1.3
 cross-source duplicates prefer primary, then trusted media, then verified discovery
 ```
 
@@ -358,7 +360,7 @@ Extend recency scores through 96 and 120 hours with scores 2 and 1. Keep determi
 
 - [ ] **Step 4: Change the selection contract**
 
-Set maximum publication count to 7 and final source cap to 2. Prompts must say “目标 3–7 条，质量不足时允许少于 3 条；全部不合格时返回空数组，不得凑数.” Parser validation allows 0–7 analyses and does not impose a positive minimum. The pipeline converts an empty/fully rejected result into `no_eligible_content` instead of a zero-item `DailyReport`. Unverified discovery has already been removed by deterministic eligibility. In `_build_items`, reject every remaining non-primary item whose marketing risk is high. Build `NewsItem.is_official` from the raw source fact, not `analysis.is_official`.
+Set maximum publication count to 7 and final source cap to 2. Prompts must say “目标 3–7 条，质量不足时允许少于 3 条；全部不合格时返回空数组，不得凑数.” Parser validation allows 0–7 analyses and does not impose a positive minimum. The pipeline converts an empty/fully rejected result into `no_eligible_content` instead of a zero-item `DailyReport`. Unverified discovery has already been removed by deterministic eligibility. In `_build_items`, reject every remaining non-primary item whose marketing risk is high. Build `NewsItem.is_official`, `source_id`, `source_role`, and `discovery_verified` from the raw source facts, never model output. Make those provenance fields nullable for legacy reports, require them for newly generated items, and publish new reports as schema `1.3`.
 
 Update both dedupe winner selection and the exact-URL accumulator preference key so source role wins before numeric source weight. Add an event key based on normalized product/entity/version/action terms; tests must prove an official product launch replaces its media/discovery duplicate without merging unrelated products.
 
@@ -383,7 +385,7 @@ git commit -m "feat: enforce quality-first daily selection"
 
 **Files:**
 - Modify: `src/ai_news/models.py`
-- Create: `src/ai_news/storage/run_records.py`
+- Modify: `src/ai_news/storage/repository.py`
 - Modify: `src/ai_news/storage/__init__.py`
 - Modify: `src/ai_news/pipeline/run.py`
 - Modify: `src/ai_news/cli.py`
@@ -414,12 +416,12 @@ Assert the path is `data/runs/2026/08/2026-08-30.json`, writes are atomic, symli
 Run:
 
 ```bash
-python -m pytest tests/test_storage.py -k run_record tests/test_pipeline_run.py -k run_record tests/test_cli.py -k historical -q
+python -m pytest tests/test_storage.py tests/test_run_records.py tests/test_pipeline_run.py tests/test_cli.py -k "run_record or publication_transaction or historical" -q
 ```
 
 Expected: FAIL because the model and storage API do not exist.
 
-- [ ] **Step 3: Add the safe model and focused storage module**
+- [ ] **Step 3: Add the safe model and versioned storage contracts**
 
 Use these exact status values:
 
@@ -449,11 +451,13 @@ class RunRecord(BaseModel):
     ] = "none"
 ```
 
-`run_records.py` must resolve the repository boundary, reject symlink leaves/parents, write a same-directory mode-0600 temporary file, `fsync`, then `os.replace`. Loading only accepts canonical `data/runs/YYYY/MM/YYYY-MM-DD.json` paths and verifies the path date. Keep this outside the existing three-target report transaction so old recovery journals remain compatible.
+Standalone empty/failed run-record writes must resolve the repository boundary, reject symlink leaves/parents, write a same-directory mode-0600 temporary file, `fsync`, then `os.replace`. Loading only accepts canonical `data/runs/YYYY/MM/YYYY-MM-DD.json` paths and verifies the path date.
+
+For a successful publication, add `save_publication(root, report, published_record)` and atomically commit report JSON, Markdown, index, and the same-date published run record. Preserve the existing version-1 three-target journal parser and recovery behavior for `save_report`; add a version-2 four-target journal whose fourth target is exactly the canonical run-record path. Recovery must accept and validate either version, never a variable arbitrary target list.
 
 - [ ] **Step 4: Wire records into pipeline outcomes**
 
-Add a `RunRecordSaver` dependency defaulting to `save_run_record`. After collection, persist one record for each terminal outcome. Save a `published` record only after `save_report` succeeds. For `PublicationThresholdError`, write `no_eligible_content` first and keep the CLI exit code 0. For safe pipeline failures after collection, write `failed_before_publish` and then raise the existing safe exception.
+Add injectable `PublicationSaver` and `RunRecordSaver` dependencies defaulting to `save_publication` and `save_run_record`. After collection, persist one record for each terminal outcome. A successful result calls the atomic publication saver once; it must never expose a report without its matching published record. For `PublicationThresholdError`, write `no_eligible_content` first and keep the CLI exit code 0. For safe pipeline failures after collection, write `failed_before_publish` and then raise the existing safe exception.
 
 In `cli._generate`, compute the effective date and cutoff before loading configuration. If source or model configuration fails, write a `failed_before_publish` record with empty `source_runs` and `configuration_failed`, then emit only the existing safe error category. The Daily workflow must call this unified generate path instead of terminating in a separate `check-config` preflight.
 
@@ -468,6 +472,8 @@ python -m pytest tests/test_storage.py tests/test_run_records.py tests/test_pipe
 ```
 
 Expected: PASS; no existing report transaction test regresses.
+
+Also inject crashes after each of the four version-2 replacements. The next load must roll back or recover to a fully consistent old/new publication. Explicitly test that a run-record write failure cannot leave a newly indexed report without a published record, while old version-1 crash journals still recover unchanged.
 
 - [ ] **Step 6: Commit run records**
 

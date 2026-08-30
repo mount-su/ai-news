@@ -72,6 +72,8 @@ def source_statuses(source_specs, run_records): ...
 
 Do not expand the historical `Category` enum just to create the policy channel. Preserve `/categories/ai-tools/` as the canonical URL for “AI 产品.” Old reports without V2 diagnostics must display “历史诊断不可用”; never infer contribution from `success`.
 
+`source_statuses` receives the full enabled source configuration loaded through `load_source_config(root / "sources/feeds.yaml")`. For each source it sums `recent/new/eligible/candidate/selected` over the latest seven Shanghai calendar dates represented by run records, takes the maximum `latest_published_at`, and keeps configured-but-missing sources visible as “暂无运行数据.”
+
 - [ ] **Step 4: Verify GREEN**
 
 Run:
@@ -108,6 +110,7 @@ home and day pages use explicit continuous 01…N labels, never CSS-generated 00
 each article has a stable id and its title is a usable deep link
 day pages have older/newer edition links and an archive link
 sources page reads load_run_records(root), not a second JSON scanner
+sources page includes every enabled configured source and aggregates the latest 7 calendar days
 archive distinguishes published, no_eligible_content, failed, and never-run dates
 mobile-visible archive count fields remain in the HTML
 ```
@@ -133,7 +136,7 @@ Expected: FAIL on missing routes, pagination, fragments, and run-record views.
 
 - [ ] **Step 3: Refactor build orchestration**
 
-Keep the existing staging/install transaction intact. Build page contexts through presentation helpers and generate:
+Keep the existing staging/install transaction intact. Load both `load_source_config(root / "sources/feeds.yaml")` and `load_run_records(root)` through their public APIs, build page contexts through presentation helpers, and generate:
 
 ```text
 index.html
@@ -362,9 +365,11 @@ git commit -m "feat: add static full-text news search"
 
 **Files:**
 - Modify: `src/ai_news/site/builder.py`
+- Modify: `src/ai_news/cli.py`
 - Modify: `src/ai_news/site/templates/base.html`
 - Modify: `src/ai_news/site/templates/404.html`
 - Test: `tests/test_site_builder.py`
+- Test: `tests/test_cli.py`
 
 - [ ] **Step 1: Write failing metadata and XML tests**
 
@@ -379,6 +384,7 @@ sitemap.xml is valid and lists home, five channels and pages, search, archive, s
 404 is excluded from sitemap
 robots.txt points at the absolute sitemap URL
 404.html links remain inside the GitHub Pages project path
+build-info.json contains the exact injected 40-character build revision and optional numeric workflow run ID
 ```
 
 - [ ] **Step 2: Verify RED**
@@ -395,12 +401,14 @@ Expected: FAIL because the outputs do not exist.
 
 Pass `page_title`, `description`, `canonical_url`, and `og_type` explicitly. Generate `feed.xml` and `sitemap.xml` with a standard XML builder, never string-concatenated unescaped XML. Use the fixed public root `https://mount-su.github.io/ai-news/` and keep build output paths relative for Pages.
 
+Add explicit `build_revision` and `workflow_run_id` inputs to `build_site`; the CLI reads `AI_NEWS_BUILD_SHA` and `AI_NEWS_BUILD_RUN_ID`, validates them, and passes deterministic `local`/`offline-demo` values outside production. Emit `build-info.json` with only `schema_version`, `revision`, and `workflow_run_id`. This file is the production provenance authority after the build job checks out the data commit pushed by the generate job.
+
 - [ ] **Step 4: Verify GREEN**
 
 Run:
 
 ```bash
-python -m pytest tests/test_site_builder.py -q
+python -m pytest tests/test_site_builder.py tests/test_cli.py -q
 ```
 
 Expected: PASS.
@@ -408,7 +416,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit discoverability assets**
 
 ```bash
-git add src/ai_news/site tests/test_site_builder.py
+git add src/ai_news/site src/ai_news/cli.py tests/test_site_builder.py tests/test_cli.py
 git commit -m "feat: add RSS and static-site metadata"
 ```
 
@@ -421,7 +429,7 @@ git commit -m "feat: add RSS and static-site metadata"
 
 - [ ] **Step 1: Write failing validation tests**
 
-Require the validator to reject invalid `search.json`, malformed feed/sitemap XML, missing robots/404/favicon, duplicate IDs, broken internal pages, and broken internal fragments. Extend the offline demo expected output set to all V2 routes.
+Require the validator to reject invalid `search.json`, malformed feed/sitemap XML, malformed or missing `build-info.json`, missing robots/404/favicon, duplicate IDs, broken internal pages, and broken internal fragments. Extend the offline demo expected output set to all V2 routes.
 
 - [ ] **Step 2: Verify RED**
 

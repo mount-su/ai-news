@@ -30,6 +30,8 @@ run-record staging and secret scan happen before the exit code is propagated
 generation failure prevents build/deploy but leaves the prior Pages deployment intact
 source-health runs daily at 07:17 Asia/Shanghai, retains PR/manual triggers, and receives no secret
 CI runs the dependency-free Node search tests
+manual Daily runs have a date-bearing run-name so a dispatch can be identified unambiguously
+the build job injects its checked-out revision and workflow run ID into build-info.json
 ```
 
 The deploy job must contain this exact condition:
@@ -65,6 +67,8 @@ schedule:
 ```
 
 The source-health job remains `contents: read`, receives no LLM or Reddit secret, and publishes no data. Add the explicit deploy condition above.
+
+Give Daily an explicit `run-name` containing the requested date (or `today`). Immediately after the build job checks out current `main`, write the exact `git rev-parse HEAD` to `AI_NEWS_BUILD_SHA` and `GITHUB_RUN_ID` to `AI_NEWS_BUILD_RUN_ID` through `GITHUB_ENV`; the static builder publishes those values in `build-info.json`. Also write the revision to the job summary without printing any secret.
 
 - [ ] **Step 5: Verify workflow tests and actionlint**
 
@@ -270,6 +274,8 @@ gh workflow run source-health.yml --repo mount-su/ai-news --ref main
 
 Resolve the new run ID and watch it. Confirm all enabled primary/trusted-media sources are represented, freshness is distinct from reachability, and discovery failures do not masquerade as fresh contribution.
 
+Identify this run by snapshotting current `databaseId` values before dispatch and selecting a newly appearing `workflow_dispatch` run afterward; never assume the newest repository run belongs to this operation.
+
 - [ ] **Step 2: Dispatch each historical date oldest to newest**
 
 The fixed sequence is:
@@ -284,14 +290,16 @@ The fixed sequence is:
 For one date at a time:
 
 ```bash
+RUN_ID_SNAPSHOT="$(mktemp)"
+gh run list --repo mount-su/ai-news --workflow daily-news.yml --event workflow_dispatch --limit 100 --json databaseId --jq '.[].databaseId' > "$RUN_ID_SNAPSHOT"
 gh workflow run daily-news.yml --repo mount-su/ai-news --ref main -f date=YYYY-MM-DD
 ```
 
-Resolve the newly created run ID, wait with `gh run watch --exit-status`, and do not dispatch the next date until the current one finishes and its main-branch data commit is visible. Rapid bulk dispatch is forbidden because the workflow concurrency group retains at most one pending run.
+Poll `gh run list --workflow daily-news.yml --event workflow_dispatch --json databaseId,displayTitle,createdAt` until a database ID not present in `$RUN_ID_SNAPSHOT` appears whose date-bearing `displayTitle` contains the requested date. Record that exact ID, run `gh run watch --repo mount-su/ai-news <id> --exit-status`, and do not dispatch the next date until the current one finishes and its main-branch data commit is visible. Rapid bulk dispatch is forbidden because the workflow concurrency group retains at most one pending run.
 
 - [ ] **Step 3: Validate every regenerated date before continuing**
 
-For each date, fetch current `main` and assert:
+For each date, read the deployed `build-info.json`, record `{date, run_id, result, data_sha, status}`, fetch current `origin/main`, and use `git show origin/main:data/runs/YYYY/MM/YYYY-MM-DD.json` (plus the report path when published) for the assertions below. The build-info `workflow_run_id` must equal the watched ID and its `revision` must be an ancestor of current `origin/main`.
 
 ```text
 data/runs/YYYY/MM/YYYY-MM-DD.json exists
@@ -316,7 +324,7 @@ After the 14 dates finish, dispatch 2026-08-30 one final time so its history vie
 
 - [ ] **Step 1: Verify deployment provenance**
 
-Record the V2 merge SHA and the final data/deployment SHA. Fetch `origin/main` and require:
+Record the V2 merge SHA. Read deployed `/build-info.json` and use its `revision` as the authoritative final data/deployment SHA; confirm its `workflow_run_id` is the final successful build/deploy run. Fetch `origin/main` and require:
 
 ```bash
 git merge-base --is-ancestor "$V2_MERGE_SHA" "$DEPLOYMENT_SHA"
@@ -342,6 +350,7 @@ https://mount-su.github.io/ai-news/
 /sitemap.xml
 /robots.txt
 /search.json
+/build-info.json
 /404.html
 ```
 
