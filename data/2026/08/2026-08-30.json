@@ -2,8 +2,29 @@
   "candidate_count": 8,
   "date": "2026-08-30",
   "degraded": false,
-  "generated_at": "2026-08-30T10:39:05.962261Z",
+  "generated_at": "2026-08-30T10:49:08.019423Z",
   "items": [
+    {
+      "canonical_url": "https://openai.com/index/loveholidays",
+      "category": "Coding Agent",
+      "editorial_lane": "产品与应用",
+      "id": "76c95cd852987031",
+      "importance": 7,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "How loveholidays is making everyone a builder with Codex",
+      "published_at": "2026-08-26T00:00:00Z",
+      "source": "OpenAI",
+      "summary": "loveholidays 使用 OpenAI Codex 让非技术团队也能参与软件开发，加速从想法到产品的转化。",
+      "tags": [
+        "Codex",
+        "企业采用",
+        "低代码开发"
+      ],
+      "title": "loveholidays 用 Codex 让全员成为开发者",
+      "tracking_signal": "关注 loveholidays 是否公布具体开发效率提升数据或可复用的 Codex 工作流。",
+      "why_it_matters": "展示 Coding Agent 在非技术业务团队中的生产部署案例，为其他企业评估 Codex 的落地价值提供参考。"
+    },
     {
       "canonical_url": "https://www.producthunt.com/products/omlx",
       "category": "AI 工具",
@@ -11,26 +32,110 @@
       "id": "4fde41f07a3a7fa0",
       "importance": 6,
       "is_official": false,
-      "marketing_risk": "medium",
+      "marketing_risk": "high",
       "original_title": "oMLX",
       "published_at": "2026-08-29T20:17:05Z",
       "source": "Product Hunt AI",
-      "summary": "oMLX 是一款 Mac LLM 服务器，宣称可将 Agent 等待时间从 90 秒缩短至 5 秒，直接改善本地推理响应速度。",
+      "summary": "oMLX 是一个 Mac LLM 服务器，声称可将 Agent 等待时间从 90 秒缩短到 5 秒。",
       "tags": [
-        "本地推理",
         "Mac",
-        "Agent"
+        "本地推理",
+        "性能优化"
       ],
-      "title": "oMLX Mac LLM 服务器将 Agent 等待时间从 90 秒降至 5 秒",
-      "tracking_signal": "关注其是否发布可复现的基准测试、支持模型范围及安装方式，并在实际 Mac 环境验证延迟改善。",
-      "why_it_matters": "对在 Mac 上运行本地大模型和 Agent 的开发者，等待时间大幅下降可提升交互效率与可用性，降低对云端推理的依赖。"
+      "title": "oMLX 将 Mac 上 Agent 等待时间从 90 秒降至 5 秒",
+      "tracking_signal": "在 Mac 设备上验证 oMLX 的实际延迟表现，并关注其模型兼容性和稳定性。",
+      "why_it_matters": "如果性能数据属实，Mac 用户运行本地 Agent 的响应速度将大幅提升，改善本地 AI 工作流的可用性。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/what-students-gain-from-chatgpt-critical-thinking-training",
+      "category": "大模型",
+      "editorial_lane": "产品与应用",
+      "id": "5c8d75ef9c12c059",
+      "importance": 6,
+      "is_official": true,
+      "marketing_risk": "medium",
+      "original_title": "Better answers, broader thinking: What students gain from ChatGPT and critical-thinking training",
+      "published_at": "2026-08-27T09:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 公布一项覆盖 1000 多名学生的随机对照研究，考察 ChatGPT 与批判性思维训练对原创性和真实大学作业表现的影响。",
+      "tags": [
+        "ChatGPT",
+        "教育研究",
+        "随机对照试验"
+      ],
+      "title": "OpenAI 发布千名学生 ChatGPT 与批判性思维随机对照研究",
+      "tracking_signal": "关注 OpenAI 是否公开完整研究数据及教育机构后续政策调整。",
+      "why_it_matters": "为教育机构和教师提供 ChatGPT 在真实课程任务中效果的可验证证据，可能影响学校对 AI 工具的使用政策。"
+    },
+    {
+      "canonical_url": "https://www.producthunt.com/products/superagent-a-home-for-your-ai-agents",
+      "category": "AI 工具",
+      "editorial_lane": "产品与应用",
+      "id": "140b4885676e7aa0",
+      "importance": 5,
+      "is_official": false,
+      "marketing_risk": "high",
+      "original_title": "Superagent",
+      "published_at": "2026-08-29T22:27:58Z",
+      "source": "Product Hunt AI",
+      "summary": "Superagent 定位为面向普通用户的 Claude Code 类工具，降低编码 Agent 的使用门槛。",
+      "tags": [
+        "Claude Code",
+        "编码工具",
+        "易用性"
+      ],
+      "title": "Superagent 面向普通用户的 Claude Code 替代方案",
+      "tracking_signal": "试用 Superagent 并对比其与 Claude Code 在功能覆盖和上手难度上的差异。",
+      "why_it_matters": "为不熟悉命令行的用户提供更易用的编码 Agent 入口，可能扩大 AI 编程工具的受众范围。"
+    },
+    {
+      "canonical_url": "https://openai.com/index/expanding-our-presence-in-brazil",
+      "category": "大模型",
+      "editorial_lane": "商业与市场",
+      "id": "fe23f369e01db08d",
+      "importance": 5,
+      "is_official": true,
+      "marketing_risk": "low",
+      "original_title": "Expanding OpenAI’s presence in Brazil",
+      "published_at": "2026-08-27T03:00:00Z",
+      "source": "OpenAI",
+      "summary": "OpenAI 宣布扩大在巴西的业务存在，深化与开发者、企业和社区的合作，以支持该国 AI 采用。",
+      "tags": [
+        "OpenAI",
+        "巴西",
+        "市场扩张"
+      ],
+      "title": "OpenAI 扩大巴西业务布局",
+      "tracking_signal": "观察 OpenAI 在巴西是否推出本地化定价、葡语支持或企业合作项目。",
+      "why_it_matters": "巴西企业和开发者可能获得更直接的 OpenAI 支持与本地化资源，影响拉美市场 AI 服务竞争格局。"
+    },
+    {
+      "canonical_url": "https://www.producthunt.com/products/staats-3",
+      "category": "AI 工具",
+      "editorial_lane": "产品与应用",
+      "id": "82302de7b81f008a",
+      "importance": 4,
+      "is_official": false,
+      "marketing_risk": "high",
+      "original_title": "Staats",
+      "published_at": "2026-08-28T07:12:12Z",
+      "source": "Product Hunt AI",
+      "summary": "Staats 允许用户向编码 Agent 询问网站运行状态，将站点监控与编码助手结合。",
+      "tags": [
+        "网站监控",
+        "编码 Agent",
+        "运维"
+      ],
+      "title": "Staats 让编码 Agent 回答网站运营状况",
+      "tracking_signal": "验证 Staats 对主流网站监控指标的支持范围及回答准确性。",
+      "why_it_matters": "为网站运营者提供一种通过编码 Agent 直接查询站点状态的新方式，可能简化日常运维流程。"
     }
   ],
   "model": "deepseek-v4-pro",
   "schema_version": "1.2",
   "source_runs": [
     {
-      "elapsed_ms": 600,
+      "elapsed_ms": 693,
       "error_type": null,
       "item_count": 1157,
       "source_id": "openai",
@@ -38,7 +143,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1094,
+      "elapsed_ms": 1088,
       "error_type": null,
       "item_count": 20,
       "source_id": "google-ai",
@@ -46,7 +151,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 1156,
+      "elapsed_ms": 968,
       "error_type": null,
       "item_count": 100,
       "source_id": "deepmind",
@@ -54,7 +159,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 844,
+      "elapsed_ms": 921,
       "error_type": null,
       "item_count": 852,
       "source_id": "hugging-face",
@@ -62,7 +167,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 624,
+      "elapsed_ms": 238,
       "error_type": null,
       "item_count": 82,
       "source_id": "mistral",
@@ -70,7 +175,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 111,
+      "elapsed_ms": 201,
       "error_type": null,
       "item_count": 44,
       "source_id": "qwen",
@@ -78,7 +183,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 928,
+      "elapsed_ms": 793,
       "error_type": null,
       "item_count": 1,
       "source_id": "anthropic",
@@ -86,7 +191,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 5138,
+      "elapsed_ms": 7798,
       "error_type": null,
       "item_count": 4,
       "source_id": "meta-ai",
@@ -94,7 +199,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 231,
+      "elapsed_ms": 380,
       "error_type": null,
       "item_count": 1,
       "source_id": "deepseek",
@@ -102,7 +207,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 961,
+      "elapsed_ms": 1527,
       "error_type": null,
       "item_count": 1,
       "source_id": "zhipu-glm",
@@ -110,7 +215,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 7987,
+      "elapsed_ms": 10080,
       "error_type": null,
       "item_count": 7,
       "source_id": "minimax",
@@ -118,7 +223,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 884,
+      "elapsed_ms": 829,
       "error_type": null,
       "item_count": 2,
       "source_id": "tencent-hunyuan",
@@ -126,7 +231,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 4105,
+      "elapsed_ms": 4081,
       "error_type": null,
       "item_count": 5,
       "source_id": "volcengine-doubao",
@@ -134,7 +239,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 2247,
+      "elapsed_ms": 2617,
       "error_type": null,
       "item_count": 2,
       "source_id": "baidu-ernie",
@@ -142,7 +247,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 63196,
+      "elapsed_ms": 62720,
       "error_type": null,
       "item_count": 0,
       "source_id": "reddit-ai",
@@ -150,7 +255,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 369,
+      "elapsed_ms": 262,
       "error_type": null,
       "item_count": 30,
       "source_id": "sourcegraph-blog",
@@ -158,7 +263,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 208,
+      "elapsed_ms": 160,
       "error_type": null,
       "item_count": 50,
       "source_id": "cursor-changelog",
@@ -166,7 +271,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 138,
+      "elapsed_ms": 75,
       "error_type": null,
       "item_count": 57,
       "source_id": "ollama-blog",
@@ -174,7 +279,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 290,
+      "elapsed_ms": 140,
       "error_type": null,
       "item_count": 50,
       "source_id": "producthunt-ai",
@@ -182,7 +287,7 @@
       "success": true
     },
     {
-      "elapsed_ms": 390,
+      "elapsed_ms": 101,
       "error_type": null,
       "item_count": 10,
       "source_id": "github-blog-ai",
