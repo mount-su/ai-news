@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
+from enum import StrEnum
 from urllib.parse import urlsplit
 
 import httpx
@@ -11,26 +14,15 @@ from ai_news.collectors.feed import parse_feed
 from ai_news.collectors.official_pages import collect_official_page
 from ai_news.collectors.reddit_rss import collect_reddit_rss
 from ai_news.http import get_bytes
-from ai_news.models import RawItem, SourceConfig, SourceSpec
+from ai_news.models import RawItem, SourceConfig, SourceRole, SourceSpec
 
-NEW_OFFICIAL_SOURCE_IDS = frozenset(
-    {
-        "anthropic",
-        "baidu-ernie",
-        "cursor-changelog",
-        "deepseek",
-        "github-blog-ai",
-        "meta-ai",
-        "minimax",
-        "mistral",
-        "ollama-blog",
-        "qwen",
-        "sourcegraph-blog",
-        "tencent-hunyuan",
-        "volcengine-doubao",
-        "zhipu-glm",
-    }
-)
+_FRESHNESS_DAYS = {
+    SourceRole.PRIMARY: 90,
+    SourceRole.TRUSTED_MEDIA: 7,
+    SourceRole.DISCOVERY: 7,
+}
+_SAFE_ERROR_TYPE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,127}$")
+_HEALTH_CONCURRENCY = 6
 
 HealthCollector = Callable[
     [httpx.AsyncClient, SourceSpec, frozenset[str]],
@@ -38,13 +30,26 @@ HealthCollector = Callable[
 ]
 
 
+class SourceHealthStatus(StrEnum):
+    FRESH = "fresh"
+    STALE = "stale"
+    EMPTY = "empty"
+    FAILED = "failed"
+
+
 @dataclass(frozen=True, slots=True)
 class SourceHealthResult:
     source_id: str
-    healthy: bool
+    source_name: str
+    source_role: SourceRole
+    status: SourceHealthStatus
     item_count: int
     latest_date: date | None
     error_type: str | None
+
+    @property
+    def healthy(self) -> bool:
+        return self.status in {SourceHealthStatus.FRESH, SourceHealthStatus.STALE}
 
 
 async def _collect_source(
@@ -72,17 +77,33 @@ def _official_domains(config: SourceConfig) -> frozenset[str]:
     return frozenset(
         hostname
         for source in config.sources
-        if source.enabled and source.official and source.url is not None
+        if source.enabled
+        and source.role in {SourceRole.PRIMARY, SourceRole.TRUSTED_MEDIA}
+        and source.url is not None
         if (hostname := urlsplit(str(source.url)).hostname) is not None
     )
 
 
-def _failed(source_id: str, error_type: str) -> SourceHealthResult:
+def _safe_error_name(error: BaseException) -> str:
+    error_name = type(error).__name__
+    return error_name if _SAFE_ERROR_TYPE.fullmatch(error_name) else "Error"
+
+
+def _result(
+    source: SourceSpec,
+    *,
+    status: SourceHealthStatus,
+    item_count: int,
+    latest_date: date | None,
+    error_type: str | None,
+) -> SourceHealthResult:
     return SourceHealthResult(
-        source_id=source_id,
-        healthy=False,
-        item_count=0,
-        latest_date=None,
+        source_id=source.id,
+        source_name=source.name,
+        source_role=source.role,
+        status=status,
+        item_count=item_count,
+        latest_date=latest_date,
         error_type=error_type,
     )
 
@@ -91,74 +112,78 @@ async def check_source_health(
     config: SourceConfig,
     *,
     collector: HealthCollector | None = None,
-    required_official_ids: frozenset[str] | None = None,
+    as_of_date: date | None = None,
 ) -> list[SourceHealthResult]:
     validated = SourceConfig.model_validate(config)
-    required_ids = required_official_ids or NEW_OFFICIAL_SOURCE_IDS
-    source_by_id = {source.id: source for source in validated.sources}
-    results = [
-        _failed(source_id, "MissingRequiredSource")
-        for source_id in sorted(required_ids - source_by_id.keys())
-    ]
-
-    targets: list[SourceSpec] = []
-    for source in validated.sources:
-        if source.id in required_ids:
-            if source.enabled:
-                targets.append(source)
-            else:
-                results.append(_failed(source.id, "DisabledRequiredSource"))
-        elif source.id == "reddit-ai" and source.enabled:
-            targets.append(source)
-
+    reference_date = as_of_date or datetime.now(UTC).date()
+    targets = [source for source in validated.sources if source.enabled]
     selected_collector = collector or _collect_source
     official_domains = _official_domains(validated)
+    semaphore = asyncio.Semaphore(_HEALTH_CONCURRENCY)
+
     async with httpx.AsyncClient(timeout=20) as client:
-        for source in targets:
-            try:
-                items = await selected_collector(client, source, official_domains)
-                if not isinstance(items, list):
-                    raise TypeError("collector result must be a list")
-                if not items:
-                    results.append(_failed(source.id, "EmptySourceResult"))
-                    continue
-                latest_date = max(item.published_at for item in items).date()
-                results.append(
-                    SourceHealthResult(
-                        source_id=source.id,
-                        healthy=True,
+
+        async def check_one(source: SourceSpec) -> SourceHealthResult:
+            async with semaphore:
+                try:
+                    items = await selected_collector(client, source, official_domains)
+                    if not isinstance(items, list):
+                        raise TypeError("collector result must be a list")
+                    if not items:
+                        return _result(
+                            source,
+                            status=SourceHealthStatus.EMPTY,
+                            item_count=0,
+                            latest_date=None,
+                            error_type="EmptySourceResult",
+                        )
+
+                    latest_date = max(item.published_at for item in items).date()
+                    threshold = reference_date - timedelta(days=_FRESHNESS_DAYS[source.role])
+                    status = (
+                        SourceHealthStatus.FRESH
+                        if latest_date >= threshold
+                        else SourceHealthStatus.STALE
+                    )
+                    return _result(
+                        source,
+                        status=status,
                         item_count=len(items),
                         latest_date=latest_date,
                         error_type=None,
                     )
-                )
-            except Exception as error:
-                results.append(_failed(source.id, type(error).__name__[:128]))
-    return results
+                except Exception as error:
+                    return _result(
+                        source,
+                        status=SourceHealthStatus.FAILED,
+                        item_count=0,
+                        latest_date=None,
+                        error_type=_safe_error_name(error),
+                    )
+
+        return list(await asyncio.gather(*(check_one(source) for source in targets)))
 
 
 def format_health_result(result: SourceHealthResult) -> str:
-    status = "ok" if result.healthy else "failed"
+    source_name = " ".join(result.source_name.split())
     latest_date = result.latest_date.isoformat() if result.latest_date is not None else "-"
     error_type = result.error_type or "-"
-    return f"{result.source_id} {status} {result.item_count} {latest_date} {error_type}"
-
-
-def source_health_succeeded(results: list[SourceHealthResult]) -> bool:
-    """Return whether health results should pass CI.
-
-    Reddit is an optional anonymous signal source; it remains visible in the
-    output but should not block verified official source checks.
-    """
-
-    return bool(results) and all(
-        result.healthy or result.source_id == "reddit-ai" for result in results
+    return (
+        f"{result.source_id} {source_name} {result.source_role.value} "
+        f"{result.status.value} {result.item_count} {latest_date} {error_type}"
     )
 
 
+def source_health_succeeded(results: list[SourceHealthResult]) -> bool:
+    """Require every enabled primary/media source to be reachable and non-empty."""
+
+    required = [result for result in results if result.source_role is not SourceRole.DISCOVERY]
+    return bool(required) and all(result.healthy for result in required)
+
+
 __all__ = [
-    "NEW_OFFICIAL_SOURCE_IDS",
     "SourceHealthResult",
+    "SourceHealthStatus",
     "check_source_health",
     "format_health_result",
     "source_health_succeeded",
