@@ -1,6 +1,11 @@
 {
   "reports": [
     {
+      "date": "2026-09-07",
+      "item_count": 6,
+      "path": "data/2026/09/2026-09-07.json"
+    },
+    {
       "date": "2026-09-06",
       "item_count": 7,
       "path": "data/2026/09/2026-09-06.json"
